@@ -3,6 +3,78 @@ import MetalKit
 import QuartzCore
 import SwiftUI
 
+// One TextKit layout supplies measurement, rasterization and logical character order.
+// A Character is an extended grapheme cluster, so emoji and combining marks stay together.
+final class ReaderLyricsHorizontalTextLayout {
+    @MainActor private static let measuredHeights: NSCache<NSString, NSNumber> = {
+        let cache = NSCache<NSString, NSNumber>()
+        cache.countLimit = 256
+        return cache
+    }()
+
+    @MainActor static func measuredHeight(text: String, fontSize: CGFloat, weight: NSFont.Weight, width: CGFloat) -> CGFloat {
+        let key = "\(fontSize)|\(weight.rawValue)|\(width)|\(text)" as NSString
+        if let cached = measuredHeights.object(forKey: key) { return CGFloat(cached.doubleValue) }
+        let height = ReaderLyricsHorizontalTextLayout(text: text, fontSize: fontSize, weight: weight, width: width).height
+        measuredHeights.setObject(NSNumber(value: Double(height)), forKey: key)
+        return height
+    }
+
+    let storage: NSTextStorage
+    let manager = NSLayoutManager()
+    let container: NSTextContainer
+    let height: CGFloat
+
+    init(text: String, fontSize: CGFloat, weight: NSFont.Weight, width: CGFloat, color: NSColor = .white) {
+        let paragraph = NSMutableParagraphStyle()
+        let rtl = ReaderLyricsTextDirection.isRightToLeft(text)
+        paragraph.alignment = rtl ? .right : .left
+        paragraph.baseWritingDirection = rtl ? .rightToLeft : .leftToRight
+        storage = NSTextStorage(string: text, attributes: [
+            .font: NSFont.systemFont(ofSize: min(max(fontSize, 12), 72), weight: weight),
+            .foregroundColor: color, .paragraphStyle: paragraph
+        ])
+        container = NSTextContainer(size: CGSize(width: max(width, 1), height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        storage.addLayoutManager(manager)
+        manager.addTextContainer(container)
+        manager.ensureLayout(for: container)
+        height = max(ceil(manager.usedRect(for: container).maxY), ceil(fontSize * 1.2))
+    }
+
+    func progressionValues(pixelWidth: Int, pixelHeight: Int, scale: CGFloat) -> [Float] {
+        let rects = characterRects
+        let count = Float(max(rects.count, 1))
+        var pixels = [Float](repeating: 2, count: pixelWidth * pixelHeight)
+        let rtl = ReaderLyricsTextDirection.isRightToLeft(storage.string)
+        for (index, rect) in rects.enumerated() where !rect.isEmpty {
+            let minX = max(0, Int(floor(rect.minX * scale)))
+            let maxX = min(pixelWidth, Int(ceil(rect.maxX * scale)))
+            let minY = max(0, Int(floor(rect.minY * scale)))
+            let maxY = min(pixelHeight, Int(ceil(rect.maxY * scale)))
+            guard minX < maxX, minY < maxY else { continue }
+            for y in minY..<maxY {
+                for x in minX..<maxX {
+                    let fraction = min(max((CGFloat(x) / scale - rect.minX) / rect.width, 0), 1)
+                    pixels[y * pixelWidth + x] = (Float(index) + Float(rtl ? 1 - fraction : fraction)) / count
+                }
+            }
+        }
+        return pixels
+    }
+
+    var characterRects: [CGRect] {
+        var offset = 0
+        return storage.string.map { character in
+            let length = String(character).utf16.count
+            defer { offset += length }
+            let range = manager.glyphRange(forCharacterRange: NSRange(location: offset, length: length),
+                                          actualCharacterRange: nil)
+            return manager.boundingRect(forGlyphRange: range, in: container)
+        }
+    }
+}
+
 private final class ReaderLyricsShiftHoverLookupResources: @unchecked Sendable {
     var workItem: DispatchWorkItem?
     var modifierFlagsMonitor: Any?
@@ -259,6 +331,7 @@ private struct ReaderLyricsHitTestLayoutSignature: Equatable {
 private struct ReaderLyricsMetalTexturePair {
     let selected: MTLTexture
     let upcoming: MTLTexture
+    let progression: MTLTexture
     let pixelSize: CGSize
     let isRightToLeft: Bool
 }
@@ -477,9 +550,12 @@ final class ReaderLyricsMetalRenderView: MTKView {
             isRightToLeft: isRightToLeft
         ) else { return false }
 
+        guard let progression = makeProgressionTexture(device: device, pixelWidth: pixelWidth,
+                                                        pixelHeight: pixelHeight, scale: scale) else { return false }
         texturePair = ReaderLyricsMetalTexturePair(
             selected: selected,
             upcoming: upcoming,
+            progression: progression,
             pixelSize: CGSize(width: pixelWidth, height: pixelHeight),
             isRightToLeft: isRightToLeft
         )
@@ -532,24 +608,12 @@ final class ReaderLyricsMetalRenderView: MTKView {
             context.translateBy(x: 0, y: CGFloat(pixelHeight))
             context.scaleBy(x: scale, y: -scale)
 
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.alignment = isRightToLeft ? .right : .left
-            paragraphStyle.baseWritingDirection = isRightToLeft ? .rightToLeft : .leftToRight
-            let attributed = NSAttributedString(
-                string: text,
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: min(max(fontSize, 12), 72), weight: weight),
-                    .foregroundColor: color,
-                    .paragraphStyle: paragraphStyle
-                ]
-            )
-
+            let layout = ReaderLyricsHorizontalTextLayout(text: text, fontSize: fontSize,
+                                                          weight: weight, width: size.width, color: color)
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
-            attributed.draw(
-                with: CGRect(origin: .zero, size: size),
-                options: [.usesLineFragmentOrigin, .usesFontLeading]
-            )
+            let range = layout.manager.glyphRange(for: layout.container)
+            layout.manager.drawGlyphs(forGlyphRange: range, at: .zero)
             NSGraphicsContext.restoreGraphicsState()
 
             texture.replace(
@@ -558,6 +622,24 @@ final class ReaderLyricsMetalRenderView: MTKView {
                 withBytes: baseAddress,
                 bytesPerRow: bytesPerRow
             )
+        }
+        return texture
+    }
+
+    private func makeProgressionTexture(
+        device: MTLDevice, pixelWidth: Int, pixelHeight: Int, scale: CGFloat
+    ) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .r32Float, width: pixelWidth, height: pixelHeight, mipmapped: false)
+        descriptor.storageMode = .managed
+        descriptor.usage = .shaderRead
+        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        let layout = ReaderLyricsHorizontalTextLayout(text: currentText, fontSize: currentFontSize,
+                                                      weight: currentWeight, width: bounds.width)
+        let pixels = layout.progressionValues(pixelWidth: pixelWidth, pixelHeight: pixelHeight, scale: scale)
+        pixels.withUnsafeBytes { bytes in
+            texture.replace(region: MTLRegionMake2D(0, 0, pixelWidth, pixelHeight), mipmapLevel: 0,
+                            withBytes: bytes.baseAddress!, bytesPerRow: pixelWidth * MemoryLayout<Float>.stride)
         }
         return texture
     }
@@ -575,6 +657,7 @@ final class ReaderLyricsMetalRenderView: MTKView {
             drawsSelectedTexture: drawsSelectedTexture ? 1 : 0
         )
         encoder.setFragmentTexture(texture, index: 0)
+        encoder.setFragmentTexture(texturePair.progression, index: 1)
         encoder.setFragmentBytes(
             &uniforms,
             length: MemoryLayout<ReaderLyricsMetalUniforms>.stride,
@@ -584,10 +667,9 @@ final class ReaderLyricsMetalRenderView: MTKView {
     }
 
     private func normalizedFeatherFraction(for texturePair: ReaderLyricsMetalTexturePair) -> Float {
-        let width = max(texturePair.pixelSize.width, 1)
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        let featherPixels = ReaderLyricsVisualSpec.lineProgressionGradientFeather * scale
-        return Float(min(max(featherPixels / width, 0), 0.25))
+        // Feather within one character rather than across every wrapped line.
+        let feather = min(ReaderLyricsVisualSpec.lineProgressionGradientFeather / 100, 0.25)
+        return Float(feather / CGFloat(max(currentText.count, 1)))
     }
 
     private var isProgressAnimationActive: Bool {
@@ -754,6 +836,7 @@ final class ReaderLyricsMetalRenderView: MTKView {
     fragment float4 readerLyricsFragment(
         ReaderLyricsVertexOut in [[stage_in]],
         texture2d<float> textTexture [[texture(0)]],
+        texture2d<float> progressionTexture [[texture(1)]],
         constant ReaderLyricsMetalUniforms &uniforms [[buffer(0)]]
     ) {
         constexpr sampler textSampler(coord::normalized, address::clamp_to_edge, filter::linear);
@@ -766,13 +849,9 @@ final class ReaderLyricsMetalRenderView: MTKView {
             }
             if (progress < 1.0) {
                 const float feather = max(uniforms.featherFraction, 0.0001);
-                const float edge = uniforms.isRightToLeft > 0.5 ? 1.0 - progress : progress;
-                float mask;
-                if (uniforms.isRightToLeft > 0.5) {
-                    mask = smoothstep(edge - feather, edge + feather, in.texCoord.x);
-                } else {
-                    mask = 1.0 - smoothstep(edge - feather, edge + feather, in.texCoord.x);
-                }
+                constexpr sampler progressSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+                const float characterProgress = progressionTexture.sample(progressSampler, in.texCoord).r;
+                const float mask = 1.0 - smoothstep(progress - feather, progress + feather, characterProgress);
                 color.rgb *= mask;
                 color.a *= mask;
             }
@@ -799,6 +878,10 @@ final class ReaderLyricsScrollView: NSScrollView {
             return nil
         }
         return super.hitTest(point)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        nextResponder?.scrollWheel(with: event)
     }
 
     override func layout() {

@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct SasayakiCue: Hashable, Sendable {
+struct SasayakiCue: Codable, Hashable, Sendable {
     let id: String
     let startTime: Double
     let endTime: Double
@@ -38,6 +38,8 @@ struct SasayakiMatch: Codable, Identifiable, Hashable, Sendable {
     let chapterIndex: Int
     let start: Int
     let length: Int
+    /// Present only when text-free interpolation between nearby narration anchors was used.
+    var contextInferred: Bool? = nil
 }
 
 extension SasayakiMatch {

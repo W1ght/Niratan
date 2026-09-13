@@ -1,6 +1,374 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Includes %lld subtitles located from surrounding narration. Their highlights may be approximate.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Includes %lld subtitles located from surrounding narration. Their highlights may be approximate."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "其中 %lld 条字幕依据前后文定位，高亮范围可能有偏差。"
+        }
+      }
+    }
+  },
+  "Generated Subtitles": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Generated Subtitles"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已生成的字幕"
+        }
+      }
+    }
+  },
+  "No subtitles matched the book. Existing matches were kept.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No subtitles matched the book. Existing matches were kept."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未匹配到书籍正文，已保留原有匹配结果。"
+        }
+      }
+    }
+  },
+  "Transcription Paused": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Transcription Paused"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "转录已暂停"
+        }
+      }
+    }
+  },
+  "Could not read audiobook audio.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Could not read audiobook audio."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法读取有声书音频。"
+        }
+      }
+    }
+  },
+  "Completed segments: %lld / %lld": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Completed segments: %lld / %lld"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已完成分段：%lld / %lld"
+        }
+      }
+    }
+  },
+  "The current audio chapter is processed first. Completed segments are saved automatically and can be exported or matched immediately.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The current audio chapter is processed first. Completed segments are saved automatically and can be exported or matched immediately."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "优先生成当前音频章节。已完成的分段会自动保存，可立即导出或用于匹配。"
+        }
+      }
+    }
+  },
+  "Generate Again": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Generate Again"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "重新生成"
+        }
+      }
+    }
+  },
+  "Resume Subtitle Generation": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Resume Subtitle Generation"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "继续生成字幕"
+        }
+      }
+    }
+  },
+  "Ready to Transcribe": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Ready to Transcribe"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "准备转录"
+        }
+      }
+    }
+  },
+  "Preparing Speech Model…": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Preparing Speech Model…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在准备语音模型…"
+        }
+      }
+    }
+  },
+  "Generating Subtitles…": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Generating Subtitles…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在生成字幕…"
+        }
+      }
+    }
+  },
+  "Subtitles Generated": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Subtitles Generated"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕已生成"
+        }
+      }
+    }
+  },
+  "Transcription Stopped": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Transcription Stopped"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "转录已停止"
+        }
+      }
+    }
+  },
+  "SpeechAnalyzer is unavailable for this language or Mac.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "SpeechAnalyzer is unavailable for this language or Mac."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此 Mac 或所选语言不支持 SpeechAnalyzer。"
+        }
+      }
+    }
+  },
+  "No speech was recognized. Check the audio and selected language.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No speech was recognized. Check the audio and selected language."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未识别到语音，请检查音频和所选语言。"
+        }
+      }
+    }
+  },
+  "Generate Subtitles": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Generate Subtitles"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "生成字幕"
+        }
+      }
+    }
+  },
+  "SpeechAnalyzer transcribes audio on this Mac. The first use may download a language model.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "SpeechAnalyzer transcribes audio on this Mac. The first use may download a language model."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "SpeechAnalyzer 在此 Mac 上本地转录音频。首次使用可能需要下载语言模型。"
+        }
+      }
+    }
+  },
+  "Audio Language": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Audio Language"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "音频语言"
+        }
+      }
+    }
+  },
+  "Elapsed: %@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Elapsed: %@"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已耗时：%@"
+        }
+      }
+    }
+  },
+  "Recognized through: %@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Recognized through: %@"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已识别至：%@"
+        }
+      }
+    }
+  },
+  "Export SRT…": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Export SRT…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "导出 SRT…"
+        }
+      }
+    }
+  },
+  "Use for Subtitle Match": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Use for Subtitle Match"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "用于字幕匹配"
+        }
+      }
+    }
+  },
     "Respect ASS subtitle styles": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Respect ASS subtitle styles" } },

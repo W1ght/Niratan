@@ -11,11 +11,14 @@ import SwiftUI
 struct SasayakiSubtitleMatchSection: View {
     let rootURL: URL
     @Binding var fileURL: URL?
+    var displayName: String? = nil
     let onImportRequested: () -> Void
     let onMatchUpdated: (SasayakiMatchData) -> Void
 
     @State private var searchWindow: Double = 200
     @State private var isMatching = false
+    @State private var matchTask: Task<Void, Never>?
+    @State private var matchGeneration = UUID()
     @State private var match: SasayakiMatchData?
     @State private var errorMessage: String?
 
@@ -37,7 +40,9 @@ struct SasayakiSubtitleMatchSection: View {
         .onAppear {
             match = BookStorage.loadSasayakiMatch(root: rootURL)
         }
+        .onDisappear(perform: cancelMatch)
         .onChange(of: fileURL) { _, newURL in
+            cancelMatch()
             if newURL != nil {
                 errorMessage = nil
             }
@@ -92,6 +97,14 @@ struct SasayakiSubtitleMatchSection: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
             }
+            let inferred = match.matches.filter { $0.contextInferred == true }.count
+            if inferred > 0 {
+                Text("Includes \(inferred) subtitles located from surrounding narration. Their highlights may be approximate.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
         }
     }
 
@@ -120,8 +133,10 @@ struct SasayakiSubtitleMatchSection: View {
 
         isMatching = true
         errorMessage = nil
-        Task { @MainActor in
-            defer { isMatching = false }
+        let generation = UUID()
+        matchGeneration = generation
+        matchTask = Task { @MainActor in
+            defer { if matchGeneration == generation { isMatching = false; matchTask = nil } }
             let accessing = fileURL.startAccessingSecurityScopedResource()
             defer {
                 if accessing {
@@ -132,23 +147,41 @@ struct SasayakiSubtitleMatchSection: View {
             do {
                 let srtData = try Data(contentsOf: fileURL)
                 let cues = SasayakiParser.parseCues(from: srtData)
-                let result = try SasayakiMatcher.match(
+                guard !cues.isEmpty else {
+                    errorMessage = String(localized: "Could not match subtitles.")
+                    return
+                }
+                let result = try await SasayakiMatcher.match(
                     rootURL: rootURL,
                     cues: cues,
                     searchWindow: Int(searchWindow)
                 )
+                guard !Task.isCancelled, matchGeneration == generation, self.fileURL == fileURL else { return }
+                // An empty result must not erase a previously usable alignment.
+                guard !result.matches.isEmpty else {
+                    errorMessage = String(localized: "No subtitles matched the book. Existing matches were kept.")
+                    return
+                }
                 try BookStorage.save(result, inside: rootURL, as: FileNames.sasayakiMatch)
                 match = result
                 onMatchUpdated(result)
             } catch {
+                guard matchGeneration == generation, !Task.isCancelled else { return }
                 errorMessage = String(localized: "Could not match subtitles.")
             }
         }
     }
 
+    private func cancelMatch() {
+        matchGeneration = UUID()
+        matchTask?.cancel()
+        matchTask = nil
+        isMatching = false
+    }
+
     @ViewBuilder
     private var fileNameView: some View {
-        if let fileName = fileURL?.lastPathComponent {
+        if let fileName = displayName ?? fileURL?.lastPathComponent {
             Text(fileName)
                 .lineLimit(1)
         } else {

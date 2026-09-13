@@ -124,6 +124,7 @@ class SasayakiPlayer {
     var endObserver: NSObjectProtocol?
     var audiobookChapterLoadTask: Task<Void, Never>?
     var audiobookChapterLoadGeneration = 0
+    let transcription = SasayakiTranscription()
     var audioURL: URL?
     private var miningAudioCache: [String: Data] = [:]
     var playbackActivity: NSObjectProtocol?
@@ -154,15 +155,11 @@ class SasayakiPlayer {
         self.getCurrentIndex = getCurrentIndex
         self.onPlayback = onPlayback
         matchData = BookStorage.loadSasayakiMatch(root: rootURL)
-        if !hasMatch {
-            return
-        }
         timeline = CueTimeline(match: matchData)
         reloadPlayback()
     }
     
     func reloadPlayback() {
-        guard hasMatch else { return }
         isRestoring = true
         playback = BookStorage.loadSasayakiPlayback(root: rootURL) ?? SasayakiPlaybackData(lastPosition: 0)
         currentTime = playback.lastPosition
@@ -403,6 +400,7 @@ class SasayakiPlayer {
         if let observer = endObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        transcription.reset()
         audiobookChapterLoadTask?.cancel()
         audiobookChapterLoadTask = nil
         audiobookChapterLoadGeneration += 1

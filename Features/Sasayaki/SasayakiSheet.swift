@@ -103,6 +103,9 @@ struct SasayakiSheet: View {
                 break
             }
         }
+        .onChange(of: player.transcription.subtitleURL) { oldURL, newURL in
+            if let oldURL, subtitleURL == oldURL { subtitleURL = newURL }
+        }
         .onAppear(perform: selectDefaultTabIfNeeded)
         .onChange(of: player.hasAudio) { _, _ in
             selectDefaultTabIfNeeded()
@@ -205,9 +208,20 @@ struct SasayakiSheet: View {
                 }
             }
 
+            SasayakiTranscriptionSection(
+                transcription: player.transcription,
+                audioURL: player.audioURL,
+                bookRootURL: player.rootURL,
+                chapters: player.audiobookChapters,
+                preferredTime: player.currentTime
+            ) { url in
+                subtitleURL = url
+            }
+
             SasayakiSubtitleMatchSection(
                 rootURL: player.rootURL,
                 fileURL: $subtitleURL,
+                displayName: subtitleURL != nil && subtitleURL == player.transcription.subtitleURL ? String(localized: "Generated Subtitles") : nil,
                 onImportRequested: {
                     pendingFileImportKind = .subtitle
                     isFileImporterPresented = true

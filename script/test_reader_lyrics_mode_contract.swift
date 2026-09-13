@@ -482,7 +482,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "horizontalLyricsContextRadius(metrics: metrics, availableHeight: availableHeight)",
+            "horizontalLyricsContextRadius(metrics: metrics, availableWidth: availableWidth, availableHeight: availableHeight)",
             "horizontal lyrics mode should expand the cue window to the measured lyric stack height"
         )
         assertContains(
@@ -497,12 +497,12 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            ".scrollPosition(id: .constant(activeLyricsCue?.id)",
+            "proxy.scrollTo(activeLyricsCue?.id, anchor: .center)",
             "lyrics mode should keep scroll anchoring on the held highlighted cue during silent gaps"
         )
         assertContains(
             nativeReader,
-            "if isVerticalLyricsMode {\n            verticalLyricsStack(\n                metrics: metrics,\n                availableWidth: availableWidth,\n                availableHeight: availableHeight\n            )\n        } else {\n            horizontalLyricsStack(metrics: metrics, availableHeight: availableHeight)\n        }",
+            "if isVerticalLyricsMode {\n            verticalLyricsStack(\n                metrics: metrics,\n                availableWidth: availableWidth,\n                availableHeight: availableHeight\n            )\n        } else {\n            horizontalLyricsStack(metrics: metrics, availableWidth: availableWidth, availableHeight: availableHeight)\n        }",
             "lyrics stack should switch between horizontal and vertical rendering without changing Reader settings"
         )
         assertContains(
@@ -513,7 +513,7 @@ enum ReaderLyricsModeContractTest {
         let horizontalLyricsLine = sourceSection(
             nativeReader,
             from: "private func lyricsLine(",
-            to: "private func fittedLyricsFontSize(",
+            to: "private func horizontalLyricsRowHeight(",
             "lyrics mode should define horizontal line rendering separately from vertical line rendering"
         )
         assertContains(
@@ -710,8 +710,8 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "let fittedFontSize = fittedLyricsFontSize(",
-            "lyrics rows should fit long cue text before passing font size into the Metal render boundary"
+            "let fontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize",
+            "lyrics rows should preserve readable focused/context font sizes while wrapping"
         )
         assertContains(
             nativeReader,
@@ -720,13 +720,13 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "fontSize: fittedFontSize",
-            "lyrics selectable text should receive the fitted font size so long focused lines are not clipped"
+            "fontSize: fontSize",
+            "lyrics selectable text should use the same font size as wrapped height measurement"
         )
         assertContains(
             nativeReader,
-            "singleLineLyricsWidth(",
-            "lyrics fitting should measure the actual one-line AppKit text width"
+            "ReaderLyricsHorizontalTextLayout.measuredHeight(text: cue.text",
+            "wrapped lyrics height should come from the same TextKit layout as rendering"
         )
         assertContains(
             nativeReader,

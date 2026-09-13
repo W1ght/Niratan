@@ -2,6 +2,20 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.6.7
+
+### 中文
+
+- 歌词模式横排长句按内容自动换行并增长高度，超高句子可滚动查看；已读高亮按字符顺序跨行推进，进度由句级字幕时间估算。
+- 阅读器 Sasayaki 的“资源”页新增日语、英语本地字幕生成，使用 Apple SpeechAnalyzer，支持两路分段并行、优先当前音频章节、自动保存进度、暂停续做、累计耗时和部分 SRT 导出。首次使用可能需要下载系统语言模型。
+- 字幕匹配现在可以容忍一定的转录差异，并在开场说明或省略段落之后重新定位原文；利用前后已定位的句子恢复日语假名／汉字及同音转录差异，并标明按上下文推断的字幕数量。修复多行字幕读取，空匹配不再覆盖已有结果。
+
+### English
+
+- Horizontal lyrics now wrap to their full height, with scrolling for sentences taller than the window. Read highlighting follows character order across lines, estimated from cue-level subtitle timing.
+- Sasayaki Resources now generates Japanese and English subtitles locally with Apple SpeechAnalyzer, with two parallel workers, current-audio-chapter priority, saved progress, pause/resume, cumulative elapsed time, and partial SRT export. First use may download a system language model.
+- Subtitle matching now tolerates bounded transcription differences and recovers its position after introductions or omitted passages. Nearby matched sentences recover gaps caused by Japanese kana/kanji and homophone differences, with context-inferred subtitles counted separately. Multiline SRT is read correctly, and empty matches preserve previous results.
+
 ## 1.6.6
 
 ### 中文
