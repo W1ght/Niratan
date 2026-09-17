@@ -601,7 +601,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.6.7;
+				MARKETING_VERSION = 1.6.8;
 				OTHER_LDFLAGS = "-lmpv";
 				PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -643,7 +643,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.6.7;
+				MARKETING_VERSION = 1.6.8;
 				OTHER_LDFLAGS = "-lmpv";
 				PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
