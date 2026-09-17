@@ -1,6 +1,550 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "All": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "All"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全部"
+        }
+      }
+    }
+  },
+  "Subtitle Settings": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Subtitle Settings"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕设置"
+        }
+      }
+    }
+  },
+  "Matching Title": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Matching Title"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "匹配作品"
+        }
+      }
+    }
+  },
+  "Filter results (e.g. WEBRip, BD)": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Filter results (e.g. WEBRip, BD)"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "筛选结果（如 WEBRip、BD）"
+        }
+      }
+    }
+  },
+  "Some subtitles could not be retrieved. Try again later.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Some subtitles could not be retrieved. Try again later."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "部分字幕暂时无法获取，请稍后重试。"
+        }
+      }
+    }
+  },
+  "Finding subtitles…": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Finding subtitles…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在查找字幕…"
+        }
+      }
+    }
+  },
+  "No Matching Subtitles": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No Matching Subtitles"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "没有匹配的字幕"
+        }
+      }
+    }
+  },
+  "Try another title, episode or filter.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Try another title, episode or filter."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "试试其他作品名、集数或筛选条件。"
+        }
+      }
+    }
+  },
+  "%lld subtitle files": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld subtitle files"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 个字幕文件"
+        }
+      }
+    }
+  },
+  "Use Subtitle": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Use Subtitle"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "使用字幕"
+        }
+      }
+    }
+  },
+  "Show Subtitle Files": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Show Subtitle Files"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "查看字幕文件"
+        }
+      }
+    }
+  },
+  "Title matching is temporarily unavailable. Searching with the entered title.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Title matching is temporarily unavailable. Searching with the entered title."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "作品匹配暂不可用，正在按输入的标题搜索。"
+        }
+      }
+    }
+  },
+  "The subtitle service returned an invalid response.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The subtitle service returned an invalid response."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕服务返回的数据无效。"
+        }
+      }
+    }
+  },
+  "Configure an API key for this subtitle source.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Configure an API key for this subtitle source."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请为此字幕来源配置 API 密钥。"
+        }
+      }
+    }
+  },
+  "The subtitle service rejected the credentials.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The subtitle service rejected the credentials."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕服务拒绝了凭据。"
+        }
+      }
+    }
+  },
+  "The subtitle download quota is exhausted.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The subtitle download quota is exhausted."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕下载配额已用完。"
+        }
+      }
+    }
+  },
+  "The subtitle service is rate limiting requests. Try again later.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The subtitle service is rate limiting requests. Try again later."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕服务正在限制请求频率，请稍后重试。"
+        }
+      }
+    }
+  },
+  "The subtitle service returned HTTP %lld.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The subtitle service returned HTTP %lld."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕服务返回 HTTP %lld。"
+        }
+      }
+    }
+  },
+  "Enter a title to search subtitles.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enter a title to search subtitles."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请输入作品名以搜索字幕。"
+        }
+      }
+    }
+  },
+  "Enter a season and episode number from 0 to 9999, or leave them empty.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enter a season and episode number from 0 to 9999, or leave them empty."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "季数和集数请输入 0 到 9999 之间的数字，或留空。"
+        }
+      }
+    }
+  },
+  "Find Subtitles": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Find Subtitles"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "查找字幕"
+        }
+      }
+    }
+  },
+  "AJATT": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "AJATT"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "AJATT"
+        }
+      }
+    }
+  },
+  "OpenSubtitles": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "OpenSubtitles"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "OpenSubtitles"
+        }
+      }
+    }
+  },
+  "Anime searches use AniList to match original, English and romaji titles. Search titles are sent to AniList and enabled API sources. AJATT matches its catalog locally.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Anime searches use AniList to match original, English and romaji titles. Search titles are sent to AniList and enabled API sources. AJATT matches its catalog locally."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "动画搜索通过 AniList 匹配原名、英文名和罗马音标题。搜索词会发送至 AniList 和已启用的 API 来源；AJATT 在本机匹配目录。"
+        }
+      }
+    }
+  },
+  "Load More": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Load More"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "加载更多"
+        }
+      }
+    }
+  },
+  "Back": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Back"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "返回"
+        }
+      }
+    }
+  },
+  "Downloading Subtitle…": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Downloading Subtitle…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在下载字幕…"
+        }
+      }
+    }
+  },
+  "Get API Key": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Get API Key"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "获取 API 密钥"
+        }
+      }
+    }
+  },
+  "Use your own OpenSubtitles API key. It is stored in macOS Keychain and sent only to the official API. Downloads are subject to the service quota.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Use your own OpenSubtitles API key. It is stored in macOS Keychain and sent only to the official API. Downloads are subject to the service quota."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请使用你自己的 OpenSubtitles API 密钥。密钥保存在 macOS 钥匙串中，仅发送至官方 API。下载受服务配额限制。"
+        }
+      }
+    }
+  },
+  "Unable to read subtitle credentials from Keychain.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to read subtitle credentials from Keychain."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法从钥匙串读取字幕服务凭据。"
+        }
+      }
+    }
+  },
+  "Remove Subtitle API Key?": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Remove Subtitle API Key?"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "移除字幕服务 API 密钥？"
+        }
+      }
+    }
+  },
+  "Unable to save subtitle credentials to Keychain.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to save subtitle credentials to Keychain."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法将字幕服务凭据保存到钥匙串。"
+        }
+      }
+    }
+  },
+  "Unable to remove subtitle credentials from Keychain.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to remove subtitle credentials from Keychain."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法从钥匙串移除字幕服务凭据。"
+        }
+      }
+    }
+  },
+  "Unable to load the OpenSubtitles subtitle.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to load the OpenSubtitles subtitle."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法加载 OpenSubtitles 字幕。"
+        }
+      }
+    }
+  },
   "Includes %lld subtitles located from surrounding narration. Their highlights may be approximate.": {
     "localizations": {
       "en": {

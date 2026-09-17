@@ -46,8 +46,7 @@ struct VideoInspectorView: View {
     @Binding var selectedTab: VideoInspectorTab
     @State private var speedInputText = ""
     @State private var subtitleTimingInputText = ""
-    @State private var isShowingJimakuBrowser = false
-    @State private var isShowingAJATTBrowser = false
+    @State private var isShowingSubtitleBrowser = false
 
     let state: VideoInspectorState
     let playlist: VideoPlaylist
@@ -79,6 +78,7 @@ struct VideoInspectorView: View {
     var onSelectRemoteSubtitle: (RemoteVideoSubtitleOption) -> Void
     var onSelectJimakuSubtitle: (JimakuSubtitleFile) -> Void
     var onSelectAJATTSubtitle: (AJATTSubtitleFile) -> Void
+    var onSelectOpenSubtitles: (RemoteVideoSubtitleOption) -> Void
     var onSelectExternalSubtitle: () -> Void
     var onSelectRemoteQuality: (RemoteVideoQualityOption) -> Void
     var onOpenSubtitle: () -> Void
@@ -120,18 +120,12 @@ struct VideoInspectorView: View {
         .onChange(of: state.subtitleDelay) { _, _ in
             synchronizeSubtitleTimingInput()
         }
-        .sheet(isPresented: $isShowingJimakuBrowser) {
-            JimakuSubtitleBrowserView(
+        .sheet(isPresented: $isShowingSubtitleBrowser) {
+            OnlineSubtitleBrowserView(
                 suggestion: subtitleCatalogSuggestion,
-                selectedFileID: selectedJimakuSubtitleID,
-                onSelectFile: onSelectJimakuSubtitle
-            )
-        }
-        .sheet(isPresented: $isShowingAJATTBrowser) {
-            AJATTSubtitleBrowserView(
-                suggestion: subtitleCatalogSuggestion,
-                selectedFileID: selectedAJATTSubtitleID,
-                onSelectFile: onSelectAJATTSubtitle
+                onSelectJimaku: onSelectJimakuSubtitle,
+                onSelectAJATT: onSelectAJATTSubtitle,
+                onSelectOpenSubtitles: onSelectOpenSubtitles
             )
         }
     }
@@ -391,17 +385,9 @@ struct VideoInspectorView: View {
 
             inspectorSection("External Subtitles", systemName: "captions.bubble") {
                 Button {
-                    isShowingJimakuBrowser = true
+                    isShowingSubtitleBrowser = true
                 } label: {
-                    Label("Get Subtitles (Jimaku)", systemImage: "icloud.and.arrow.down")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glass)
-
-                Button {
-                    isShowingAJATTBrowser = true
-                } label: {
-                    Label("Get Subtitles (AJATT)", systemImage: "icloud.and.arrow.down")
+                    Label("Find Subtitles", systemImage: "icloud.and.arrow.down")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)

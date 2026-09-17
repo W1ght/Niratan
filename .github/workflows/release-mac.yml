@@ -167,6 +167,7 @@ jobs:
           export CLANG_MODULE_CACHE_PATH="$RUNNER_TEMP/hoshi-clang-module-cache"
           export SWIFT_MODULECACHE_PATH="$RUNNER_TEMP/hoshi-swift-module-cache"
 
+          ./script/test_video_online_subtitles.sh
           swift script/test_video_ajatt_contract.swift
           xcrun swiftc -parse-as-library \
             Models/Subtitle.swift \

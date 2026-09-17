@@ -151,7 +151,7 @@ private final class ReaderLyricsHitTestTextView: NSTextView {
         let isRightToLeft = ReaderLyricsTextDirection.isRightToLeft(text)
         let signature = ReaderLyricsHitTestLayoutSignature(
             text: text,
-            fontSize: fontSize.rounded(.toNearestOrAwayFromZero),
+            fontSize: fontSize,
             fontWeight: weight.rawValue,
             isRightToLeft: isRightToLeft
         )
@@ -340,6 +340,7 @@ private struct ReaderLyricsRenderSignature: Equatable {
     let text: String
     let fontSize: CGFloat
     let fontWeight: CGFloat
+    let layoutWidth: CGFloat
     let selectedColor: String
     let upcomingColor: String
     let pixelWidth: Int
@@ -367,6 +368,7 @@ final class ReaderLyricsMetalRenderView: MTKView {
     private var progressDisplayLink: CADisplayLink?
     private var currentText = ""
     private var currentFontSize: CGFloat = 34
+    private var currentLayoutWidth: CGFloat = 1
     private var currentWeight: NSFont.Weight = .bold
     private var currentSelectedColor = NSColor.white
     private var currentUpcomingColor = NSColor.white.withAlphaComponent(0.6)
@@ -428,6 +430,7 @@ final class ReaderLyricsMetalRenderView: MTKView {
     func updateLyrics(
         text: String,
         fontSize: CGFloat,
+        layoutWidth: CGFloat,
         weight: NSFont.Weight,
         selectedColor: NSColor,
         upcomingColor: NSColor,
@@ -438,7 +441,8 @@ final class ReaderLyricsMetalRenderView: MTKView {
         let clampedProgress = min(max(progressFraction, 0), 1)
         let clampedProgressRate = max(progressRatePerSecond, 0)
         let contentChanged = text != currentText
-            || currentFontSize.rounded(.toNearestOrAwayFromZero) != fontSize.rounded(.toNearestOrAwayFromZero)
+            || currentFontSize != fontSize
+            || currentLayoutWidth != layoutWidth
             || currentWeight.rawValue != weight.rawValue
             || Self.colorSignature(currentSelectedColor) != Self.colorSignature(selectedColor)
             || Self.colorSignature(currentUpcomingColor) != Self.colorSignature(upcomingColor)
@@ -449,6 +453,7 @@ final class ReaderLyricsMetalRenderView: MTKView {
 
         currentText = text
         currentFontSize = fontSize
+        currentLayoutWidth = layoutWidth
         currentWeight = weight
         currentSelectedColor = selectedColor
         currentUpcomingColor = upcomingColor
@@ -512,8 +517,9 @@ final class ReaderLyricsMetalRenderView: MTKView {
         let isRightToLeft = ReaderLyricsTextDirection.isRightToLeft(currentText)
         let signature = ReaderLyricsRenderSignature(
             text: currentText,
-            fontSize: currentFontSize.rounded(.toNearestOrAwayFromZero),
+            fontSize: currentFontSize,
             fontWeight: currentWeight.rawValue,
+            layoutWidth: currentLayoutWidth,
             selectedColor: Self.colorSignature(currentSelectedColor),
             upcomingColor: Self.colorSignature(currentUpcomingColor),
             pixelWidth: pixelWidth,
@@ -609,7 +615,7 @@ final class ReaderLyricsMetalRenderView: MTKView {
             context.scaleBy(x: scale, y: -scale)
 
             let layout = ReaderLyricsHorizontalTextLayout(text: text, fontSize: fontSize,
-                                                          weight: weight, width: size.width, color: color)
+                                                          weight: weight, width: currentLayoutWidth, color: color)
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
             let range = layout.manager.glyphRange(for: layout.container)
@@ -635,7 +641,7 @@ final class ReaderLyricsMetalRenderView: MTKView {
         descriptor.usage = .shaderRead
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
         let layout = ReaderLyricsHorizontalTextLayout(text: currentText, fontSize: currentFontSize,
-                                                      weight: currentWeight, width: bounds.width)
+                                                      weight: currentWeight, width: currentLayoutWidth)
         let pixels = layout.progressionValues(pixelWidth: pixelWidth, pixelHeight: pixelHeight, scale: scale)
         pixels.withUnsafeBytes { bytes in
             texture.replace(region: MTLRegionMake2D(0, 0, pixelWidth, pixelHeight), mipmapLevel: 0,
@@ -863,6 +869,11 @@ final class ReaderLyricsMetalRenderView: MTKView {
 }
 
 final class ReaderLyricsScrollView: NSScrollView {
+    var layoutWidth: CGFloat = 1 {
+        didSet {
+            if layoutWidth != oldValue { markNeedsDocumentFrameSync() }
+        }
+    }
     private var lastSyncedDocumentBounds: NSRect?
     private var needsDocumentFrameSync = true
 
@@ -897,14 +908,21 @@ final class ReaderLyricsScrollView: NSScrollView {
         guard let textView = documentView as? ReaderLyricsHitTestTextView else { return }
         let bounds = contentView.bounds
         guard needsDocumentFrameSync || lastSyncedDocumentBounds != bounds else { return }
-        textView.frame = contentView.bounds
+        // Use the same proposed width as row measurement and Metal rasterization.
+        // NSClipView can round its bounds to backing pixels, changing a line break.
+        // The text container must lay out all glyphs even while the row animates.
         textView.textContainer?.containerSize = NSSize(
-            width: max(contentView.bounds.width, 1),
-            height: max(contentView.bounds.height, 1)
+            width: max(layoutWidth, 1),
+            height: .greatestFiniteMagnitude
         )
         if let textContainer = textView.textContainer {
             textView.layoutManager?.ensureLayout(for: textContainer)
         }
+        let textHeight = textView.layoutManager.flatMap { manager in
+            textView.textContainer.map { manager.usedRect(for: $0).maxY }
+        } ?? 0
+        textView.frame = NSRect(x: 0, y: 0, width: bounds.width,
+                                height: max(bounds.height, ceil(textHeight)))
         contentView.scroll(to: .zero)
         reflectScrolledClipView(contentView)
         lastSyncedDocumentBounds = bounds
@@ -936,8 +954,8 @@ final class ReaderLyricsMetalTextContainerView: NSView {
         hitTestTextView.drawsBackground = false
         hitTestTextView.textContainerInset = .zero
         hitTestTextView.textContainer?.lineFragmentPadding = 0
-        hitTestTextView.textContainer?.widthTracksTextView = true
-        hitTestTextView.textContainer?.heightTracksTextView = true
+        hitTestTextView.textContainer?.widthTracksTextView = false
+        hitTestTextView.textContainer?.heightTracksTextView = false
         hitTestTextView.isHorizontallyResizable = false
         hitTestTextView.isVerticallyResizable = false
         hitTestTextView.autoresizingMask = [.width, .height]
@@ -968,6 +986,7 @@ final class ReaderLyricsMetalTextContainerView: NSView {
         text: String,
         scanLength: Int,
         fontSize: CGFloat,
+        layoutWidth: CGFloat,
         weight: NSFont.Weight,
         textColor: NSColor,
         upcomingTextColor: NSColor,
@@ -983,6 +1002,7 @@ final class ReaderLyricsMetalTextContainerView: NSView {
         metalView.updateLyrics(
             text: text,
             fontSize: fontSize,
+            layoutWidth: layoutWidth,
             weight: weight,
             selectedColor: textColor,
             upcomingColor: upcomingTextColor,
@@ -991,6 +1011,7 @@ final class ReaderLyricsMetalTextContainerView: NSView {
             isProgressAnimating: isProgressAnimating
         )
 
+        hitTestScrollView.layoutWidth = layoutWidth
         if hitTestTextView.updateHitTestText(text, fontSize: fontSize, weight: weight) {
             hitTestScrollView.markNeedsDocumentFrameSync()
         }
@@ -1048,6 +1069,7 @@ struct ReaderLyricsSelectableTextView: NSViewRepresentable {
     let text: String
     let scanLength: Int
     let fontSize: CGFloat
+    let layoutWidth: CGFloat
     let weight: NSFont.Weight
     let textColor: Color
     let upcomingTextColor: Color
@@ -1075,6 +1097,7 @@ struct ReaderLyricsSelectableTextView: NSViewRepresentable {
             text: text,
             scanLength: scanLength,
             fontSize: fontSize,
+            layoutWidth: layoutWidth,
             weight: weight,
             textColor: NSColor(textColor),
             upcomingTextColor: NSColor(upcomingTextColor),

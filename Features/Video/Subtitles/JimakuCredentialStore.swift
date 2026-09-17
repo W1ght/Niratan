@@ -9,7 +9,13 @@ nonisolated enum JimakuCredentialStoreError: Error, Equatable, Sendable {
 actor JimakuCredentialStore {
     static let shared = JimakuCredentialStore()
 
-    private let service = "moe.shishamo.hoshi.jimaku"
+    static let openSubtitles = JimakuCredentialStore(service: "moe.shishamo.hoshi.opensubtitles")
+
+    private let service: String
+
+    init(service: String = "moe.shishamo.hoshi.jimaku") {
+        self.service = service
+    }
     private let account = "api-key"
 
     func hasAPIKey() throws -> Bool {

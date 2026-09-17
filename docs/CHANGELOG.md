@@ -2,6 +2,18 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 1.6.8
+
+### 中文
+
+- 视频字幕搜索现在聚合 AJATT、Jimaku 和 OpenSubtitles，自动收集并按语言和版本整理字幕，可筛选后直接使用。动画作品支持原名、英文名和罗马音匹配及季度选择；来源配置统一收进字幕设置。
+- 歌词横排文本在窗口尺寸和字体变化时保持换行、渲染、选择与高亮几何一致，长句末尾不再丢失。
+
+### English
+
+- Video subtitle search now aggregates AJATT, Jimaku and OpenSubtitles into selectable language and release versions. Anime title matching supports original, English and romaji names with series selection; source configuration lives in subtitle settings.
+- Horizontal lyrics keep wrapping, rendering, selection, and highlight geometry aligned when the window or font changes, without dropping the end of long cues.
+
 ## 1.6.7
 
 ### 中文

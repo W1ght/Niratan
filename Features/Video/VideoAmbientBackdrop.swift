@@ -43,7 +43,7 @@ struct VideoAmbientBackdrop: View {
     }
 }
 
-private struct VideoLetterboxMask: Shape {
+nonisolated private struct VideoLetterboxMask: Shape {
     let videoAspectSize: CGSize
 
     func path(in rect: CGRect) -> Path {

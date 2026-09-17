@@ -2981,6 +2981,7 @@ private struct ReaderLyricsModeView: View {
                 text: cue.text,
                 scanLength: scanLength,
                 fontSize: fontSize,
+                layoutWidth: availableWidth,
                 weight: .bold,
                 textColor: .white.opacity(isFocused ? 0.98 : 0.62),
                 upcomingTextColor: .white.opacity(isFocused ? 0.58 : 0.62),

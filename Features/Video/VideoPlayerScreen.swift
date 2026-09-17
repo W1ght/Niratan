@@ -1147,6 +1147,10 @@ struct VideoPlayerScreen: View {
                 dismissVideoPopupsIfNeeded()
                 loadAJATTSubtitle(file)
             },
+            onSelectOpenSubtitles: { option in
+                dismissVideoPopupsIfNeeded()
+                loadCatalogSubtitle(option: option, id: option.id, name: option.name, source: .openSubtitles)
+            },
             onSelectExternalSubtitle: {
                 dismissVideoPopupsIfNeeded()
                 restoreRememberedExternalSubtitle()
@@ -1528,7 +1532,8 @@ struct VideoPlayerScreen: View {
             do {
                 guard let tempURL = try await remoteSubtitleLoader.load(
                     option: option,
-                    allowedDownloadHosts: source.allowedDownloadHosts,
+                    allowedDownloadHosts: source.allowedDownloadHosts
+                        ?? (source == .openSubtitles ? Set([option.url.host ?? ""]) : nil),
                     maximumResponseSize: source.maximumResponseSize,
                     generation: generation
                 ), generation == remoteSubtitleGeneration,
@@ -1557,6 +1562,8 @@ struct VideoPlayerScreen: View {
                 case .ajatt:
                     selectedAJATTSubtitleID = id
                     selectedAJATTSubtitleName = name
+                case .openSubtitles:
+                    break // Restored through the shared durable external-subtitle selection.
                 }
                 model.rememberSubtitleSelection(
                     .external(path: archivedURL.standardizedFileURL.path)

@@ -20,18 +20,19 @@ private func require(_ source: String, contains value: String, _ message: String
 }
 
 let client = read("Features/Video/Subtitles/AJATTSubtitleCatalogClient.swift")
-let browser = read("Features/Video/Subtitles/AJATTSubtitleBrowserView.swift")
+let browser = read("Features/Video/Subtitles/OnlineSubtitleBrowserView.swift")
+let browserModel = read("Features/Video/Subtitles/OnlineSubtitleBrowserModel.swift")
 let inspector = read("Features/Video/VideoInspectorView.swift")
 let player = read("Features/Video/VideoPlayerScreen.swift")
 let loader = read("Features/Video/Remote/RemoteSubtitleLoader.swift")
 let boundedLoader = read("Features/Video/Remote/BoundedURLSessionData.swift")
 let project = read("Niratan.xcodeproj/project.pbxproj")
 
-require(inspector, contains: "AJATTSubtitleBrowserView(", "the Video subtitle inspector should present a native AJATT sheet")
-require(inspector, contains: "Get Subtitles (AJATT)", "the subtitle inspector should expose AJATT as an explicit action")
+require(inspector, contains: "OnlineSubtitleBrowserView(", "the Video subtitle inspector should present the aggregate subtitle sheet")
+require(inspector, contains: "onSelectAJATT: onSelectAJATTSubtitle", "the aggregate subtitle sheet should route AJATT selection into the player")
 require(!inspector.contains("https://subtitles.ajatt.top/index.html"), "the AJATT action should not fall back to a website link")
-require(browser, contains: "client.searchEntries", "the AJATT sheet should search the native catalog client")
-require(browser, contains: "client.files", "the AJATT sheet should list files inside the App")
+require(browserModel, contains: "AJATTSubtitleCatalogClient.shared.searchEntries", "the AJATT sheet should search the native catalog client")
+require(browserModel, contains: "AJATTSubtitleCatalogClient.shared.files", "the AJATT sheet should list files inside the App")
 require(browser, contains: ".buttonStyle(.glassProminent)", "AJATT search should use the native Liquid Glass action style")
 require(player, contains: "private func loadAJATTSubtitle", "AJATT downloads should enter the player subtitle path")
 require(player, contains: "loadPrimarySubtitle(", "AJATT subtitles should reuse Niratan's primary subtitle parser")
@@ -56,7 +57,7 @@ require(client, contains: "BoundedURLSessionData.load", "AJATT catalog downloads
 for path in [
     "Video/Remote/BoundedURLSessionData.swift",
     "Video/Subtitles/AJATTSubtitleCatalogClient.swift",
-    "Video/Subtitles/AJATTSubtitleBrowserView.swift",
+    "Video/Subtitles/OnlineSubtitleBrowserView.swift",
     "Video/Subtitles/CatalogSubtitleStore.swift",
 ] {
     require(project, contains: path, "AJATT source should belong to the full Niratan target: \(path)")

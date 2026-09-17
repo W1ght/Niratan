@@ -1111,7 +1111,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             readerLyricsTextView,
-            "textView.frame = contentView.bounds",
+            "height: max(bounds.height, ceil(textHeight))",
             "lyrics text view should not stay at a zero initial document frame"
         )
         assertContains(

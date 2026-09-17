@@ -206,7 +206,8 @@ actor JimakuAPIClient {
     func searchEntries(
         query: String,
         kind: JimakuSearchKind,
-        apiKey: String
+        apiKey: String,
+        anilistID: Int? = nil
     ) async throws -> [JimakuEntry] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty, query.count <= 300 else {
@@ -215,7 +216,8 @@ actor JimakuAPIClient {
         let url = try endpoint(
             path: "entries/search",
             queryItems: [
-                URLQueryItem(name: "query", value: query),
+                anilistID.map { URLQueryItem(name: "anilist_id", value: String($0)) }
+                    ?? URLQueryItem(name: "query", value: query),
                 URLQueryItem(name: "anime", value: kind.isAnime ? "true" : "false"),
             ]
         )

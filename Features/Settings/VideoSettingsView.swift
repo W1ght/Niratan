@@ -100,6 +100,9 @@ struct VideoSettingsView: View {
             }
 
             jimakuSection
+            NativeSettingsSectionCard("OpenSubtitles") {
+                SubtitleSourceCredentialView(provider: .openSubtitles)
+            }
 
             subtitleAppearanceSection
 

@@ -3,11 +3,13 @@ import Foundation
 nonisolated enum CatalogSubtitleSource: String, Sendable {
     case jimaku
     case ajatt
+    case openSubtitles
 
     var allowedDownloadHosts: Set<String>? {
         switch self {
         case .jimaku: nil
         case .ajatt: ["raw.githubusercontent.com"]
+        case .openSubtitles: nil
         }
     }
 
@@ -17,13 +19,15 @@ nonisolated enum CatalogSubtitleSource: String, Sendable {
             String(localized: "Unable to load the Jimaku subtitle.")
         case .ajatt:
             String(localized: "Unable to load the AJATT subtitle.")
+        case .openSubtitles:
+            String(localized: "Unable to load the OpenSubtitles subtitle.")
         }
     }
 
     var maximumResponseSize: Int {
         switch self {
         case .jimaku: 64 * 1_024 * 1_024
-        case .ajatt: 10 * 1_024 * 1_024
+        case .ajatt, .openSubtitles: 10 * 1_024 * 1_024
         }
     }
 }

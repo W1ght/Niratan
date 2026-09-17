@@ -17,7 +17,8 @@ private func require(_ source: String, contains value: String, _ message: String
 
 let client = read("Features/Video/Subtitles/JimakuAPIClient.swift")
 let credentials = read("Features/Video/Subtitles/JimakuCredentialStore.swift")
-let browser = read("Features/Video/Subtitles/JimakuSubtitleBrowserView.swift")
+let browser = read("Features/Video/Subtitles/OnlineSubtitleBrowserView.swift")
+let browserModel = read("Features/Video/Subtitles/OnlineSubtitleBrowserModel.swift")
 let settings = read("Features/Settings/VideoSettingsView.swift")
 let inspector = read("Features/Video/VideoInspectorView.swift")
 let player = read("Features/Video/VideoPlayerScreen.swift")
@@ -33,14 +34,11 @@ require(credentials, contains: "kSecClassGenericPassword", "Jimaku API keys shou
 require(credentials, contains: "moe.shishamo.hoshi.jimaku", "Jimaku should use an isolated Keychain service")
 require(settings, contains: "SecureField(\"Enter a new API key\"", "Video Settings should expose Jimaku API-key configuration")
 require(browser, contains: "SecureField(", "the Jimaku subtitle sheet should configure its API key in context")
-require(browser, contains: "credentialStore.save", "the Jimaku subtitle sheet should persist its API key through Keychain storage")
-require(browser, contains: "configurationPanelWidth: CGFloat = 430", "the Jimaku sheet should keep a wider configuration column")
-require(browser, contains: "minimumPanelWidth: CGFloat = 1_120", "the Jimaku sheet should present at a larger minimum width")
-require(browser, contains: "idealPanelWidth: CGFloat = 1_240", "the Jimaku sheet should prefer a wide desktop layout")
-require(browser, contains: "client.searchEntries", "the subtitle inspector should search Jimaku entries")
-require(browser, contains: "client.files", "the subtitle inspector should list Jimaku entry files")
-require(inspector, contains: "JimakuSubtitleBrowserView(", "the Video subtitle inspector should include Jimaku")
-require(inspector, contains: "Get Subtitles (Jimaku)", "the subtitle inspector should expose the Jimaku sheet as an explicit action")
+require(browser, contains: "store.save", "the Jimaku subtitle sheet should persist its API key through Keychain storage")
+require(browserModel, contains: "JimakuAPIClient.shared.searchEntries", "the subtitle inspector should search Jimaku entries")
+require(browserModel, contains: "JimakuAPIClient.shared.files", "the subtitle inspector should list Jimaku entry files")
+require(inspector, contains: "OnlineSubtitleBrowserView(", "the Video subtitle inspector should include aggregate search")
+require(inspector, contains: "onSelectJimaku: onSelectJimakuSubtitle", "the aggregate subtitle sheet should retain Jimaku selection")
 require(player, contains: "private func loadJimakuSubtitle", "Jimaku downloads should enter the player subtitle path")
 require(player, contains: "loadPrimarySubtitle(", "Jimaku subtitles should reuse Niratan's primary subtitle parser")
 require(player, contains: "CatalogSubtitleStore.archive", "Jimaku downloads should be archived for reuse after the session")
@@ -51,7 +49,7 @@ require(loader, contains: "case .ass:", "remote subtitle loading should preserve
 for path in [
     "Video/Subtitles/JimakuAPIClient.swift",
     "Video/Subtitles/JimakuCredentialStore.swift",
-    "Video/Subtitles/JimakuSubtitleBrowserView.swift",
+    "Video/Subtitles/OnlineSubtitleBrowserView.swift",
     "Video/Subtitles/CatalogSubtitleStore.swift",
 ] {
     require(project, contains: path, "Jimaku source should belong to the full Niratan target: \(path)")
