@@ -129,6 +129,8 @@ verify_full_bundle() {
   local candidate
   local file_description
   while IFS= read -r -d '' candidate; do
+    # Versioned frameworks (onnxruntime.framework) link Resources and Versions/Current to directories.
+    [[ -d "$candidate" ]] && continue
     file_description="$(LC_ALL=C file -Lb "$candidate")"
     if [[ "$file_description" == *Mach-O* ]]; then
       if otool -hv "$candidate" 2>/dev/null \
