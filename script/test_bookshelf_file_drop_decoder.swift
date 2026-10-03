@@ -1,3 +1,4 @@
+// test-sources: Features/Bookshelf/BookshelfDropSupport.swift
 import AppKit
 import Foundation
 

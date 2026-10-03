@@ -33,6 +33,12 @@ let userConfig = read("Core/UserConfig.swift")
 let settings = read("Features/Settings/VideoSettingsView.swift")
 let nativeSettings = read("NativeMac/NativeReuseViews.swift")
 let player = read("Features/Video/VideoPlayerScreen.swift")
+    + read("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + read("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + read("Features/Video/VideoPlayerScreen+OSD.swift")
+    + read("Features/Video/VideoPlayerScreen+Mining.swift")
+    + read("Features/Video/VideoPlayerScreen+Opening.swift")
+    + read("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let inspector = read("Features/Video/VideoInspectorView.swift")
 let subtitleOverlay = read("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let interactiveSubtitleText = read("Features/Video/Subtitles/InteractiveSubtitleTextView.swift")
@@ -73,7 +79,7 @@ require(
 )
 require(
     userConfig,
-    contains: "private static func clampedVideoSubtitleGapFastForwardSpeed",
+    contains: "static func clampedVideoSubtitleGapFastForwardSpeed",
     "video subtitle gap fast-forward speed should share one clamp"
 )
 require(
@@ -146,7 +152,7 @@ require(
 )
 require(
     userConfig,
-    contains: "private static func clampedVideoEqualizerValue",
+    contains: "static func clampedVideoEqualizerValue",
     "video equalizer preferences should share one finite -100...100 clamp"
 )
 require(
@@ -669,7 +675,7 @@ require(
 )
 require(
     inspector,
-    contains: "private var subtitleLookupHighlightTextColor: Binding<Color>",
+    contains: "var subtitleLookupHighlightTextColor: Binding<Color>",
     "Video inspector should bind the lookup highlight text color setting"
 )
 require(
@@ -866,7 +872,7 @@ require(
 )
 require(
     interactiveSubtitleText,
-    contains: "private func subtitleFontWeight() -> NSFont.Weight",
+    contains: "func subtitleFontWeight() -> NSFont.Weight",
     "interactive subtitle text view should map CSS-style font weights to AppKit font weights"
 )
 require(

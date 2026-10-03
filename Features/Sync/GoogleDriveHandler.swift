@@ -12,6 +12,8 @@ import Network
 enum GoogleDriveError: LocalizedError {
     case invalidResponse
     case apiError(String, statusCode: Int?)
+    /// The request could not reach Google Drive at all (offline, DNS, TLS…); stops a sync run.
+    case unavailable(Error)
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +21,8 @@ enum GoogleDriveError: LocalizedError {
             return String(localized: "Invalid response from Google Drive")
         case .apiError(let message, _):
             return message
+        case .unavailable(let error):
+            return error.localizedDescription
         }
     }
 
@@ -115,7 +119,7 @@ class GoogleDriveHandler {
 
     private func performRequest(_ request: URLRequest, retry: Bool = true) async throws -> Data {
         if pathMonitor.currentPath.status == .unsatisfied {
-            throw URLError(.notConnectedToInternet, userInfo: [NSLocalizedDescriptionKey: "No Internet connection."])
+            throw URLError(.notConnectedToInternet, userInfo: [NSLocalizedDescriptionKey: String(localized: "No Internet connection.")])
         }
 
         let (data, response) = try await session.data(for: request)
@@ -137,7 +141,7 @@ class GoogleDriveHandler {
                let message = error["message"] as? String {
                 throw GoogleDriveError.apiError(message, statusCode: httpResponse.statusCode)
             }
-            throw GoogleDriveError.apiError("Request failed with status \(httpResponse.statusCode)", statusCode: httpResponse.statusCode)
+            throw GoogleDriveError.apiError(String(localized: "Request failed with status \(httpResponse.statusCode)"), statusCode: httpResponse.statusCode)
         }
 
         return data
@@ -149,7 +153,7 @@ class GoogleDriveHandler {
         onProgress: @MainActor @Sendable @escaping (Double) -> Void
     ) async throws -> Data {
         if pathMonitor.currentPath.status == .unsatisfied {
-            throw URLError(.notConnectedToInternet, userInfo: [NSLocalizedDescriptionKey: "No Internet connection."])
+            throw URLError(.notConnectedToInternet, userInfo: [NSLocalizedDescriptionKey: String(localized: "No Internet connection.")])
         }
 
         final class ObservationHolder: @unchecked Sendable {
@@ -197,7 +201,7 @@ class GoogleDriveHandler {
                let message = error["message"] as? String {
                 throw GoogleDriveError.apiError(message, statusCode: httpResponse.statusCode)
             }
-            throw GoogleDriveError.apiError("Request failed with status \(httpResponse.statusCode)", statusCode: httpResponse.statusCode)
+            throw GoogleDriveError.apiError(String(localized: "Request failed with status \(httpResponse.statusCode)"), statusCode: httpResponse.statusCode)
         }
 
         onProgress(1)
@@ -644,65 +648,15 @@ class GoogleDriveHandler {
 
     // https://github.com/ttu-ttu/ebook-reader/blob/d7d1dc1fd1151e067db218b8ff7eecf1c14d2276/apps/web/src/lib/data/storage/handler/base-handler.ts#L244
     nonisolated static func getStatisticsFileName(stats: [Statistics]) -> String {
-        var readingTime: Double = 0
-        var charactersRead: Int = 0
-        var minReadingSpeed: Int = 0
-        var altMinReadingSpeed: Int = 0
-        var maxReadingSpeed: Int = 0
-        var weightedSum: Int = 0
-        var validReadingDays: Int = 0
-        var lastStatisticModified: Int = 0
-
-        for stat in stats {
-            readingTime += stat.readingTime
-            charactersRead += stat.charactersRead
-            minReadingSpeed = minReadingSpeed > 0 ? min(minReadingSpeed, stat.minReadingSpeed) : stat.minReadingSpeed
-            altMinReadingSpeed = altMinReadingSpeed > 0 ? min(altMinReadingSpeed, stat.altMinReadingSpeed) : stat.altMinReadingSpeed
-            maxReadingSpeed = max(maxReadingSpeed, stat.lastReadingSpeed)
-            weightedSum += Int(stat.readingTime) * stat.charactersRead
-            lastStatisticModified = max(lastStatisticModified, stat.lastStatisticModified)
-            if stat.readingTime > 0 {
-                validReadingDays += 1
-            }
-        }
-
-        let averageReadingTime = validReadingDays > 0 ? ceil(readingTime / Double(validReadingDays)) : 0
-        let averageWeightedReadingTime = charactersRead > 0 ? ceil(Double(weightedSum) / Double(charactersRead)) : 0
-        let averageCharactersRead = validReadingDays > 0 ? ceil(Double(charactersRead) / Double(validReadingDays)) : 0
-        let averageWeightedCharactersRead = readingTime > 0 ? ceil(Double(weightedSum) / Double(readingTime)) : 0
-        let lastReadingSpeed = readingTime > 0 ? ceil((3600.0 * Double(charactersRead)) / readingTime) : 0
-        let averageReadingSpeed = averageReadingTime > 0 ? ceil((3600 * averageCharactersRead) / averageReadingTime) : 0
-        let averageWeightedReadingSpeed = averageWeightedReadingTime > 0 ? ceil((3600 * averageWeightedCharactersRead) / averageWeightedReadingTime) : 0
-        return "statistics_1_6_\(lastStatisticModified)_\(charactersRead)_\(readingTime)_\(minReadingSpeed)_\(altMinReadingSpeed)_\(lastReadingSpeed)_\(maxReadingSpeed)_\(averageReadingTime)_\(averageWeightedReadingTime)_\(averageCharactersRead)_\(averageWeightedCharactersRead)_\(averageReadingSpeed)_\(averageWeightedReadingSpeed)_na.json"
+        TtuSyncNaming.statisticsFileName(stats: stats)
     }
 
-    // https://github.com/ttu-ttu/ebook-reader/blob/d7d1dc1fd1151e067db218b8ff7eecf1c14d2276/apps/web/src/lib/data/storage/handler/base-handler.ts#L642
     nonisolated static func sanitizeTtuFilename(_ title: String) -> String {
-        var result = title
-        if result.hasSuffix(" ") {
-            result = String(result.dropLast())
-            result += "~ttu-spc~"
-        }
-        if result.hasSuffix(".") {
-            result = String(result.dropLast())
-            result += "~ttu-dend~"
-        }
-        result = result.replacingOccurrences(of: "*", with: "~ttu-star~")
-        result = result.replacing(/[\/?\<>\\:*|%"]/) { match in
-            match.output.unicodeScalars.map { scalar in
-                let value = scalar.value
-                return String(format: "%%%02X", value)
-            }.joined()
-        }
-
-        return result
+        TtuSyncNaming.sanitize(title)
     }
 
     nonisolated static func desanitizeTtuFilename(_ title: String) -> String {
-        (title.removingPercentEncoding ?? title)
-            .replacingOccurrences(of: "~ttu-star~", with: "*")
-            .replacingOccurrences(of: "~ttu-dend~", with: ".")
-            .replacingOccurrences(of: "~ttu-spc~", with: " ")
+        TtuSyncNaming.desanitize(title)
     }
 
     private func uploadCoverImage(folderId: String, coverData: Data) async throws {

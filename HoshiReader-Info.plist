@@ -7,8 +7,12 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_fushi-sync._tcp</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.</string>
+	<string>Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, Fushi interconnect hosts, and user-installed Aidoku sources on your local network.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -36,6 +40,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NiratanGoogleClientID</key>
+	<string>$(NIRATAN_GOOGLE_CLIENT_ID)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

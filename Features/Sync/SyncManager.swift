@@ -112,7 +112,7 @@ class SyncManager {
         async let fetchedStats: [Statistics]? = fetchStats(fileId: statsFileId)
         async let fetchedAudioBook: TtuAudioBook? = fetchAudioBook(fileId: audioBookFileId)
         
-        let localStats = syncStats ? BookStorage.loadStatistics(root: url) : nil
+        let localStats = syncStats ? StatisticsStorage.dailyStatistics(root: url) : nil
         let playbackData = syncAudioBook ? BookStorage.loadSasayakiPlayback(root: url) : nil
         
         let ttuProgress = try await fetchedProgress
@@ -124,9 +124,9 @@ class SyncManager {
             guard let ttuProgress else { return .skipped }
             importProgress(ttuProgress: ttuProgress, to: url)
             if syncStats {
-                let mergedStats = mergeStatistics(localStatistics: localStats ?? [], externalStatistics: ttuStats ?? [], syncMode: statsSyncMode)
-                if !mergedStats.isEmpty {
-                    try? BookStorage.save(mergedStats, inside: url, as: FileNames.statistics)
+                // TTU days are applied to the local sessions; an empty remote file never clears them.
+                if let ttuStats, !ttuStats.isEmpty {
+                    try? StatisticsStorage.importDaily(ttuStats, root: url, mode: statsSyncMode)
                 }
             }
             if syncAudioBook, let ttuAudioBook {
@@ -193,7 +193,7 @@ class SyncManager {
             importProgress(ttuProgress: progress, to: bookFolder)
         }
         if let stats = try await ttuStats, !stats.isEmpty {
-            try BookStorage.save(stats, inside: bookFolder, as: FileNames.statistics)
+            try StatisticsStorage.importDaily(stats, root: bookFolder, mode: .merge)
         }
         if let audioBook = try await ttuAudioBook {
             importAudioBook(ttuAudioBook: audioBook, to: bookFolder)

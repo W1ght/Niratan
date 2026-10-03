@@ -986,7 +986,7 @@ nonisolated extension MangaReadingSession {
         let chapters = aidokuChapters.map { chapter in
             MangaReadingChapter(
                 id: ["aidoku", source.sourceID, loadedManga.key, chapter.key].joined(separator: "\u{1f}"),
-                title: chapter.title ?? chapter.chapterNumber.map { "Chapter \($0)" } ?? chapter.key,
+                title: chapter.title ?? chapter.chapterNumber.map { String(localized: "Chapter \($0.formatted())") } ?? chapter.key,
                 remoteIdentity: MangaRemoteIdentity(provider: .aidoku, sourceID: source.sourceID, mangaID: loadedManga.key, chapterID: chapter.key),
                 wasReadAtOpen: progress.first(where: {
                     $0.sourceID == source.sourceID

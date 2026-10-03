@@ -39,6 +39,7 @@ final class VideoPlayerViewModel {
     @ObservationIgnored private var remoteRecoveryTask: Task<Void, Never>?
     private var remotePlaybackSession: RemotePlaybackSession?
     private var remotePlaybackGeneration: Int?
+    @ObservationIgnored private var remotePlaybackReporter: (any RemotePlaybackReporting)?
     private var pendingPlaybackState: VideoPlaybackState?
     private var pendingRestorePosition: TimeInterval?
     private var pendingPlaybackIntent: Bool?
@@ -150,6 +151,7 @@ final class VideoPlayerViewModel {
         startsFromBeginning: Bool = false
     ) {
         saveCurrentPosition(deferred: false)
+        finishRemotePlaybackReport()
         restoreSubtitleGapFastForwardSpeedIfNeeded()
         remoteRecoveryTask?.cancel()
         remoteRecoveryTask = nil
@@ -175,6 +177,9 @@ final class VideoPlayerViewModel {
             0
         } else {
             restorePositionOverride.map { max(0, $0) }
+                ?? (rememberPlaybackPosition
+                    ? Self.newerRemoteResumePosition(for: playbackSource, localState: playbackState)
+                    : nil)
                 ?? (playbackState?.isResumable == true ? playbackState?.position : nil)
         }
         pendingPlaybackIntent = playbackIntentOverride
@@ -202,6 +207,7 @@ final class VideoPlayerViewModel {
                 )
             }
             remotePlaybackGeneration = 1
+            remotePlaybackReporter = RemotePlaybackReporterCatalog.makeReporter(for: remoteSource)
         }
         do {
             try engine.load(source: playbackSource)
@@ -453,6 +459,7 @@ final class VideoPlayerViewModel {
 
     func shutdown() {
         saveCurrentPosition(deferred: false)
+        finishRemotePlaybackReport()
         restoreSubtitleGapFastForwardSpeedIfNeeded()
         engine.shutdown()
         stopAccessingCurrentURL()
@@ -514,6 +521,15 @@ final class VideoPlayerViewModel {
         playbackIntent: Bool
     ) {
         let playbackSource = VideoPlaybackSource.remoteStream(attempt.source)
+        let previousContext: [String: String] = if case .remoteStream(let previous) = currentSource {
+            previous.providerContext
+        } else {
+            [:]
+        }
+        if attempt.source.providerContext != previousContext {
+            finishRemotePlaybackReport()
+            remotePlaybackReporter = RemotePlaybackReporterCatalog.makeReporter(for: attempt.source)
+        }
         currentSource = playbackSource
         currentURL = playbackSource.displayURL
         currentTitle = playbackSource.title
@@ -604,6 +620,36 @@ final class VideoPlayerViewModel {
             lastSavedSecond = second
             saveCurrentPosition(deferred: true)
         }
+        if snapshot.isLoaded, snapshot.duration > 0 {
+            remotePlaybackReporter?.playbackDidUpdate(
+                position: snapshot.currentTime,
+                duration: snapshot.duration,
+                isPlaying: snapshot.isPlaying
+            )
+        }
+    }
+
+    private func finishRemotePlaybackReport() {
+        guard let reporter = remotePlaybackReporter else { return }
+        remotePlaybackReporter = nil
+        reporter.playbackDidStop(position: snapshot.currentTime, duration: snapshot.duration)
+    }
+
+    /// Media servers keep their own resume point. It wins over the local
+    /// history only when it was written later (last-writer-wins, as in Fushi).
+    private static func newerRemoteResumePosition(
+        for source: VideoPlaybackSource,
+        localState: VideoPlaybackState?
+    ) -> TimeInterval? {
+        guard case .remoteStream(let remoteSource) = source,
+              let hint = remoteSource.resumeHint,
+              hint.position >= 2 else {
+            return nil
+        }
+        if let localState, localState.updatedAt >= hint.updatedAt {
+            return nil
+        }
+        return hint.position
     }
 
     private func restoreResumeOptions(

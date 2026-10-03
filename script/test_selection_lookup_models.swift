@@ -1,3 +1,4 @@
+// test-sources: Core/SelectionLookup/SelectionLookupModels.swift Core/SelectionLookup/AccessibilitySelectionReader.swift
 import AppKit
 import CoreGraphics
 import Foundation

@@ -1,3 +1,4 @@
+// test-sources: Models/Profile.swift Core/ProfileRepository.swift Core/ProfileSettingsStore.swift Models/Dictionary.swift
 import Foundation
 
 @MainActor

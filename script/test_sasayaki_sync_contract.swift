@@ -18,11 +18,11 @@ func assertContains(_ needle: String, _ message: String) {
 }
 
 assertContains(
-    "private func shouldImportAudioBook(remoteFile: DriveFile?, bookFolder: URL) -> Bool",
+    "func shouldImportAudioBook(remoteFile: DriveFile?, bookFolder: URL) -> Bool",
     "Sasayaki audiobook sync must decide remote-only imports separately from bookmark progress."
 )
 assertContains(
-    "private func parseAudioBookTimestamp(from file: DriveFile) -> Date?",
+    "func parseAudioBookTimestamp(from file: DriveFile) -> Date?",
     "Sasayaki audiobook sync must parse the audioBook_ file timestamp."
 )
 assertContains(

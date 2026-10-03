@@ -108,18 +108,18 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "@State private var displayMode: ReaderDisplayMode = .novel",
+            "var displayMode: ReaderDisplayMode = .novel",
             "lyrics mode should be session-scoped and default to novel"
         )
         assertContains(
             nativeReader,
-            "private var canShowLyricsMode: Bool",
+            "var canShowLyricsMode: Bool",
             "native Reader should centralize the SRT-match/audio gate for lyrics mode"
         )
         let canShowLyricsMode = sourceSection(
             nativeReader,
-            from: "private var canShowLyricsMode: Bool",
-            to: "private func navigateBackward()",
+            from: "var canShowLyricsMode: Bool",
+            to: "func navigateBackward()",
             "native Reader should define the lyrics availability gate before Reader actions"
         )
         assertContains(
@@ -195,7 +195,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             readerLyricsTextView,
-            "private func popupCoordinateRect(_ rect: NSRect, from sourceView: NSView) -> CGRect",
+            "func popupCoordinateRect(_ rect: NSRect, from sourceView: NSView) -> CGRect",
             "horizontal lyrics lookup should convert AppKit hit rects into popup coordinates inside the AppKit bridge"
         )
         assertContains(
@@ -291,7 +291,7 @@ enum ReaderLyricsModeContractTest {
         )
         let lyricsModeView = sourceSection(
             nativeReader,
-            from: "private struct ReaderLyricsModeView: View",
+            from: "struct ReaderLyricsModeView: View",
             to: "@ViewBuilder\n    private var lyricsBackground",
             "lyrics mode view should define its full-screen overlay layout"
         )
@@ -322,32 +322,32 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             lyricsModeView,
-            "@State private var coverImage: NSImage?",
+            "var coverImage: NSImage?",
             "lyrics mode should cache the cover image instead of decoding it during every playback tick"
         )
         assertContains(
             lyricsModeView,
-            "@State private var heldLyricsCue: SasayakiMatch?",
+            "var heldLyricsCue: SasayakiMatch?",
             "lyrics mode should keep the last highlighted cue during silent gaps between cues"
         )
         assertContains(
             lyricsModeView,
-            "@State private var isVerticalLyricsMode = false",
+            "var isVerticalLyricsMode = false",
             "lyrics mode vertical writing should be a session-only visual toggle"
         )
         assertContains(
             lyricsModeView,
-            "@State private var isLyricsMaskEnabled = false",
+            "var isLyricsMaskEnabled = false",
             "lyrics mask mode should be a session-only visual toggle"
         )
         assertContains(
             lyricsModeView,
-            "@State private var hoveredLyricsCueID: String?",
+            "var hoveredLyricsCueID: String?",
             "lyrics mask mode should track the hovered sentence without adding persistent settings"
         )
         assertContains(
             lyricsModeView,
-            "private var activeLyricsCue: SasayakiMatch?",
+            "var activeLyricsCue: SasayakiMatch?",
             "lyrics mode should expose a UI-only active cue independent from SasayakiPlayer clearing WebView highlight"
         )
         assertContains(
@@ -467,7 +467,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "Color.clear\n                    .frame(width: size, height: size)",
+            "Color.clear\n                        .frame(width: size, height: size)",
             "lyrics artwork should reserve a transparent square album-art slot"
         )
         assertContains(
@@ -482,23 +482,58 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "horizontalLyricsContextRadius(metrics: metrics, availableWidth: availableWidth, availableHeight: availableHeight)",
-            "horizontal lyrics mode should expand the cue window to the measured lyric stack height"
+            "LazyVStack(alignment: .leading, spacing: ReaderLyricsVisualSpec.listRowSpacing) {\n                    ForEach(cues.indices, id: \\.self) { index in",
+            "horizontal lyrics mode should render every matched cue in one lazily scrolling list"
         )
         assertContains(
             nativeReader,
-            "verticalLyricsContextRadius(\n            metrics: metrics,\n            availableWidth: availableWidth,\n            availableHeight: availableHeight",
-            "vertical lyrics mode should expand the cue window to the measured lyric stack width"
+            "LazyHStack(alignment: .center, spacing: verticalLyricsColumnSpacing(metrics: metrics)) {\n                    ForEach(cues.indices.reversed(), id: \\.self) { index in",
+            "vertical lyrics mode should render every matched cue as lazily scrolling right-to-left columns"
+        )
+        assertNotContains(
+            nativeReader,
+            "visibleLyricsCueWindow(",
+            "lyrics mode should not trim the subtitle list to a window around the active cue"
         )
         assertContains(
             nativeReader,
-            "visibleLyricsCueWindow(radius: radius, activeCue: activeLyricsCue)",
-            "lyrics mode should keep the dynamically expanded cue window centered on the held cue during silent gaps"
+            "var lyricsCues: [SasayakiMatch] {\n        player.matchData?.matches ?? []",
+            "lyrics mode should display the full matched cue list"
         )
         assertContains(
             nativeReader,
-            "proxy.scrollTo(activeLyricsCue?.id, anchor: .center)",
+            "proxy.scrollTo(index, anchor: anchor)",
             "lyrics mode should keep scroll anchoring on the held highlighted cue during silent gaps"
+        )
+        assertContains(
+            nativeReader,
+            "func lyricsCueIndex(of cue: SasayakiMatch) -> Int?",
+            "lyrics mode should locate the active row without rescanning the whole book on every tick"
+        )
+        assertContains(
+            nativeReader,
+            ".onScrollPhaseChange { _, phase in\n                handleLyricsScrollPhase(phase)",
+            "lyrics mode should observe manual scrolling of the full subtitle list"
+        )
+        assertContains(
+            nativeReader,
+            "case .tracking, .interacting, .decelerating:",
+            "manual scrolling should detach the subtitle list from playback"
+        )
+        assertContains(
+            nativeReader,
+            "ReaderLyricsVisualSpec.manualScrollFollowResumeDelay",
+            "lyrics mode should resume following playback after manual browsing"
+        )
+        assertContains(
+            nativeReader,
+            "Label(\"Back to Current Line\"",
+            "lyrics mode should offer an explicit way back to the current line while browsing"
+        )
+        assertContains(
+            nativeReader,
+            "guard isFollowingPlayback, let index = activeLyricsIndex else { return }",
+            "automatic lyrics scrolling should never fight a reader who is browsing the list"
         )
         assertContains(
             nativeReader,
@@ -512,8 +547,8 @@ enum ReaderLyricsModeContractTest {
         )
         let horizontalLyricsLine = sourceSection(
             nativeReader,
-            from: "private func lyricsLine(",
-            to: "private func horizontalLyricsRowHeight(",
+            from: "func lyricsLine(",
+            to: "func horizontalLyricsRowHeight(",
             "lyrics mode should define horizontal line rendering separately from vertical line rendering"
         )
         assertContains(
@@ -553,9 +588,9 @@ enum ReaderLyricsModeContractTest {
             "lyrics text containers should not claim empty row space that is reserved for tap-to-seek"
         )
         assertContains(
-            nativeReader,
-            "horizontalLyricsMaskStack(cues: cues, metrics: metrics)",
-            "horizontal lyrics mask should render one stack-level blurred duplicate instead of per-row boxes"
+            horizontalLyricsLine,
+            "maskedHorizontalLyricsText(cue, fontSize: fontSize, isFocused: isFocused, isRightToLeft: isRightToLeft)",
+            "horizontal lyrics mask should render a feathered blurred glyph duplicate for each lazily created row"
         )
         assertNotContains(
             horizontalLyricsLine,
@@ -589,7 +624,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "ForEach(cues.reversed())",
+            "ForEach(cues.indices.reversed(), id: \\.self)",
             "vertical lyrics mode should lay out cue columns in Japanese right-to-left reading order"
         )
         assertContains(
@@ -619,8 +654,8 @@ enum ReaderLyricsModeContractTest {
         )
         let verticalLyricsLine = sourceSection(
             nativeReader,
-            from: "private func verticalLyricsLine(",
-            to: "private func lyricsLine(",
+            from: "func verticalLyricsLine(",
+            to: "func lyricsLine(",
             "lyrics mode should define vertical line rendering separately from horizontal line rendering"
         )
         assertNotContains(
@@ -649,9 +684,9 @@ enum ReaderLyricsModeContractTest {
             "vertical lyrics mask should mirror the AppKit vertical text wrapping"
         )
         assertContains(
-            nativeReader,
-            "verticalLyricsMaskStack(\n                    cues: cues,\n                    metrics: metrics,\n                    availableWidth: availableWidth,\n                    availableHeight: availableHeight",
-            "vertical lyrics mask should render one stack-level blurred duplicate instead of per-column boxes"
+            verticalLyricsLine,
+            "maskedVerticalLyricsText(cue, fontSize: fontSize, isFocused: isFocused, availableHeight: availableHeight)",
+            "vertical lyrics mask should render a feathered blurred glyph duplicate for each lazily created column"
         )
         assertNotContains(
             verticalLyricsLine,
@@ -710,13 +745,13 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "let fontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize",
-            "lyrics rows should preserve readable focused/context font sizes while wrapping"
+            "let fontSize = metrics.lyricsListFontSize",
+            "lyrics rows should share one list font size so focus changes never resize scrolling rows"
         )
         assertContains(
             nativeReader,
-            "availableWidth: geometry.size.width",
-            "lyrics row fitting should use the measured row width instead of a fixed estimate"
+            "width: horizontalLyricsTextWidth(availableWidth: availableWidth))",
+            "lyrics row height should be measured with the same padded width used for rendering"
         )
         assertContains(
             nativeReader,
@@ -740,8 +775,8 @@ enum ReaderLyricsModeContractTest {
         )
         let lyricsControls = sourceSection(
             nativeReader,
-            from: "private func playerPanel(\n        metrics: ReaderLyricsLayoutMetrics,",
-            to: "private func handleCurrentCueChange(_ cue: SasayakiMatch?)",
+            from: "func playerPanel(\n        metrics: ReaderLyricsLayoutMetrics,",
+            to: "func handleCurrentCueChange(_ cue: SasayakiMatch?)",
             "lyrics mode should define its bottom controls before cue change handling"
         )
         assertContains(
@@ -761,17 +796,17 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             lyricsControls,
-            "lyricsMaskButton\n                    verticalLyricsModeButton",
+            "lyricsMaskButton\n                verticalLyricsModeButton",
             "lyrics mask toggle should sit immediately to the left of the vertical writing toggle"
         )
         assertContains(
             lyricsControls,
-            "HStack(spacing: 10) {\n                    lyricsMaskButton\n                    verticalLyricsModeButton",
+            "HStack(spacing: 10) {\n                lyricsMaskButton\n                verticalLyricsModeButton",
             "lyrics mask and vertical writing toggles should share a fixed-size side control group with the statistics button"
         )
         assertContains(
             lyricsControls,
-            "private var lyricsMaskButton: some View",
+            "var lyricsMaskButton: some View",
             "lyrics mask toggle should be a dedicated player icon button"
         )
         assertContains(
@@ -832,7 +867,7 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             lyricsControls,
-            "systemName: isStatisticsTracking ? \"timer\" : \"chart.xyaxis.line\",\n                            diameter: 34,\n                            fontSize: 19",
+            "systemName: isStatisticsTracking ? \"timer\" : \"chart.xyaxis.line\",\n                        diameter: 34,\n                        fontSize: 19",
             "lyrics statistics button should remain the same size as the vertical writing toggle"
         )
         assertContains(
@@ -859,6 +894,21 @@ enum ReaderLyricsModeContractTest {
             lyricsControls,
             "player.nextCue()",
             "lyrics transport controls should keep next sentence navigation"
+        )
+        assertContains(
+            lyricsControls,
+            "lyricsScrubber",
+            "lyrics player panel should include a scrubber with elapsed and remaining time"
+        )
+        assertContains(
+            nativeReader,
+            "seekLyricsPlayback(to: min(max(value.location.x / trackWidth, 0), 1) * duration)",
+            "lyrics scrubber should seek through one manual-seek path"
+        )
+        assertContains(
+            nativeReader,
+            "suppressNextCueAdvance = true\n        onManualBaselineReset()\n        player.seekRelative(time - player.currentTime)",
+            "scrubbing should reset the statistics baseline instead of counting skipped text"
         )
         assertContains(
             lyricsControls,
@@ -922,8 +972,8 @@ enum ReaderLyricsModeContractTest {
         )
         let exitLyricsMode = sourceSection(
             nativeReader,
-            from: "private func exitLyricsMode()",
-            to: "private func setFocusMode",
+            from: "func exitLyricsMode()",
+            to: "func setFocusMode",
             "native Reader should expose lyrics mode exit behavior"
         )
         assertContains(
@@ -938,8 +988,8 @@ enum ReaderLyricsModeContractTest {
         )
         let closeShortcut = sourceSection(
             nativeReader,
-            from: "private func handleReaderCloseShortcut()",
-            to: "private func handleReaderToggleFocusModeShortcut()",
+            from: "func handleReaderCloseShortcut()",
+            to: "func handleReaderToggleFocusModeShortcut()",
             "native Reader should expose close shortcut behavior"
         )
         assertContains(
@@ -1161,9 +1211,9 @@ enum ReaderLyricsModeContractTest {
         )
         let lyricsMaskBehavior = sourceSection(
             nativeReader,
-            from: "private func isLyricsMaskVisible(for cue: SasayakiMatch) -> Bool",
-            to: "private func visibleLyricsCueWindow(radius: Int, activeCue: SasayakiMatch?) -> [SasayakiMatch]",
-            "lyrics mode should define mask visibility before cue windowing"
+            from: "func isLyricsMaskVisible(for cue: SasayakiMatch) -> Bool",
+            to: "func maskedHorizontalLyricsText(",
+            "lyrics mode should define mask visibility before the mask overlays"
         )
         assertContains(
             lyricsMaskBehavior,
@@ -1192,13 +1242,13 @@ enum ReaderLyricsModeContractTest {
         )
         assertContains(
             nativeReader,
-            "private func horizontalLyricsMaskStack(",
-            "lyrics mode should expose a horizontal stack-level text-only mask overlay"
+            "func maskedHorizontalLyricsText(",
+            "lyrics mode should expose a horizontal text-only mask overlay"
         )
         assertContains(
             nativeReader,
-            "private func verticalLyricsMaskStack(",
-            "lyrics mode should expose a vertical stack-level text-only mask overlay"
+            "func maskedVerticalLyricsText(",
+            "lyrics mode should expose a vertical text-only mask overlay"
         )
         assertNotContains(
             nativeReader,
@@ -1274,7 +1324,11 @@ enum ReaderLyricsModeContractTest {
             "Lyrics Mask",
             "No lyrics match",
             "Session",
-            "Reading Progress:"
+            "Reading Progress:",
+            "Back to Current Line",
+            "Playback Position",
+            "Previous Cue",
+            "Next Cue"
         ] {
             assertLocalized(
                 localizationStrings,

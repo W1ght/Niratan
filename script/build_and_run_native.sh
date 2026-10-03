@@ -13,10 +13,12 @@ APP_EXECUTABLE=""
 MODE="run"
 MODE_ARGS=()
 OPEN_ENV_ARGS=()
+DATA_ROOT="${HOSHI_DATA_ROOT:-}"
+SYSTEM_APPEARANCE="${HOSHI_DEBUG_SYSTEM_APPEARANCE:-}"
 
 usage() {
   cat <<'EOF'
-usage: build_and_run_native.sh [--instance <id>] [mode] [arguments]
+usage: build_and_run_native.sh [--instance <id>] [--data-root <dir>] [--appearance dark|light] [mode] [arguments]
 
 Niratan has one full-feature build containing Reader and Video.
 
@@ -24,6 +26,11 @@ isolation:
   --instance <id>         Use .build/xcode-derived-data-<id> so parallel sessions target distinct app bundles.
                           HOSHI_DERIVED_DATA_PATH still takes precedence when set.
                           Old inactive instance builds are pruned automatically.
+  --data-root <dir>       Keep all user data (defaults, Application Support, Keychain items)
+                          under <dir> instead of sharing the installed app's data.
+
+debugging:
+  --appearance dark|light Stand in for the system appearance (follow-system themes only).
 
 modes:
   run                     Build and launch.
@@ -51,6 +58,24 @@ while [[ $# -gt 0 ]]; do
         exit 2
       fi
       INSTANCE_ID="$2"
+      shift 2
+      ;;
+    --data-root)
+      if [[ $# -lt 2 ]]; then
+        echo "--data-root requires a directory" >&2
+        usage >&2
+        exit 2
+      fi
+      DATA_ROOT="$2"
+      shift 2
+      ;;
+    --appearance)
+      if [[ $# -lt 2 || ! "$2" =~ ^(dark|light)$ ]]; then
+        echo "--appearance requires dark or light" >&2
+        usage >&2
+        exit 2
+      fi
+      SYSTEM_APPEARANCE="$2"
       shift 2
       ;;
     run|--clean|clean|--open-latest|open-latest|--open-url|open-url|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
@@ -193,8 +218,25 @@ open_url() {
   open_with_env -a "$APP_BUNDLE" "$url"
 }
 
+if [[ -n "$DATA_ROOT" ]]; then
+  mkdir -p "$DATA_ROOT/Home"
+  DATA_ROOT="$(cd "$DATA_ROOT" && pwd)"
+  # The app refuses to start unless both point at the same isolated root.
+  export HOSHI_DATA_ROOT="$DATA_ROOT"
+  export CFFIXED_USER_HOME="$DATA_ROOT/Home"
+fi
+if [[ -n "$SYSTEM_APPEARANCE" ]]; then
+  export HOSHI_DEBUG_SYSTEM_APPEARANCE="$SYSTEM_APPEARANCE"
+fi
+
 open_env_args() {
   OPEN_ENV_ARGS=()
+  local name
+  for name in HOSHI_DATA_ROOT CFFIXED_USER_HOME HOSHI_DEBUG_SYSTEM_APPEARANCE; do
+    if [[ -n "${!name:-}" ]]; then
+      OPEN_ENV_ARGS+=(--env "$name=${!name}")
+    fi
+  done
   if [[ -n "${HOSHI_VIDEO_LIBRARY_CATALOG_URL:-}" ]]; then
     OPEN_ENV_ARGS+=(--env "HOSHI_VIDEO_LIBRARY_CATALOG_URL=$HOSHI_VIDEO_LIBRARY_CATALOG_URL")
   fi

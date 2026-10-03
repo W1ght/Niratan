@@ -51,7 +51,6 @@ actor MangaOCRService {
     private static let maximumCachedPageBytes = 32 * 1_024 * 1_024
     private static let maximumRegionsPerPage = 100_000
     private static let cacheSchemaVersion = 2
-    private static let engineSignature = "google-lens-v2"
 
     private let session: URLSession
     private let cacheDirectory: URL
@@ -160,6 +159,29 @@ actor MangaOCRService {
         return regions
     }
 
+    /// Recognizes a page with an on-device engine and caches the regions under
+    /// that engine's signature. Nothing is uploaded.
+    func recognizeText(
+        in data: Data,
+        key: MangaOCRCacheKey,
+        pagePaths: [String],
+        idPrefix: String,
+        recognizer: @Sendable (Data) async throws -> MangaOCRPageResult
+    ) async throws -> [MangaOCRTextRegion] {
+        if let cached = cachedRegions(for: key, pagePaths: pagePaths) {
+            return cached
+        }
+        let page = try await recognizer(data)
+        try Task.checkCancellation()
+        let regions = MangaOCRRegionBuilder.regions(
+            from: page,
+            pageIndex: key.pageIndex,
+            idPrefix: idPrefix
+        )
+        storeCachedRegions(regions, for: key, pagePaths: pagePaths)
+        return regions
+    }
+
     func cachedRegions(
         for key: MangaOCRCacheKey,
         pagePaths: [String]
@@ -169,12 +191,7 @@ actor MangaOCRService {
             return nil
         }
 
-        let itemDirectory = try? prepareCache(
-            itemID: key.itemID,
-            modifiedAt: key.modifiedAt,
-            pagePaths: pagePaths,
-            language: key.language
-        )
+        let itemDirectory = try? prepareCache(for: key, pagePaths: pagePaths)
         if let cached = cache[key] {
             touch(key)
             return cached
@@ -212,12 +229,7 @@ actor MangaOCRService {
               isValid(regions, pageIndex: key.pageIndex) else {
             return
         }
-        let itemDirectory = try? prepareCache(
-            itemID: key.itemID,
-            modifiedAt: key.modifiedAt,
-            pagePaths: pagePaths,
-            language: key.language
-        )
+        let itemDirectory = try? prepareCache(for: key, pagePaths: pagePaths)
         cache[key] = regions
         touch(key)
         trimCacheIfNeeded()
@@ -247,15 +259,48 @@ actor MangaOCRService {
         )
     }
 
-    private func prepareCache(
-        itemID: String,
-        modifiedAt: Date?,
-        pagePaths: [String],
+    /// Removes one engine's cached pages for an item ("re-run OCR").
+    func clear(itemID: String, engineID: String, language: MangaOCRLanguage) {
+        let directoryName = Self.cacheDirectoryName(engineID: engineID, language: language)
+        cache = cache.filter {
+            !($0.key.itemID == itemID && $0.key.engineID == engineID && $0.key.language == language)
+        }
+        cacheOrder.removeAll {
+            $0.itemID == itemID && $0.engineID == engineID && $0.language == language
+        }
+        preparedManifests["\(itemID)\u{1f}\(directoryName)"] = nil
+        try? fileManager.removeItem(
+            at: cacheDirectory
+                .appendingPathComponent(Self.safeCacheName(for: itemID), isDirectory: true)
+                .appendingPathComponent(directoryName, isDirectory: true)
+        )
+    }
+
+    /// Google Lens keeps its original per-language directory; other engines
+    /// use `<engine>-<language>` beside it.
+    private static func cacheDirectoryName(
+        engineID: String,
         language: MangaOCRLanguage
+    ) -> String {
+        engineID == MangaOCRCacheKey.googleLensEngineID
+            ? language.rawValue
+            : "\(engineID)-\(language.rawValue)"
+    }
+
+    private func prepareCache(
+        for key: MangaOCRCacheKey,
+        pagePaths: [String]
     ) throws -> URL {
+        let itemID = key.itemID
+        let modifiedAt = key.modifiedAt
+        let language = key.language
+        let directoryName = Self.cacheDirectoryName(
+            engineID: key.engineID,
+            language: language
+        )
         let expectedManifest = CacheManifest(
             schemaVersion: Self.cacheSchemaVersion,
-            engineSignature: Self.engineSignature,
+            engineSignature: key.engineSignature,
             language: language,
             itemID: itemID,
             modifiedAt: modifiedAt,
@@ -277,10 +322,10 @@ actor MangaOCRService {
             }
         }
         let itemDirectory = itemRootDirectory.appendingPathComponent(
-            language.rawValue,
+            directoryName,
             isDirectory: true
         )
-        let manifestIdentity = "\(itemID)\u{1f}\(language.rawValue)"
+        let manifestIdentity = "\(itemID)\u{1f}\(directoryName)"
         if preparedManifests[manifestIdentity] == expectedManifest,
            fileManager.fileExists(atPath: itemDirectory.path) {
             return itemDirectory
@@ -301,8 +346,14 @@ actor MangaOCRService {
         }
         if existingManifest != expectedManifest {
             try? fileManager.removeItem(at: itemDirectory)
-            cache = cache.filter { $0.key.itemID != itemID }
-            cacheOrder.removeAll { $0.itemID == itemID }
+            cache = cache.filter {
+                !($0.key.itemID == itemID && $0.key.engineID == key.engineID
+                    && $0.key.language == language)
+            }
+            cacheOrder.removeAll {
+                $0.itemID == itemID && $0.engineID == key.engineID
+                    && $0.language == language
+            }
         }
 
         try fileManager.createDirectory(

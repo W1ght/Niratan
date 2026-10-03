@@ -1,3 +1,4 @@
+// test-sources: Models/Manga.swift Features/Manga/MangaOCRService.swift Features/Manga/OCR/MangaOCRTypes.swift Features/Manga/OCR/MangaOCRRegionBuilder.swift
 import Foundation
 
 @main
@@ -140,7 +141,96 @@ private enum MangaOCRCacheTests {
             "changing the stable page path list should invalidate cached OCR"
         )
 
+        try await testEngineIsolation()
         print("Manga OCR cache tests passed")
+    }
+
+    /// Each engine keeps its own directory; re-running one engine never drops
+    /// another engine's pages, and a new engine signature invalidates only
+    /// that engine.
+    private static func testEngineIsolation() async throws {
+        let cacheRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "niratan-manga-ocr-engines-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        defer { try? FileManager.default.removeItem(at: cacheRoot) }
+        let pagePaths = ["001.jpg"]
+        let lensKey = MangaOCRCacheKey(
+            itemID: "book-b",
+            pageIndex: 0,
+            pagePath: pagePaths[0],
+            modifiedAt: nil,
+            language: .japanese
+        )
+        var visionKey = lensKey
+        visionKey.engineID = "apple-vision"
+        visionKey.engineSignature = "apple-vision-v1-page"
+        let lensRegion = MangaOCRTextRegion(
+            id: "lens",
+            pageIndex: 0,
+            blockID: "lens-block",
+            lineID: "lens-line",
+            sentence: "レンズ",
+            utf16Offset: 0,
+            isVertical: true,
+            normalizedBounds: CGRect(x: 0.1, y: 0.1, width: 0.1, height: 0.3)
+        )
+        let visionRegion = MangaOCRTextRegion(
+            id: "vision",
+            pageIndex: 0,
+            blockID: "vision-block",
+            lineID: "vision-line",
+            sentence: "ビジョン",
+            utf16Offset: 0,
+            isVertical: true,
+            normalizedBounds: CGRect(x: 0.5, y: 0.1, width: 0.1, height: 0.3)
+        )
+        let service = MangaOCRService(cacheDirectory: cacheRoot)
+        await service.storeCachedRegions([lensRegion], for: lensKey, pagePaths: pagePaths)
+        await service.storeCachedRegions([visionRegion], for: visionKey, pagePaths: pagePaths)
+
+        let reopened = MangaOCRService(cacheDirectory: cacheRoot)
+        let reopenedLens = await reopened.cachedRegions(for: lensKey, pagePaths: pagePaths)
+        let reopenedVision = await reopened.cachedRegions(for: visionKey, pagePaths: pagePaths)
+        require(
+            reopenedLens == [lensRegion] && reopenedVision == [visionRegion],
+            "Google Lens and Apple Vision pages must be cached side by side"
+        )
+        let itemDirectory = try FileManager.default.contentsOfDirectory(
+            at: cacheRoot,
+            includingPropertiesForKeys: nil
+        ).first
+        let engineDirectories = try itemDirectory.map {
+            try FileManager.default.contentsOfDirectory(atPath: $0.path).sorted()
+        } ?? []
+        require(
+            engineDirectories == ["apple-vision-ja", "ja"],
+            "Google Lens must keep its original per-language directory beside other engines"
+        )
+
+        var newModelKey = visionKey
+        newModelKey.engineSignature = "apple-vision-v1-detector-abc"
+        let newModelRegions = await reopened.cachedRegions(for: newModelKey, pagePaths: pagePaths)
+        require(
+            newModelRegions == nil,
+            "a new engine signature must invalidate that engine's pages"
+        )
+        let keptLens = await reopened.cachedRegions(for: lensKey, pagePaths: pagePaths)
+        require(
+            keptLens == [lensRegion],
+            "invalidating one engine must keep the other engine's pages"
+        )
+
+        await reopened.storeCachedRegions([visionRegion], for: visionKey, pagePaths: pagePaths)
+        await reopened.clear(itemID: "book-b", engineID: "apple-vision", language: .japanese)
+        let afterClear = MangaOCRService(cacheDirectory: cacheRoot)
+        let clearedVision = await afterClear.cachedRegions(for: visionKey, pagePaths: pagePaths)
+        let survivingLens = await afterClear.cachedRegions(for: lensKey, pagePaths: pagePaths)
+        require(
+            clearedVision == nil && survivingLens == [lensRegion],
+            "re-running one engine must clear only that engine's pages"
+        )
     }
 
     private static func require(

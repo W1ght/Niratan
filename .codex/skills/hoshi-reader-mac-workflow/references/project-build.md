@@ -15,6 +15,7 @@ Load this reference only for Xcode project changes, dependencies, build scripts,
 - Verification must match both `CFBundleIdentifier == moe.shishamo.hoshi` and the running executable inside the exact built `.app`.
 - Never select or validate a build by process name, window title, bundle id alone, or an unqualified `/Applications/Niratan.app`.
 - Parallel sessions use distinct `--instance` or DerivedData paths, but still share bundle-domain preferences and user data.
+- `--data-root <dir>` (Debug builds) keeps defaults, Application Support, caches and Keychain items under `<dir>`; use it whenever verification would write user data. `--appearance dark|light` stands in for the system appearance.
 
 ## Verification
 

@@ -90,29 +90,24 @@ assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" '--prerelease="$pr
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'release/Niratan-Mac-$version.dmg'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" "format('refs/tags/v{0}', inputs.version)"
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'bash script/test_cleanup_build_artifacts.sh'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_build_and_run_native_contract.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_native_settings_navigation_contract.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Verify Manga and shared Reader regressions'
+assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'bash script/run_tests.sh'
+# High-risk regressions run through script/run_tests.sh; they must stay runnable there.
+for release_test in test_build_and_run_native_contract test_native_settings_navigation_contract test_manga_library_contract test_suwayomi_connector test_manga_page_processing test_reader_chapter_index test_reader_popup_sasayaki_regressions test_video_ajatt_contract test_video_ajatt_client test_video_remote_subtitle_loader test_video_playback_model test_video_window_open_request test_video_window_coordinator; do
+  test_file="$ROOT_DIR/script/$release_test.swift"
+  [[ -f "$test_file" ]] || fail "missing release regression test: $release_test"
+  if grep -q "^// test-skip:" "$test_file"; then
+    fail "release regression test must not be skipped: $release_test"
+  fi
+done
+assert_contains "$ROOT_DIR/script/test_video_ajatt_client.swift" 'Features/Video/Remote/BoundedURLSessionData.swift'
+assert_contains "$ROOT_DIR/script/test_video_ajatt_client.swift" 'Features/Video/Subtitles/AJATTSubtitleCatalogClient.swift'
+assert_contains "$ROOT_DIR/script/test_video_remote_subtitle_loader.swift" 'Features/Video/Remote/RemoteSubtitleLoader.swift'
 assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift test --package-path Libraries/AidokuRuntime'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_manga_library_contract.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_suwayomi_connector.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_manga_page_processing.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_chapter_index.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_reader_popup_sasayaki_regressions.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'swift script/test_video_ajatt_contract.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Features/Video/Remote/BoundedURLSessionData.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Features/Video/Subtitles/AJATTSubtitleCatalogClient.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_ajatt_client.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'Features/Video/Remote/RemoteSubtitleLoader.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_remote_subtitle_loader.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_playback_model.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_window_open_request.swift'
-assert_contains "$ROOT_DIR/.github/workflows/release-mac.yml" 'script/test_video_window_coordinator.swift'
 assert_contains "$PROJECT_FILE" "InfoPlist.xcstrings"
 assert_contains "$INFO_PLIST_STRINGS" '"NSLocalNetworkUsageDescription"'
 assert_contains "$INFO_PLIST_STRINGS" '"zh-Hans"'
 assert_contains "$INFO_PLIST_STRINGS" '"zh-Hant"'
-LOCAL_NETWORK_DESCRIPTION='Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.'
+LOCAL_NETWORK_DESCRIPTION='Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, and user-installed Aidoku sources on your local network.'
 assert_contains "$PROJECT_FILE" \
   "INFOPLIST_KEY_NSLocalNetworkUsageDescription = \"$LOCAL_NETWORK_DESCRIPTION\";"
 assert_contains "$INFO_PLIST" "$LOCAL_NETWORK_DESCRIPTION"

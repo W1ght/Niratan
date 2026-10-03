@@ -12,6 +12,7 @@
 		48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */; };
 		48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48D0C0032FB0000100000001 /* YouTubeKit */; };
 		48D0C0112FB0000100000001 /* SwiftLAME in Frameworks */ = {isa = PBXBuildFile; productRef = 48D0C0132FB0000100000001 /* SwiftLAME */; };
+		48E0A0012FC0000100000001 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = 48E0A0032FC0000100000001 /* onnxruntime */; };
 		48AA10502FAA000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 48568A462F1E7F5C00F9C126 /* Assets.xcassets */; };
 		48AA10512FAA000100000001 /* HoshiIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 48568A472F1E7F5C00F9C126 /* HoshiIcon.icon */; };
 		48AA10522FAA000100000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48C8125E2F5F47C000127630 /* PrivacyInfo.xcprivacy */; };
@@ -49,6 +50,7 @@
 				ProfileRepository.swift,
 				ProfileSettingsStore.swift,
 				ReaderKeyboardShortcutAppKitBridge.swift,
+				StatisticsStorage.swift,
 				SelectionLookup/AccessibilitySelectionReader.swift,
 				SelectionLookup/HoshiShiftHoverWKWebView.swift,
 				SelectionLookup/SelectionLookupModels.swift,
@@ -83,6 +85,7 @@
 				Sasayaki.swift,
 				Statistics.swift,
 				Subtitle.swift,
+				Sync.swift,
 			);
 			target = 48AA10002FAA000100000001 /* Niratan */;
 		};
@@ -93,7 +96,8 @@
 				Bookshelf/BookshelfDropSupport.swift,
 				Bookshelf/BookshelfViewModel.swift,
 				Bookshelf/BookView.swift,
-				Bookshelf/ShelfManagementView.swift,
+				Bookshelf/LibraryShelfSelection.swift,
+				Bookshelf/LibraryShelfSidebar.swift,
 				Bookshelf/ShelfView.swift,
 				Bookshelf/StatisticsDashboardModels.swift,
 				Bookshelf/StatisticsDashboardView.swift,
@@ -119,6 +123,26 @@
 				Manga/MangaPageProcessing.swift,
 				Manga/MangaReaderView.swift,
 				Manga/MangaReaderViewModel.swift,
+				Manga/OCR/MangaOCRPageTiling.swift,
+				Manga/MangaOCREngineRouter.swift,
+				Manga/OCR/MangaLocalOCREngine.swift,
+				Manga/OCR/MangaOCRBitmap.swift,
+				Manga/OCR/MangaOCRInference.swift,
+				Manga/OCR/MangaOCRLineLayout.swift,
+				Manga/OCR/MangaOCRModelStore.swift,
+				Manga/OCR/MangaOCRReadingOrder.swift,
+				Manga/OCR/MangaOCRRecognizer.swift,
+				Manga/OCR/MangaOCRRegionBuilder.swift,
+				Manga/OCR/MangaOCRTypes.swift,
+				Manga/OCR/MangaPanelDetector.swift,
+				Manga/OCR/MangaPPOCR.swift,
+				Manga/OCR/MangaTextDetector.swift,
+				Manga/OCR/MangaVisionOCREngine.swift,
+				Manga/MangaReaderCanvas.swift,
+				Manga/MangaReaderSettings.swift,
+				Manga/MangaReaderSettingsPanel.swift,
+				Manga/MangaReaderOCRSettings.swift,
+				Manga/MangaShortcutActions.swift,
 				Manga/SuwayomiClient.swift,
 				Manga/SuwayomiConnectionStore.swift,
 				Manga/SuwayomiSourceView.swift,
@@ -145,6 +169,7 @@
 				Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift,
 				Reader/Lyrics/ReaderLyricsTextView.swift,
 				Reader/ReaderChapterIndex.swift,
+				Reader/ReaderPageIndex.swift,
 				Reader/ReaderStatisticsPersistencePolicy.swift,
 				Reader/ReaderShortcutActions.swift,
 				Reader/Search/ReaderGoToView.swift,
@@ -152,6 +177,7 @@
 				Reader/Search/ReaderSearchEngine.swift,
 				Reader/ReaderWebView/ReaderViewportGeometry.swift,
 				Reader/ReaderWebView/WebViewBridge.swift,
+				Reader/ReaderWebView/paragraph.js,
 				Reader/ReaderWebView/reader.js,
 				Reader/ReaderWebView/selection.js,
 				Reader/ScrollReaderWebView/scrollreader.js,
@@ -186,11 +212,20 @@
 				Settings/SettingsHomeView.swift,
 				Settings/ShortcutKeyCaptureView.swift,
 				Settings/StatisticsSettingsView.swift,
+				Settings/FushiInterconnectSettingsSection.swift,
 				Settings/SyncView.swift,
 				Settings/VideoSettingsView.swift,
 				Settings/XboxControllerView.swift,
+				Sync/Fushi/FushiConflictResolutionView.swift,
+				Sync/Fushi/FushiEPUBSpineReader.swift,
+				Sync/Fushi/FushiInterconnectClient.swift,
+				Sync/Fushi/FushiInterconnectStore.swift,
+				Sync/Fushi/FushiPairingFlow.swift,
+				Sync/Fushi/FushiProgressCoordinator.swift,
+				Sync/Fushi/FushiProgressSync.swift,
 				Sync/GoogleDriveAuth.swift,
 				Sync/GoogleDriveHandler.swift,
+				Sync/TtuSyncNaming.swift,
 				Sync/GoogleDrivePresentationAnchor.swift,
 				Sync/SyncManager.swift,
 				Sync/TokenStorage.swift,
@@ -202,6 +237,8 @@
 				Video/Playback/MpvPlayerEngine.swift,
 				Video/Playback/MpvRenderView.swift,
 				Video/Playback/PlaybackEngine.swift,
+				Video/Playback/VideoTrack.swift,
+				Video/Playback/VideoShaderPreset.swift,
 				Video/Playback/VideoAudioClipExporter.swift,
 				Video/Remote/BoundedURLSessionData.swift,
 				Video/Remote/RemotePlaybackSession.swift,
@@ -238,6 +275,15 @@
 				Video/Subtitles/VideoSubtitleController.swift,
 				Video/Subtitles/VideoShiftHoverLookupState.swift,
 				Video/Subtitles/VideoSubtitleTrackExtractor.swift,
+				Video/MediaServer/JellyfinMediaServerClient.swift,
+				Video/MediaServer/MediaServerAccountStore.swift,
+				Video/MediaServer/MediaServerBrowserModel.swift,
+				Video/MediaServer/MediaServerBrowserView.swift,
+				Video/MediaServer/MediaServerClient.swift,
+				Video/MediaServer/MediaServerModels.swift,
+				Video/MediaServer/MediaServerRemoteVideoResolver.swift,
+				Video/MediaServer/MediaServerSignInSheet.swift,
+				Video/MediaServer/PlexMediaServerClient.swift,
 				Video/Anime4KShaderManager.swift,
 				Video/VideoControlsView.swift,
 				Video/VideoAudioClipRange.swift,
@@ -263,12 +309,26 @@
 				Video/VideoPlaybackHistoryStore.swift,
 				Video/VideoPlaylist.swift,
 				Video/VideoPlayerScreen.swift,
+				"Video/VideoPlayerScreen+Subtitles.swift",
+				"Video/VideoPlayerScreen+Chrome.swift",
+				"Video/VideoPlayerScreen+OSD.swift",
+				"Video/VideoPlayerScreen+Mining.swift",
+				"Video/VideoPlayerScreen+Opening.swift",
+				"Video/VideoPlayerScreen+Shortcuts.swift",
 				Video/VideoPlayerViewModel.swift,
 				Video/VideoShortcutActions.swift,
 				Video/VideoStudyListCard.swift,
 				Video/VideoThumbnailStore.swift,
 				Video/VideoWindowChromeController.swift,
 				Video/VideoWindowCoordinator.swift,
+				Sync/GoogleDriveClient.swift,
+				Sync/GoogleDriveSync/GoogleDriveSyncHandler.swift,
+				Sync/GoogleDriveSync/GoogleDriveSyncManager.swift,
+				"Sync/GoogleDriveSync/GoogleDriveSyncManager+Files.swift",
+				"Sync/GoogleDriveSync/GoogleDriveSyncManager+Listing.swift",
+				"Sync/GoogleDriveSync/GoogleDriveSyncManager+State.swift",
+				Sync/SyncLedger.swift,
+				Sync/SyncStorage.swift,
 			);
 			target = 48AA10002FAA000100000001 /* Niratan */;
 		};
@@ -336,6 +396,7 @@
 				48AA10142FAA000100000001 /* CHoshiDicts in Frameworks */,
 				48D0C0012FB0000100000001 /* YouTubeKit in Frameworks */,
 				48D0C0112FB0000100000001 /* SwiftLAME in Frameworks */,
+				48E0A0012FC0000100000001 /* onnxruntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -386,6 +447,7 @@
 				48BC0BDE2F5C316B00EDAC3F /* CHoshiDicts */,
 				48D0C0032FB0000100000001 /* YouTubeKit */,
 				48D0C0132FB0000100000001 /* SwiftLAME */,
+				48E0A0032FC0000100000001 /* onnxruntime */,
 			);
 			productName = "Niratan";
 			productReference = 48AA10012FAA000100000001 /* Niratan.app */;
@@ -423,6 +485,7 @@
 				48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */,
 				48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
 				48D0C0122FB0000100000001 /* XCRemoteSwiftPackageReference "SwiftLAME" */,
+				48E0A0022FC0000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 48107AAE2F114021009E12D1;
@@ -594,7 +657,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, Fushi interconnect hosts, and user-installed Aidoku sources on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -636,7 +699,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, Fushi interconnect hosts, and user-installed Aidoku sources on your local network.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -696,10 +759,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		48BC0BDD2F5C316B00EDAC3F /* XCRemoteSwiftPackageReference "hoshidicts" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/HuangAntimony/hoshidicts.git";
+			repositoryURL = "https://github.com/W1ght/hoshidicts.git";
 			requirement = {
 				kind = revision;
-				revision = c60de40bf5f000a28bd6d309383761cd881b196b;
+				revision = 885c49fb1c8b74e6b2811a10007c3236f0d7c881;
 			};
 		};
 		48D0C0022FB0000100000001 /* XCRemoteSwiftPackageReference "YouTubeKit" */ = {
@@ -716,6 +779,14 @@
 			requirement = {
 				kind = revision;
 				revision = 45d1b021c2bd2bbd38b9669934c0584cda0d1b6b;
+			};
+		};
+		48E0A0022FC0000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager.git";
+			requirement = {
+				kind = revision;
+				revision = b7fb7f7dea8a2469e6335d95a61b8f36d0dc83b2;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -743,6 +814,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 48D0C0122FB0000100000001 /* XCRemoteSwiftPackageReference "SwiftLAME" */;
 			productName = SwiftLAME;
+		};
+		48E0A0032FC0000100000001 /* onnxruntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 48E0A0022FC0000100000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
+			productName = onnxruntime;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

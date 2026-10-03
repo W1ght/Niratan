@@ -1,3 +1,4 @@
+// test-sources: Features/Reader/Lyrics/ReaderLyricsTextView.swift Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift Features/Reader/Lyrics/ReaderLyricsSelectionResolver.swift Features/Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift
 import AppKit
 
 @main

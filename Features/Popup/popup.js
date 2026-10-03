@@ -18,6 +18,7 @@ const NUMERIC_TAG = /^\d+$/;
 // this might not cover every tag
 const POS_TAGS = new Set(['n', 'adj-i', 'adj-na', 'adj-no', 'v1', 'vk', 'vs', 'vs-i', 'vs-s', 'vz', 'vi', 'vt']);
 let audioUrls = {};
+let audioLists = {};
 let lastSelection = '';
 let currentDictionaryMedia = null;
 let selectedDictionaries = {};
@@ -68,6 +69,21 @@ document.addEventListener('copy', event => {
     event.preventDefault();
     event.clipboardData.setData('text/plain', text);
 }, true);
+
+function wrapKanji(text) {
+    if (!window.kanjiLookupEnabled) {
+        return [document.createTextNode(text)];
+    }
+    const nodes = [];
+    for (const ch of text) {
+        if (KANJI_PATTERN.test(ch)) {
+            nodes.push(el('span', { className: 'kanji-char', textContent: ch }));
+        } else {
+            nodes.push(document.createTextNode(ch));
+        }
+    }
+    return nodes;
+}
 
 function el(tag, props = {}, children = []) {
     const element = document.createElement(tag);
@@ -257,11 +273,11 @@ function buildFuriganaEl(parent, expression, reading) {
     const segments = segmentFurigana(expression, reading);
     for (const [text, furigana] of segments) {
         if (furigana) {
-            const ruby = el('ruby', {}, [text]);
+            const ruby = el('ruby', {}, wrapKanji(text));
             ruby.appendChild(el('rt', { textContent: furigana }));
             parent.appendChild(ruby);
         } else {
-            parent.appendChild(document.createTextNode(text));
+            parent.append(...wrapKanji(text));
         }
     }
     return segments.length === 1 && segments[0][1];
@@ -507,6 +523,9 @@ function constructGlossaryHtml(entryIndex) {
 
     entry.glossaries.forEach(g => {
         const dictName = g.dictionary;
+        if (window.excludedDictionaries?.includes(dictName)) {
+            return;
+        }
 
         const tempDiv = document.createElement('div');
         try {
@@ -1088,7 +1107,7 @@ function createFrequencyGroup(freqGroup) {
 function createHarmonicFrequencyTag(frequencies) {
     const rank = getFrequencyHarmonicRank(frequencies);
     return el('span', { className: 'frequency-group harmonic-frequency' }, [
-        el('span', { className: 'frequency-dict-label', textContent: 'Average' }),
+        el('span', { className: 'frequency-dict-label', textContent: window.hoshiLabels?.average || 'Average' }),
         el('span', { className: 'frequency-values', textContent: rank })
     ]);
 }
@@ -1261,23 +1280,75 @@ function createTags(entry) {
     return container;
 }
 
+async function fetchAudioSources(template, expression, reading) {
+    const url = template
+    .replace('{term}', encodeURIComponent(expression))
+    .replace('{reading}', encodeURIComponent(reading));
+    try {
+        const response = await fetch(`audio://?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+        if (data.type !== 'audioSourceList') {
+            return [];
+        }
+        return (data.audioSources || []).filter(source => source.url);
+    } catch {
+        return [];
+    }
+}
+
 async function fetchAudioUrl(expression, reading) {
     const templates = window.audioSources;
     if (!templates?.length) return null;
 
     for (const template of templates) {
-        const url = template
-        .replace('{term}', encodeURIComponent(expression))
-        .replace('{reading}', encodeURIComponent(reading));
-        try {
-            const response = await fetch(`audio://?url=${encodeURIComponent(url)}`);
-            const data = await response.json();
-            if (data.type === 'audioSourceList' && data.audioSources?.[0]?.url) {
-                return data.audioSources[0].url;
-            }
-        } catch {}
+        const entries = await fetchAudioSources(template, expression, reading);
+        if (entries.length) {
+            return entries[0].url;
+        }
     }
     return null;
+}
+
+async function fetchAudioList(entryIndex) {
+    if (audioLists[entryIndex]) {
+        return audioLists[entryIndex];
+    }
+    const entry = window.lookupEntries?.[entryIndex];
+    const templates = window.audioSources;
+    if (!entry || !templates?.length) {
+        return [];
+    }
+
+    const list = [];
+    for (const [index, template] of templates.entries()) {
+        const entries = await fetchAudioSources(template, entry.expression, entry.reading || entry.expression);
+        const sourceName = window.audioSourceNames?.[index] || 'Audio';
+        entries.forEach(item => list.push({
+            name: item.name ? `${sourceName}: ${item.name}` : sourceName,
+            url: item.url
+        }));
+    }
+    audioLists[entryIndex] = list;
+    return list;
+}
+
+async function getAudioMenu(entryIndex) {
+    const list = await fetchAudioList(entryIndex);
+    const counts = {};
+    return {
+        names: list.map(item => {
+            counts[item.name] = (counts[item.name] || 0) + 1;
+            return counts[item.name] > 1 ? `${item.name} ${counts[item.name]}` : item.name;
+        }),
+        selected: list.findIndex(item => item.url === audioUrls[entryIndex])
+    };
+}
+
+async function showAudioSourceMenu(entryIndex, x, y) {
+    const handler = window.webkit?.messageHandlers?.audioSourceMenu;
+    if (!handler) { return; }
+    const menu = await getAudioMenu(entryIndex);
+    handler.postMessage({ entryIndex, names: menu.names, selected: menu.selected, x, y });
 }
 
 function playWordAudio(audioUrl) {
@@ -1348,6 +1419,14 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
                 await mineEntryAtIndex(entryIndex);
             }
         };
+        if (kind === 'audio') {
+            slot.addEventListener('contextmenu', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (slot.dataset.enabled === 'false') { return; }
+                showAudioSourceMenu(entryIndex, event.clientX, event.clientY);
+            });
+        }
     }
 
     return slot;
@@ -1370,12 +1449,12 @@ function updateButtonSlot(slot, changes) {
         const enabled = slot.dataset.enabled !== 'false';
         slot.disabled = !enabled;
         const title = kind === 'audio'
-            ? 'Play Audio'
+            ? (window.hoshiLabels?.playAudio || 'Play Audio')
             : (kind === 'context'
                 ? (window.contextMiningLabel || 'Select Context')
                 : (kind === 'viewNote'
                     ? (window.viewAnkiNoteLabel || 'View added note in Anki')
-                    : 'Add to Anki'));
+                    : (window.hoshiLabels?.addToAnki || 'Add to Anki')));
         slot.setAttribute('aria-label', title);
         slot.title = title;
         slot.innerHTML = inlineButtonIcon(kind, state);
@@ -1413,12 +1492,14 @@ function inlineButtonIcon(kind, state) {
     return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8m-4-4h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 }
 
-async function playEntryAudio(entryIndex) {
+async function playEntryAudio(entryIndex, sourceIndex = null) {
     const entry = window.lookupEntries?.[entryIndex];
     if (!entry) { return; }
     const audioSlot = getButtonSlot('audio', entryIndex);
 
-    if (!audioUrls[entryIndex]) {
+    if (sourceIndex !== null) {
+        audioUrls[entryIndex] = (await fetchAudioList(entryIndex))[sourceIndex]?.url || null;
+    } else if (!audioUrls[entryIndex]) {
         audioUrls[entryIndex] = await fetchAudioUrl(entry.expression, entry.reading);
     }
     if (!audioUrls[entryIndex] || !playWordAudio(audioUrls[entryIndex])) {
@@ -1438,7 +1519,7 @@ async function mineEntryAtIndex(entryIndex) {
     updateButtonSlot(mineSlot, { enabled: false });
     webkit.messageHandlers.miningFeedback.postMessage({
         status: 'pending',
-        message: 'Preparing card…'
+        message: window.hoshiLabels?.preparingCard || 'Preparing card…'
     });
 
     let result;
@@ -1454,10 +1535,10 @@ async function mineEntryAtIndex(entryIndex) {
             lastSelection
         );
     } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error || 'Unknown error');
+        const detail = error instanceof Error ? error.message : String(error || window.hoshiLabels?.unknownError || 'Unknown error');
         webkit.messageHandlers.miningFeedback.postMessage({
             status: 'failed',
-            message: `Unable to prepare the card: ${detail}`
+            message: (window.hoshiLabels?.prepareCardFailed || 'Unable to prepare the card: %@').replace('%@', detail)
         });
         updateButtonSlot(mineSlot, { state: 'default', enabled: true });
         return;
@@ -1546,7 +1627,7 @@ function createEntryHeader(entry, idx) {
     if (reading && reading !== expression) {
         needsScroll = buildFuriganaEl(expressionSpan, expression, reading);
     } else {
-        expressionSpan.textContent = expression;
+        expressionSpan.append(...wrapKanji(expression));
     }
     if (needsScroll) {
         const expressionScroll = el('div', { className: 'expression-scroll' });
@@ -1618,7 +1699,7 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     const dictStyle = window.dictionaryStyles?.[dictName] ?? '';
     dictWrapper.appendChild(el('style', {
         textContent: `
-            [data-dictionary="${dictName}"] {
+            :where(div)[data-dictionary="${dictName}"] {
                 @media (prefers-color-scheme: light) { color: #000; }
                 @media (prefers-color-scheme: dark) { color: #fff; }
                 ${dictStyle}
@@ -1771,6 +1852,7 @@ function redirect(count) {
     window.entryCount = count;
     currentDictionaryEntryIndex = 0;
     audioUrls = {};
+    audioLists = {};
     selectedDictionaries = {};
     document.getElementById('entries-container').innerHTML = '';
     syncButtonFrames();
@@ -1798,6 +1880,7 @@ function redirectDictionaryQuery(count) {
     window.entryCount = count;
     currentDictionaryEntryIndex = 0;
     audioUrls = {};
+    audioLists = {};
     selectedDictionaries = {};
     container.replaceChildren(querySource, queryDivider);
     syncButtonFrames();
@@ -1808,6 +1891,85 @@ function redirectDictionaryQuery(count) {
             document.scrollingElement.scrollTop = 0;
         });
     });
+}
+
+function buildKanjiEntry(data) {
+    const entry = el('div', { className: 'entry kanji-entry' });
+
+    const header = el('div', { className: 'entry-header' });
+    header.appendChild(el('span', { className: 'kanji', textContent: data.character }));
+    entry.appendChild(header);
+
+    const sections = el('div', { className: 'glossary-sections single-section' });
+    data.entries.forEach(e => {
+        const details = el('details', { className: 'glossary-group', open: true });
+
+        const summary = el('summary', { className: 'dict-label' });
+        summary.appendChild(el('span', { className: 'dict-name', textContent: e.dictName }));
+        details.appendChild(summary);
+
+        const dictWrapper = el('div', { 'data-dictionary': e.dictName });
+        const tagsRow = createGlossaryTags([
+            ...(e.tags || []),
+            ...(e.stats || []).map(stat => `${stat.label} ${stat.value}`)
+        ]);
+        if (tagsRow) {
+            dictWrapper.appendChild(tagsRow);
+        }
+
+        const content = el('div', { className: 'glossary-content' });
+        if (e.onyomi) {
+            content.appendChild(el('div', { className: 'kanji-reading' }, [
+                el('span', { className: 'kanji-reading-label', textContent: '音' }),
+                document.createTextNode(e.onyomi)
+            ]));
+        }
+        if (e.kunyomi) {
+            content.appendChild(el('div', { className: 'kanji-reading' }, [
+                el('span', { className: 'kanji-reading-label', textContent: '訓' }),
+                document.createTextNode(e.kunyomi)
+            ]));
+        }
+        if (e.meanings.length) {
+            if (e.onyomi || e.kunyomi) {
+                content.appendChild(el('hr', { className: 'kanji-separator' }));
+            }
+            content.appendChild(el('ul', {}, e.meanings.map(m => el('li', { textContent: m }))));
+        }
+        dictWrapper.appendChild(content);
+        details.appendChild(dictWrapper);
+        sections.appendChild(details);
+    });
+    entry.appendChild(sections);
+
+    return entry;
+}
+
+function redirectKanji(data) {
+    backStack.push(snapshot());
+    forwardStack.length = 0;
+    window.lookupEntries = undefined;
+    window.entryCount = 0;
+    currentDictionaryEntryIndex = 0;
+    audioUrls = {};
+    selectedDictionaries = {};
+    const container = document.getElementById('entries-container');
+    container.replaceChildren(buildKanjiEntry(data));
+    normalizeDictionaryEntries();
+    syncButtonFrames();
+    requestAnimationFrame(() => {
+        document.scrollingElement.scrollTop = 0;
+        requestAnimationFrame(() => {
+            document.scrollingElement.scrollTop = 0;
+        });
+    });
+}
+
+async function lookupKanji(kanji) {
+    const data = await webkit.messageHandlers.kanjiRedirect.postMessage(kanji);
+    if (data) {
+        redirectKanji(data);
+    }
 }
 
 function snapshot() {
@@ -1828,6 +1990,7 @@ function restore(s) {
     window.entryCount = s.entryCount;
     currentDictionaryEntryIndex = s.currentDictionaryEntryIndex || 0;
     audioUrls = {};
+    audioLists = {};
     selectedDictionaries = {};
     normalizeDictionaryEntries();
     window.hoshiFocusDictionaryEntry(currentDictionaryEntryIndex, false);
@@ -2256,6 +2419,11 @@ window.renderPopup = function() {
         }
         if (hasPopupSelection()) {
             cachePopupSelection();
+            return;
+        }
+        const kanjiTarget = window.kanjiLookupEnabled ? target?.closest('.kanji-char') : null;
+        if (kanjiTarget) {
+            lookupKanji(kanjiTarget.textContent);
             return;
         }
         handlePopupLookupAtPoint(target, e.clientX, e.clientY);

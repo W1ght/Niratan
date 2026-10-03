@@ -1,9 +1,12 @@
 import AppKit
+import IOKit.pwr_mgt
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct MangaReaderView: View {
     @Environment(UserConfig.self) private var userConfig
+    @Environment(ShortcutManager.self) private var shortcutManager
+    @Environment(\.controlActiveState) private var controlActiveState
     @AppStorage("mangaGoogleOCRDisclosureAccepted")
     private var hasAcceptedGoogleOCRDisclosure = false
     @State private var profileRepository = ProfileRepository.shared
@@ -12,6 +15,12 @@ struct MangaReaderView: View {
     @State private var showsGoogleOCRDisclosure = false
     @State private var showsPageNavigator = false
     @State private var showsZoomControls = false
+    @State private var showsTapZones = false
+    @State private var flashOpacity = 0.0
+    @State private var continuousScrollRequest: MangaContinuousScrollRequest?
+    @State private var shortcutRegistrationIDs: [UUID] = []
+    @State private var displaySleepGuard = MangaDisplaySleepGuard()
+    @State private var window: NSWindow?
     @State private var popupCoordinateSpace = MangaReaderPopupCoordinateSpace()
 
     init(item: MangaLibraryItem, source: MangaLibrarySource) {
@@ -38,36 +47,77 @@ struct MangaReaderView: View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
                 readerContent
+                    .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                        viewModel.viewportSize = size
+                    }
+
+                if showsTapZones {
+                    MangaTapZoneHint(settings: viewModel.settings)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+
+                Color.white
+                    .opacity(flashOpacity)
+                    .allowsHitTesting(false)
 
                 ForEach(viewModel.popupPresentation.popups) { popup in
                     popupView(popup, screenSize: geometry.size)
                 }
 
-                if viewModel.isRecognizingText {
-                    HStack(spacing: 10) {
-                        ProgressView(value: viewModel.ocrProgress)
-                            .frame(width: 96)
-                        Text(
-                            "OCR \(viewModel.ocrCompletedPageCount) / \(viewModel.ocrTotalPageCount)"
-                        )
-                        .monospacedDigit()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect(.regular, in: .capsule)
-                    .padding(.top, 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .allowsHitTesting(false)
-                    .zIndex(1_000)
-                } else if let message = viewModel.ocrStatusMessage {
-                    Label(message, systemImage: "text.viewfinder")
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                statusOverlay
+            }
+            .overlay(alignment: .topLeading) {
+                if let hint = viewModel.transientHint {
+                    Text(hint)
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
                         .glassEffect(.regular, in: .capsule)
-                        .padding(.top, 12)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .padding(14)
                         .allowsHitTesting(false)
-                        .zIndex(1_000)
+                        .transition(.opacity)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if !viewModel.isInterfaceHidden,
+                   viewModel.pageCount > 1,
+                   viewModel.isContentAvailable {
+                    MangaReaderBottomBar(
+                        viewModel: viewModel,
+                        onJumpToPage: jumpToPage
+                    )
+                    .padding(.bottom, 14)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if viewModel.isInterfaceHidden, viewModel.settings.showsPageNumber,
+                   viewModel.pageCount > 0 {
+                    Text(viewModel.pageLabel)
+                        .font(.caption.monospacedDigit())
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .glassEffect(.regular, in: .capsule)
+                        .padding(12)
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if viewModel.isInterfaceHidden {
+                    Button {
+                        withAnimation(.smooth) {
+                            viewModel.isInterfaceHidden = false
+                        }
+                    } label: {
+                        Label("Show Interface", systemImage: "menubar.rectangle")
+                            .labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .opacity(0.35)
+                    .padding(12)
+                    .help("Show Interface")
                 }
             }
             .background(
@@ -75,89 +125,164 @@ struct MangaReaderView: View {
                     coordinateSpace: popupCoordinateSpace
                 )
             )
+            .background(MangaWindowReader { window = $0 })
         }
-            .navigationTitle(viewModel.title)
-            .toolbar {
-                MangaReaderToolbar(
-                    viewModel: viewModel,
-                    showsPageNavigator: $showsPageNavigator,
-                    showsZoomControls: $showsZoomControls,
-                    onJumpToPage: jumpToPage,
-                    onToggleOCR: toggleOCR
-                )
+        .background(Color(nsColor: viewModel.pageBackgroundColor))
+        .animation(.smooth(duration: 0.2), value: viewModel.isInterfaceHidden)
+        .animation(.smooth(duration: 0.2), value: viewModel.transientHint)
+        .navigationTitle(viewModel.title)
+        .toolbar {
+            MangaReaderToolbar(
+                viewModel: viewModel,
+                showsPageNavigator: $showsPageNavigator,
+                showsZoomControls: $showsZoomControls,
+                onJumpToPage: jumpToPage,
+                onToggleOCR: toggleOCR,
+                onToggleFullScreen: toggleFullScreen
+            )
+        }
+        .inspector(isPresented: $viewModel.showsSettingsPanel) {
+            MangaReaderSettingsPanel(viewModel: viewModel)
+                .inspectorColumnWidth(min: 300, ideal: 340, max: 440)
+        }
+        .alert(
+            "Unable to Open Manga",
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+        .alert(
+            "Use Google Lens Text Recognition?",
+            isPresented: $showsGoogleOCRDisclosure
+        ) {
+            Button("Cancel", role: .cancel) {}
+            Button("Continue") {
+                hasAcceptedGoogleOCRDisclosure = true
+                viewModel.toggleOCR()
             }
-            .alert(
-                "Unable to Open Manga",
-                isPresented: Binding(
-                    get: { viewModel.errorMessage != nil },
-                    set: { if !$0 { viewModel.errorMessage = nil } }
-                )
-            ) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(viewModel.errorMessage ?? "")
+        } message: {
+            Text("Recognizing an entire manga sends a reduced copy of every page without Mokuro text to Google. Results are cached on this Mac so reopening does not recognize the same pages again. Google Lens requires an internet connection.")
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.home) {
+            viewModel.goToFirstPage()
+            syncContinuousPosition()
+            return .handled
+        }
+        .onKeyPress(.end) {
+            viewModel.goToLastPage()
+            syncContinuousPosition()
+            return .handled
+        }
+        .onChange(of: viewModel.mode) { _, mode in
+            if mode == .continuous {
+                continuousScrollPosition = viewModel.currentPageIndex
             }
-            .alert(
-                "Use Google Lens Text Recognition?",
-                isPresented: $showsGoogleOCRDisclosure
-            ) {
-                Button("Cancel", role: .cancel) {}
-                Button("Continue") {
-                    hasAcceptedGoogleOCRDisclosure = true
-                    viewModel.toggleOCR()
+            viewModel.showReadingModeHintIfNeeded()
+        }
+        .onChange(of: viewModel.pageTurnToken) { _, _ in
+            flashIfNeeded()
+        }
+        .onChange(of: viewModel.isInterfaceHidden) { _, hidden in
+            setToolbarVisible(!hidden)
+        }
+        .onChange(of: viewModel.settings.keepsScreenOn) { _, _ in
+            updateDisplaySleepGuard()
+        }
+        .onChange(of: controlActiveState) { _, _ in
+            updateDisplaySleepGuard()
+        }
+        .onChange(
+            of: profileRepository.index.globalActiveProfileId
+        ) { _, _ in
+            // Lookup state belongs to the Profile that created it. Close
+            // it before the new Profile's Anki mapping becomes active.
+            viewModel.closeOCRLookup()
+        }
+        .onAppear {
+            registerKeyboardShortcuts()
+            updateDisplaySleepGuard()
+            viewModel.showReadingModeHintIfNeeded()
+            if viewModel.settings.showsTapZonesOnOpen,
+               viewModel.settings.tapZoneLayout != .disabled {
+                showsTapZones = true
+            }
+        }
+        .onDisappear {
+            unregisterKeyboardShortcuts()
+            displaySleepGuard.isActive = false
+            setToolbarVisible(true)
+            // Model sessions hold hundreds of megabytes; reload on demand.
+            Task {
+                await MangaLocalOCREngine.shared.unload()
+                await MangaPanelDetector.shared.unload()
+            }
+        }
+        .task(id: showsTapZones) {
+            guard showsTapZones else { return }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { showsTapZones = false }
+        }
+        .task {
+            await viewModel.refreshOCREngine()
+        }
+        .onChange(of: MangaOCRModelManager.shared.revision) { _, _ in
+            Task { await viewModel.refreshOCREngine() }
+        }
+        .task(id: viewModel.visibleOCRRequestID) {
+            await viewModel.loadVisibleOCRRegions()
+        }
+        .task(id: viewModel.pageProcessingRequestID) {
+            await viewModel.preparePageProcessing()
+            if viewModel.mode == .continuous {
+                continuousScrollPosition = viewModel.currentPageIndex
+            }
+        }
+        .task(id: viewModel.fullOCRRequestID) {
+            await viewModel.recognizeAllPages()
+        }
+        .task(id: pagedAutoScrollID) {
+            await runPagedAutoScroll()
+        }
+    }
+
+    @ViewBuilder
+    private var statusOverlay: some View {
+        VStack(spacing: 8) {
+            if viewModel.isRecognizingText {
+                HStack(spacing: 10) {
+                    ProgressView(value: viewModel.ocrProgress)
+                        .frame(width: 96)
+                    Text(
+                        "OCR \(viewModel.ocrCompletedPageCount) / \(viewModel.ocrTotalPageCount)"
+                    )
+                    .monospacedDigit()
                 }
-            } message: {
-                Text("Recognizing an entire manga sends a reduced copy of every page without Mokuro text to Google. Results are cached on this Mac so reopening does not recognize the same pages again. Google Lens requires an internet connection.")
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect(.regular, in: .capsule)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            } else if let message = viewModel.ocrStatusMessage {
+                Label(message, systemImage: "text.viewfinder")
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(.regular, in: .capsule)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
-            .focusable()
-            .focusEffectDisabled()
-            .onKeyPress(.escape) {
-                viewModel.handleEscape() ? .handled : .ignored
+            if viewModel.settings.panelNavigation,
+               let status = viewModel.panelStatus {
+                MangaPanelStatusChip(status: status)
             }
-            .onKeyPress(.leftArrow) {
-                viewModel.handleLeftArrow()
-                syncContinuousPosition()
-                return .handled
-            }
-            .onKeyPress(.rightArrow) {
-                viewModel.handleRightArrow()
-                syncContinuousPosition()
-                return .handled
-            }
-            .onKeyPress(.pageUp) {
-                viewModel.goBackward()
-                syncContinuousPosition()
-                return .handled
-            }
-            .onKeyPress(.pageDown) {
-                viewModel.goForward()
-                syncContinuousPosition()
-                return .handled
-            }
-            .onChange(of: viewModel.layout) { _, layout in
-                if layout == .continuous {
-                    continuousScrollPosition = viewModel.currentPageIndex
-                }
-            }
-            .onChange(
-                of: profileRepository.index.globalActiveProfileId
-            ) { _, _ in
-                // Lookup state belongs to the Profile that created it. Close
-                // it before the new Profile's Anki mapping becomes active.
-                viewModel.closeOCRLookup()
-            }
-            .task(id: viewModel.visibleOCRRequestID) {
-                await viewModel.loadVisibleOCRRegions()
-            }
-            .task(id: viewModel.pageProcessingRequestID) {
-                await viewModel.preparePageProcessing()
-                if viewModel.layout == .continuous {
-                    continuousScrollPosition = viewModel.currentPageIndex
-                }
-            }
-            .task(id: viewModel.fullOCRRequestID) {
-                await viewModel.recognizeAllPages()
-            }
+        }
+        .padding(.top, 12)
+        .allowsHitTesting(false)
+        .zIndex(1_000)
     }
 
     @ViewBuilder
@@ -173,49 +298,84 @@ struct MangaReaderView: View {
             ProgressView("Preparing Manga Pages…")
                 .controlSize(.large)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black)
         } else {
-            switch viewModel.layout {
-            case .singlePage, .doublePage:
+            switch viewModel.mode {
+            case .paged, .verticalPaged:
                 MangaPagedReader(
                     viewModel: viewModel,
                     ocrRegions: viewModel.visibleOCRRegions,
                     showsOCRSelection: !viewModel.popupPresentation.popups.isEmpty,
-                    onSetCover: coverUpdateHandler,
-                    onDismissOCRSelection: viewModel.closeOCRLookup,
-                    onOCRSelection: { region, rect in
-                        viewModel.presentOCRLookup(
-                            region: region,
-                            anchorRect: rect,
-                            userConfig: userConfig
-                        )
-                    }
+                    style: canvasStyle,
+                    actions: canvasActions
                 )
             case .continuous:
                 MangaContinuousReader(
                     viewModel: viewModel,
                     scrollPosition: $continuousScrollPosition,
+                    scrollRequest: $continuousScrollRequest,
                     popupCoordinateSpace: popupCoordinateSpace,
                     showsOCRSelection: !viewModel.popupPresentation.popups.isEmpty,
-                    onSetCover: coverUpdateHandler,
-                    onDismissOCRSelection: viewModel.closeOCRLookup,
-                    onOCRSelection: { region, rect in
-                        viewModel.presentOCRLookup(
-                            region: region,
-                            anchorRect: rect,
-                            userConfig: userConfig
-                        )
-                    }
+                    style: canvasStyle,
+                    actions: canvasActions
                 )
             }
         }
     }
 
-    private var coverUpdateHandler: ((Int) -> Void)? {
-        guard viewModel.allowsCoverUpdates else { return nil }
-        return { pageIndex in
-            viewModel.setCover(to: pageIndex)
+    private var canvasStyle: MangaCanvasStyle {
+        MangaCanvasStyle(
+            settings: viewModel.settings,
+            backgroundColor: viewModel.pageBackgroundColor,
+            isPopupOpen: !viewModel.popupPresentation.popups.isEmpty
+        )
+    }
+
+    private var canvasActions: MangaCanvasActions {
+        var actions = MangaCanvasActions()
+        actions.onSetCover = viewModel.allowsCoverUpdates
+            ? { pageIndex in viewModel.setCover(to: pageIndex) }
+            : nil
+        actions.onZoomScaleChange = { scale in
+            viewModel.zoomPercentage = Int((scale * 100).rounded())
         }
+        actions.onWheelTurn = { turn in
+            viewModel.turnFromWheel(turn)
+            syncContinuousPosition()
+        }
+        actions.onTapZone = { action in
+            withAnimation(.smooth(duration: 0.2)) {
+                viewModel.handleTapZone(action)
+            }
+            syncContinuousPosition()
+        }
+        actions.onSwipeTurn = { turn in
+            turn == .forward ? viewModel.goForward() : viewModel.goBackward()
+        }
+        actions.onDismissOCRSelection = viewModel.closeOCRLookup
+        actions.onOCRSelection = { region, rect in
+            viewModel.presentOCRLookup(
+                region: region,
+                anchorRect: rect,
+                userConfig: userConfig
+            )
+        }
+        actions.onPreviousPage = {
+            viewModel.goBackward()
+            syncContinuousPosition()
+        }
+        actions.onNextPage = {
+            viewModel.goForward()
+            syncContinuousPosition()
+        }
+        actions.onJumpToPage = {
+            viewModel.isInterfaceHidden = false
+            showsPageNavigator = true
+        }
+        actions.onToggleDirection = viewModel.toggleDirection
+        actions.onZoomStep = { step in
+            viewModel.zoom(by: step)
+        }
+        return actions
     }
 
     private func jumpToPage(_ pageIndex: Int) {
@@ -233,6 +393,7 @@ struct MangaReaderView: View {
             return
         }
         guard !viewModel.isOCREnabled,
+              viewModel.settings.ocrEngine == .googleLens,
               !hasAcceptedGoogleOCRDisclosure else {
             viewModel.toggleOCR()
             return
@@ -240,11 +401,188 @@ struct MangaReaderView: View {
         showsGoogleOCRDisclosure = true
     }
 
+    /// Hides or shows the window toolbar without resizing the window, so the
+    /// page area grows into the toolbar's space instead of the window shrinking.
+    private func setToolbarVisible(_ visible: Bool) {
+        guard let window, let toolbar = window.toolbar,
+              toolbar.isVisible != visible else {
+            return
+        }
+        let frame = window.frame
+        toolbar.isVisible = visible
+        if !window.styleMask.contains(.fullScreen) {
+            window.setFrame(frame, display: true)
+        }
+    }
+
+    /// The display stays awake only while the manga window is active.
+    private func updateDisplaySleepGuard() {
+        displaySleepGuard.isActive = viewModel.settings.keepsScreenOn
+            && controlActiveState == .key
+    }
+
+    private func toggleFullScreen() {
+        window?.toggleFullScreen(nil)
+    }
+
     private func syncContinuousPosition() {
-        guard viewModel.layout == .continuous else { return }
+        guard viewModel.mode == .continuous else { return }
         withAnimation(.smooth) {
             continuousScrollPosition = viewModel.currentPageIndex
         }
+    }
+
+    private func flashIfNeeded() {
+        guard viewModel.settings.flashesOnPageChange else { return }
+        flashOpacity = 0.9
+        withAnimation(.linear(duration: 0.08).delay(0.02)) {
+            flashOpacity = 0
+        }
+    }
+
+    // MARK: Auto-scroll
+
+    private var isAutoScrollActive: Bool {
+        viewModel.settings.autoScroll
+            && !viewModel.showsSettingsPanel
+            && viewModel.popupPresentation.popups.isEmpty
+            && !viewModel.isLoadingChapter
+    }
+
+    private var pagedAutoScrollID: String {
+        "\(isAutoScrollActive)|\(viewModel.mode.rawValue)|\(viewModel.settings.autoScrollSpeed)|\(viewModel.currentPageIndex)"
+    }
+
+    /// Fushi turns one page every viewport-height / speed seconds in paged
+    /// modes; the long strip scrolls continuously instead.
+    private func runPagedAutoScroll() async {
+        guard isAutoScrollActive, viewModel.mode != .continuous else { return }
+        let height = max(200, viewModel.viewportSize.height)
+        let interval = Double(height) / Double(max(5, viewModel.settings.autoScrollSpeed))
+        try? await Task.sleep(for: .seconds(interval))
+        guard !Task.isCancelled, isAutoScrollActive, viewModel.canGoForward else { return }
+        viewModel.goForward()
+    }
+
+    // MARK: Keyboard
+
+    private func registerKeyboardShortcuts() {
+        guard shortcutRegistrationIDs.isEmpty else { return }
+        shortcutRegistrationIDs = [
+            shortcutManager.register(
+                scope: .popup,
+                handlers: [
+                    PopupShortcutActions.dismiss.id: {
+                        guard let popup = viewModel.popupPresentation.popups.last else {
+                            return false
+                        }
+                        viewModel.dismissPopup(id: popup.id)
+                        return true
+                    },
+                ]
+            ),
+            shortcutManager.register(
+                scope: .manga,
+                handlers: mangaShortcutHandlers
+            ),
+        ]
+    }
+
+    private func unregisterKeyboardShortcuts() {
+        shortcutRegistrationIDs.forEach(shortcutManager.unregister)
+        shortcutRegistrationIDs.removeAll()
+    }
+
+    private var mangaShortcutHandlers: [String: ShortcutHandler] {
+        [
+            MangaShortcutActions.pageLeft.id: {
+                pageHorizontally(left: true)
+            },
+            MangaShortcutActions.pageRight.id: {
+                pageHorizontally(left: false)
+            },
+            MangaShortcutActions.nextPage.id: {
+                pageVertically(.forward)
+            },
+            MangaShortcutActions.previousPage.id: {
+                pageVertically(.backward)
+            },
+            MangaShortcutActions.pageDown.id: {
+                pageVertically(.forward)
+            },
+            MangaShortcutActions.pageUp.id: {
+                pageVertically(.backward)
+            },
+            MangaShortcutActions.advance.id: {
+                pageVertically(.forward)
+            },
+            MangaShortcutActions.toggleInterface.id: {
+                withAnimation(.smooth(duration: 0.2)) {
+                    viewModel.toggleInterface()
+                }
+                return true
+            },
+            MangaShortcutActions.toggleFullScreen.id: {
+                toggleFullScreen()
+                return true
+            },
+            MangaShortcutActions.toggleSettings.id: {
+                viewModel.showsSettingsPanel.toggle()
+                return true
+            },
+            MangaShortcutActions.panLeft.id: { pan(dx: -0.15, dy: 0) },
+            MangaShortcutActions.panRight.id: { pan(dx: 0.15, dy: 0) },
+            MangaShortcutActions.panUp.id: { pan(dx: 0, dy: -0.15) },
+            MangaShortcutActions.panDown.id: { pan(dx: 0, dy: 0.15) },
+            MangaShortcutActions.back.id: {
+                handleBack()
+            },
+        ]
+    }
+
+    private func pageHorizontally(left: Bool) -> Bool {
+        guard viewModel.isContentAvailable else { return false }
+        if left {
+            viewModel.handleLeftArrow()
+        } else {
+            viewModel.handleRightArrow()
+        }
+        syncContinuousPosition()
+        return true
+    }
+
+    /// In the long strip the vertical keys scroll by most of a screen, like
+    /// Fushi leaving them to the page's own scrolling.
+    private func pageVertically(_ turn: MangaPageTurn) -> Bool {
+        guard viewModel.isContentAvailable else { return false }
+        if viewModel.mode == .continuous {
+            continuousScrollRequest = MangaContinuousScrollRequest(turn: turn)
+        } else if turn == .forward {
+            viewModel.goForward()
+        } else {
+            viewModel.goBackward()
+        }
+        return true
+    }
+
+    private func pan(dx: Double, dy: Double) -> Bool {
+        guard viewModel.mode != .continuous else { return false }
+        viewModel.pan(dx: dx, dy: dy)
+        return true
+    }
+
+    /// Fushi's back steps: close the dictionary, the settings, the hidden
+    /// interface, full screen, and finally the reader.
+    private func handleBack() -> Bool {
+        if viewModel.handleEscape() {
+            return true
+        }
+        if let window, window.styleMask.contains(.fullScreen) {
+            window.toggleFullScreen(nil)
+            return true
+        }
+        window?.performClose(nil)
+        return true
     }
 
     private func popupView(_ popup: PopupItem, screenSize: CGSize) -> some View {
@@ -291,8 +629,9 @@ struct MangaReaderView: View {
         )
         .id(popupID)
     }
-
 }
+
+// MARK: - Toolbar
 
 private struct MangaReaderToolbar: ToolbarContent {
     @Bindable var viewModel: MangaReaderViewModel
@@ -300,6 +639,7 @@ private struct MangaReaderToolbar: ToolbarContent {
     @Binding var showsZoomControls: Bool
     let onJumpToPage: (Int) -> Void
     let onToggleOCR: () -> Void
+    let onToggleFullScreen: () -> Void
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
@@ -347,17 +687,14 @@ private struct MangaReaderToolbar: ToolbarContent {
                     } label: {
                         Label("Previous Chapter", systemImage: "chevron.left")
                     }
-                    .disabled(viewModel.currentChapterIndex == 0)
+                    .disabled(!viewModel.hasPreviousChapter)
 
                     Button {
                         Task { await viewModel.goToNextChapter() }
                     } label: {
                         Label("Next Chapter", systemImage: "chevron.right")
                     }
-                    .disabled(
-                        viewModel.currentChapterIndex
-                            >= viewModel.chapters.count - 1
-                    )
+                    .disabled(!viewModel.hasNextChapter)
 
                     Divider()
 
@@ -425,21 +762,35 @@ private struct MangaReaderToolbar: ToolbarContent {
             }
 
             Menu {
-                ForEach(MangaReaderLayout.allCases) { layout in
-                    Button {
-                        viewModel.layout = layout
-                    } label: {
-                        Label(
-                            LocalizedStringKey(layout.titleKey),
-                            systemImage: viewModel.layout == layout
-                                ? "checkmark"
-                                : layout.systemImage
-                        )
+                Picker("Reading Mode", selection: modeBinding) {
+                    ForEach(MangaReaderMode.allCases) { mode in
+                        Label(LocalizedStringKey(mode.titleKey), systemImage: mode.systemImage)
+                            .tag(mode)
                     }
                 }
+                .pickerStyle(.inline)
+
+                if viewModel.mode == .paged {
+                    Picker("Page Layout", selection: spreadBinding) {
+                        ForEach(MangaSpreadMode.allCases) { spread in
+                            Label(LocalizedStringKey(spread.titleKey), systemImage: spread.systemImage)
+                                .tag(spread)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
+
+                Picker("Reading Direction", selection: directionBinding) {
+                    ForEach(MangaReadingDirection.allCases) { direction in
+                        Label(LocalizedStringKey(direction.titleKey), systemImage: direction.systemImage)
+                            .tag(direction)
+                    }
+                }
+                .pickerStyle(.inline)
             } label: {
-                Label("Reading Layout", systemImage: viewModel.layout.systemImage)
+                Label("Reading Mode", systemImage: viewModel.mode.systemImage)
             }
+            .help("Reading Mode")
 
             Button {
                 showsZoomControls.toggle()
@@ -456,37 +807,6 @@ private struct MangaReaderToolbar: ToolbarContent {
                 MangaZoomControls(viewModel: viewModel)
             }
 
-            Menu {
-                ForEach(MangaReadingDirection.allCases) { direction in
-                    Button {
-                        viewModel.direction = direction
-                    } label: {
-                        Label(
-                            LocalizedStringKey(direction.titleKey),
-                            systemImage: viewModel.direction == direction
-                                ? "checkmark"
-                                : direction.systemImage
-                        )
-                    }
-                }
-            } label: {
-                Label("Reading Direction", systemImage: viewModel.direction.systemImage)
-            }
-
-            Menu {
-                Toggle(
-                    "Split Wide Pages",
-                    isOn: $viewModel.splitsWidePages
-                )
-
-                Toggle(
-                    "Crop White Borders",
-                    isOn: $viewModel.cropsWhiteBorders
-                )
-            } label: {
-                Label("Page Processing", systemImage: "crop")
-            }
-
             Button {
                 showsPageNavigator.toggle()
             } label: {
@@ -501,8 +821,198 @@ private struct MangaReaderToolbar: ToolbarContent {
                 )
             }
         }
+
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                withAnimation(.smooth(duration: 0.2)) {
+                    viewModel.isInterfaceHidden = true
+                }
+            } label: {
+                Label("Hide Interface", systemImage: "rectangle.dashed")
+            }
+            .help("Hide Interface")
+
+            Button {
+                viewModel.showsSettingsPanel.toggle()
+            } label: {
+                Label("Reader Settings", systemImage: "slider.horizontal.3")
+            }
+            .help("Reader Settings")
+        }
+    }
+
+    private var modeBinding: Binding<MangaReaderMode> {
+        Binding(
+            get: { viewModel.mode },
+            set: { mode in
+                var next = viewModel.settings
+                next.mode = mode
+                next.autoDetectsMode = false
+                viewModel.apply(next, scope: .thisManga)
+            }
+        )
+    }
+
+    private var spreadBinding: Binding<MangaSpreadMode> {
+        Binding(
+            get: { viewModel.settings.spreadMode },
+            set: { spread in
+                var next = viewModel.settings
+                next.spreadMode = spread
+                viewModel.apply(next, scope: .thisManga)
+            }
+        )
+    }
+
+    private var directionBinding: Binding<MangaReadingDirection> {
+        Binding(
+            get: { viewModel.direction },
+            set: { direction in
+                var next = viewModel.settings
+                next.direction = direction
+                viewModel.apply(next, scope: .thisManga)
+            }
+        )
     }
 }
+
+// MARK: - Bottom bar
+
+/// Fushi's bottom page slider. It runs right-to-left for right-to-left books
+/// and only changes the page when released.
+private struct MangaReaderBottomBar: View {
+    @Bindable var viewModel: MangaReaderViewModel
+    let onJumpToPage: (Int) -> Void
+
+    @State private var sliderPage = 1.0
+    @State private var isEditing = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(verbatim: "\(Int(sliderPage.rounded()))")
+                .font(.callout.monospacedDigit())
+                .frame(minWidth: 32)
+
+            Slider(
+                value: $sliderPage,
+                in: 1...Double(max(2, viewModel.pageCount)),
+                step: 1
+            ) { editing in
+                isEditing = editing
+                if !editing {
+                    onJumpToPage(Int(sliderPage.rounded()) - 1)
+                }
+            }
+            .environment(
+                \.layoutDirection,
+                viewModel.direction == .rightToLeft ? .rightToLeft : .leftToRight
+            )
+            .accessibilityLabel(Text("Jump to Page"))
+            .accessibilityValue(Text(viewModel.pageLabel))
+
+            Text(verbatim: "\(viewModel.pageCount)")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 32)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 560)
+        .glassEffect(.regular, in: .capsule)
+        .padding(.horizontal, 24)
+        .onAppear(perform: sync)
+        .onChange(of: viewModel.currentPageIndex) { _, _ in
+            guard !isEditing else { return }
+            sync()
+        }
+    }
+
+    private func sync() {
+        sliderPage = Double(min(max(1, viewModel.currentPageIndex + 1), max(1, viewModel.pageCount)))
+    }
+}
+
+private struct MangaPanelStatusChip: View {
+    let status: MangaPanelNavigationStatus
+
+    var body: some View {
+        Label(title, systemImage: "square.grid.2x2")
+            .font(.callout)
+            .foregroundStyle(isWarning ? Color.orange : Color.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .glassEffect(.regular, in: .capsule)
+    }
+
+    private var title: String {
+        switch status {
+        case let .panel(index, total):
+            String(
+                format: String(localized: "Panel %lld / %lld"),
+                Int64(index),
+                Int64(total)
+            )
+        case .noPanels:
+            String(localized: "No panels detected")
+        case .unavailable:
+            String(localized: "Panel model unavailable")
+        case .failed:
+            String(localized: "Panel detection failed")
+        }
+    }
+
+    private var isWarning: Bool {
+        switch status {
+        case .unavailable, .failed: true
+        default: false
+        }
+    }
+}
+
+/// Shows the click zones for a few seconds after opening, like Fushi's
+/// tap-zone overlay.
+private struct MangaTapZoneHint: View {
+    let settings: MangaReaderSettings
+
+    var body: some View {
+        Canvas { context, size in
+            let columns = 24
+            let rows = 24
+            let cell = CGSize(
+                width: size.width / CGFloat(columns),
+                height: size.height / CGFloat(rows)
+            )
+            for row in 0..<rows {
+                for column in 0..<columns {
+                    let point = CGPoint(
+                        x: (CGFloat(column) + 0.5) / CGFloat(columns),
+                        y: (CGFloat(row) + 0.5) / CGFloat(rows)
+                    )
+                    guard let action = settings.tapZoneAction(at: point) else { continue }
+                    let rect = CGRect(
+                        x: CGFloat(column) * cell.width,
+                        y: CGFloat(row) * cell.height,
+                        width: cell.width + 0.5,
+                        height: cell.height + 0.5
+                    )
+                    context.fill(Path(rect), with: .color(color(for: action)))
+                }
+            }
+        }
+    }
+
+    private func color(for action: MangaTapZoneAction) -> Color {
+        switch action {
+        case .previous: Color.blue.opacity(0.28)
+        case .next: Color.green.opacity(0.28)
+        case .menu: Color.gray.opacity(0.18)
+        }
+    }
+}
+
+// MARK: - Zoom and page navigator popovers
 
 private struct MangaZoomControls: View {
     @Bindable var viewModel: MangaReaderViewModel
@@ -539,13 +1049,13 @@ private struct MangaZoomControls: View {
             }
 
             HStack(spacing: 10) {
-                Text(verbatim: "\(MangaReaderPreferences.minimumZoomPercentage)%")
+                Text(verbatim: "\(minimumPercentage)%")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
 
                 Slider(
                     value: $sliderPercentage,
-                    in: Double(MangaReaderPreferences.minimumZoomPercentage)...Double(MangaReaderPreferences.maximumZoomPercentage),
+                    in: Double(minimumPercentage)...Double(MangaReaderSettings.maximumZoomPercentage),
                     step: 1
                 ) { editing in
                     if editing {
@@ -559,7 +1069,7 @@ private struct MangaZoomControls: View {
                     percentageText = String(Int(newValue.rounded()))
                 }
 
-                Text(verbatim: "\(MangaReaderPreferences.maximumZoomPercentage)%")
+                Text(verbatim: "\(MangaReaderSettings.maximumZoomPercentage)%")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -578,6 +1088,10 @@ private struct MangaZoomControls: View {
         }
     }
 
+    private var minimumPercentage: Int {
+        viewModel.settings.minimumEffectiveZoomPercentage
+    }
+
     private func commitPercentageText() {
         guard let percentage = Int(percentageText) else {
             syncFromViewModel()
@@ -587,10 +1101,9 @@ private struct MangaZoomControls: View {
     }
 
     private func apply(_ percentage: Int) {
-        let clamped = MangaReaderPreferences.clampedZoomPercentage(percentage)
-        viewModel.zoomPercentage = clamped
-        sliderPercentage = Double(clamped)
-        percentageText = String(clamped)
+        viewModel.zoomPercentage = percentage
+        sliderPercentage = Double(viewModel.zoomPercentage)
+        percentageText = String(viewModel.zoomPercentage)
     }
 
     private func syncFromViewModel() {
@@ -613,7 +1126,7 @@ private struct MangaPageNavigator: View {
                 pageButton(
                     title: "First Page",
                     systemImage: "backward.end.fill",
-                    disabled: !viewModel.canGoBackward
+                    disabled: viewModel.currentPageIndex == 0
                 ) {
                     jump(to: 0)
                 }
@@ -650,7 +1163,7 @@ private struct MangaPageNavigator: View {
                 pageButton(
                     title: "Last Page",
                     systemImage: "forward.end.fill",
-                    disabled: !viewModel.canGoForward
+                    disabled: viewModel.currentPageIndex >= viewModel.pageCount - 1
                 ) {
                     jump(to: viewModel.pageCount - 1)
                 }
@@ -717,7 +1230,7 @@ private struct MangaPageNavigator: View {
     }
 }
 
-private extension View {
+extension View {
     func mangaGlassNumericField() -> some View {
         self
             .textFieldStyle(.plain)
@@ -730,15 +1243,14 @@ private extension View {
     }
 }
 
-private struct MangaPagedReader: View {
-    private static let contentInset: CGFloat = 12
+// MARK: - Paged reader
 
+private struct MangaPagedReader: View {
     let viewModel: MangaReaderViewModel
     let ocrRegions: [Int: [MangaOCRTextRegion]]
     let showsOCRSelection: Bool
-    let onSetCover: ((Int) -> Void)?
-    let onDismissOCRSelection: () -> Void
-    let onOCRSelection: (MangaOCRTextRegion, CGRect) -> Int?
+    let style: MangaCanvasStyle
+    let actions: MangaCanvasActions
 
     var body: some View {
         GeometryReader { proxy in
@@ -754,48 +1266,34 @@ private struct MangaPagedReader: View {
                     ),
                     ocrRegions: ocrRegions,
                     showsOCRSelection: showsOCRSelection,
-                    zoomScale: viewModel.zoomScale,
-                    onSetCover: onSetCover,
-                    onZoomScaleChange: { scale in
-                        viewModel.zoomPercentage = Int((scale * 100).rounded())
-                    },
-                    onWheelNavigation: { navigation in
-                        switch navigation {
-                        case .backward:
-                            viewModel.goBackward()
-                        case .forward:
-                            viewModel.goForward()
-                        }
-                    },
-                    onDismissOCRSelection: onDismissOCRSelection,
-                    onOCRSelection: { region, rect in
-                        onOCRSelection(
-                            region,
-                            rect.offsetBy(
-                                dx: Self.contentInset,
-                                dy: Self.contentInset
-                            )
-                        )
-                    }
+                    style: style,
+                    actions: actions,
+                    turn: viewModel.pageTurn,
+                    turnToken: viewModel.pageTurnToken,
+                    entryEdge: viewModel.pageEntryEdge,
+                    verticalPaging: viewModel.mode == .verticalPaged,
+                    command: viewModel.canvasCommand
                 )
             }
-            .padding(Self.contentInset)
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .background(Color.black)
+            .background(Color(nsColor: style.backgroundColor))
         }
     }
 }
 
+/// Keeps the previous spread on screen until the next one is decoded, so
+/// page turns animate between two complete spreads.
 private struct MangaAsyncSpread<Content: View>: View {
     let viewModel: MangaReaderViewModel
     let pages: [MangaPresentationPage]
     @ViewBuilder let content: ([NSImage]) -> Content
 
     @State private var images: [NSImage] = []
+    @State private var loadedPages: [MangaPresentationPage] = []
 
     var body: some View {
         Group {
-            if images.count == pages.count {
+            if !images.isEmpty {
                 content(images)
             } else {
                 ProgressView()
@@ -804,7 +1302,7 @@ private struct MangaAsyncSpread<Content: View>: View {
             }
         }
         .task(id: pages) {
-            images = []
+            guard loadedPages != pages else { return }
             var loadedImages: [NSImage] = []
             for page in pages {
                 guard let image = await viewModel.renderedImage(for: page),
@@ -814,32 +1312,91 @@ private struct MangaAsyncSpread<Content: View>: View {
                 loadedImages.append(image)
             }
             images = loadedImages
+            loadedPages = pages
         }
     }
+}
+
+private struct MangaZoomableCanvas: NSViewRepresentable {
+    let images: [NSImage]
+    let pageIndices: [Int]
+    let sourcePageIndices: [Int]
+    let ocrRegions: [Int: [MangaOCRTextRegion]]
+    let showsOCRSelection: Bool
+    let style: MangaCanvasStyle
+    let actions: MangaCanvasActions
+    let turn: MangaPageTurn?
+    let turnToken: Int
+    let entryEdge: MangaPageEntryEdge
+    let verticalPaging: Bool
+    let command: MangaCanvasCommand?
+
+    func makeNSView(context: Context) -> MangaZoomScrollView {
+        MangaZoomScrollView()
+    }
+
+    func updateNSView(_ scrollView: MangaZoomScrollView, context: Context) {
+        scrollView.setContent(
+            images: images,
+            pageIndices: pageIndices,
+            sourcePageIndices: sourcePageIndices,
+            ocrRegions: ocrRegions,
+            showsOCRSelection: showsOCRSelection,
+            style: style,
+            actions: actions,
+            turn: turn,
+            turnToken: turnToken,
+            entryEdge: entryEdge,
+            verticalPaging: verticalPaging,
+            command: command
+        )
+    }
+}
+
+// MARK: - Continuous reader
+
+struct MangaContinuousScrollRequest: Equatable {
+    let id = UUID()
+    let turn: MangaPageTurn
 }
 
 private struct MangaContinuousReader: View {
     let viewModel: MangaReaderViewModel
     @Binding var scrollPosition: Int?
+    @Binding var scrollRequest: MangaContinuousScrollRequest?
     let popupCoordinateSpace: MangaReaderPopupCoordinateSpace
     let showsOCRSelection: Bool
-    let onSetCover: ((Int) -> Void)?
-    let onDismissOCRSelection: () -> Void
-    let onOCRSelection: (MangaOCRTextRegion, CGRect) -> Int?
+    let style: MangaCanvasStyle
+    let actions: MangaCanvasActions
 
     @State private var visiblePageIndex: Int?
     @State private var requestedScrollTarget: Int?
+    @State private var scrollTargetAttempts = 0
+    @State private var hasRestoredPosition = false
+    @State private var position = ScrollPosition(idType: Int.self)
+    @State private var contentOffsetY: CGFloat = 0
+    @State private var hideAnchorY: CGFloat = 0
+    @State private var interactionHost = MangaContinuousInteractionHost()
+
+    private static let hideThreshold: CGFloat = 13
 
     var body: some View {
         GeometryReader { geometry in
-            let basePageWidth = min(max(320, geometry.size.width - 24), 1_400)
+            let settings = viewModel.settings
+            let padding = geometry.size.width * CGFloat(settings.sidePaddingPercent) / 100
+            let basePageWidth = max(320, geometry.size.width - padding * 2)
             let pageWidth = basePageWidth * viewModel.zoomScale
+            let gap: CGFloat = settings.showsPageGaps ? 12 : 0
 
             ScrollViewReader { scrollProxy in
                 ScrollView([.horizontal, .vertical]) {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: gap) {
                         ForEach(viewModel.presentationPages) { page in
-                            MangaAsyncPage(viewModel: viewModel, page: page) { image in
+                            MangaAsyncPage(
+                                viewModel: viewModel,
+                                page: page,
+                                placeholderHeight: pageWidth * viewModel.pageAspectRatio(for: page)
+                            ) { image in
                                 MangaContinuousPageCanvas(
                                     image: image,
                                     pageIndex: page.index,
@@ -847,13 +1404,9 @@ private struct MangaContinuousReader: View {
                                     ocrRegions: viewModel.lookupRegions(for: page),
                                     showsOCRSelection: showsOCRSelection,
                                     popupCoordinateSpace: popupCoordinateSpace,
-                                    zoomScale: viewModel.zoomScale,
-                                    onZoomScaleChange: { scale in
-                                        viewModel.zoomPercentage = Int((scale * 100).rounded())
-                                    },
-                                    onSetCover: onSetCover,
-                                    onDismissOCRSelection: onDismissOCRSelection,
-                                    onOCRSelection: onOCRSelection
+                                    style: style,
+                                    actions: actions,
+                                    interactionHost: interactionHost
                                 )
                                     .frame(width: pageWidth)
                                     .aspectRatio(
@@ -863,7 +1416,6 @@ private struct MangaContinuousReader: View {
                             }
                             .id(page.index)
                             .frame(width: pageWidth)
-                            .frame(minHeight: 160)
                             .background {
                                 GeometryReader { proxy in
                                     Color.clear.preference(
@@ -884,11 +1436,18 @@ private struct MangaContinuousReader: View {
                         }
                     }
                     .frame(
-                        width: max(geometry.size.width, pageWidth + 24),
+                        width: max(geometry.size.width, pageWidth + padding * 2),
                         alignment: .top
                     )
                 }
+                .scrollPosition($position)
                 .coordinateSpace(name: MangaContinuousPageFramePreferenceKey.coordinateSpace)
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    geometry.contentOffset.y
+                } action: { _, offset in
+                    contentOffsetY = offset
+                    updateInterfaceVisibility(for: offset)
+                }
                 .onPreferenceChange(MangaContinuousPageFramePreferenceKey.self) { frames in
                     guard let pageIndex = topVisiblePageIndex(
                         in: frames,
@@ -896,8 +1455,30 @@ private struct MangaContinuousReader: View {
                     ) else {
                         return
                     }
+                    // The first layout pass decides where the strip opens:
+                    // the reader's current page, not the top of the chapter.
+                    if !hasRestoredPosition {
+                        hasRestoredPosition = true
+                        let target = viewModel.currentPageIndex
+                        if target > 0, target != pageIndex {
+                            requestedScrollTarget = target
+                            scrollTargetAttempts = 0
+                            scrollProxy.scrollTo(target, anchor: .top)
+                            return
+                        }
+                    }
                     if let requestedScrollTarget {
-                        guard pageIndex == requestedScrollTarget else { return }
+                        guard pageIndex == requestedScrollTarget else {
+                            // Lazy pages grow as their images decode; keep
+                            // aiming at the requested page for a while.
+                            if scrollTargetAttempts < 30 {
+                                scrollTargetAttempts += 1
+                                scrollProxy.scrollTo(requestedScrollTarget, anchor: .top)
+                            } else {
+                                self.requestedScrollTarget = nil
+                            }
+                            return
+                        }
                         self.requestedScrollTarget = nil
                     }
                     visiblePageIndex = pageIndex
@@ -909,18 +1490,96 @@ private struct MangaContinuousReader: View {
                 .onChange(of: scrollPosition) { _, pageIndex in
                     guard let pageIndex, pageIndex != visiblePageIndex else { return }
                     requestedScrollTarget = pageIndex
+                    scrollTargetAttempts = 0
                     scrollProxy.scrollTo(pageIndex, anchor: .top)
                 }
+                .onChange(of: scrollRequest) { _, request in
+                    guard let request else { return }
+                    scrollByScreen(request.turn, viewportHeight: geometry.size.height)
+                }
                 .onAppear {
+                    configureInteractionHost(viewportHeight: geometry.size.height)
                     guard let pageIndex = scrollPosition else { return }
                     requestedScrollTarget = pageIndex
+                    scrollTargetAttempts = 0
                     DispatchQueue.main.async {
                         scrollProxy.scrollTo(pageIndex, anchor: .top)
                     }
                 }
+                .onChange(of: style) { _, _ in
+                    configureInteractionHost(viewportHeight: geometry.size.height)
+                }
+                .onChange(of: geometry.size.height) { _, height in
+                    configureInteractionHost(viewportHeight: height)
+                }
+                .task(id: autoScrollID) {
+                    await runAutoScroll()
+                }
             }
         }
-        .background(Color.black)
+        .background(Color(nsColor: style.backgroundColor))
+    }
+
+    private var autoScrollID: String {
+        "\(viewModel.settings.autoScroll)|\(viewModel.settings.autoScrollSpeed)|\(viewModel.showsSettingsPanel)|\(showsOCRSelection)"
+    }
+
+    private func configureInteractionHost(viewportHeight: CGFloat) {
+        interactionHost.style = style
+        interactionHost.actions = actions
+        interactionHost.onScrollPage = { turn in
+            scrollByScreen(turn, viewportHeight: viewportHeight)
+        }
+        interactionHost.onDoubleClickZoom = {
+            viewModel.zoomPercentage = viewModel.zoomPercentage > 100 ? 100 : 200
+        }
+    }
+
+    /// Fushi's long-strip click zones and vertical keys move 90% of a screen.
+    private func scrollByScreen(_ turn: MangaPageTurn, viewportHeight: CGFloat) {
+        let distance = viewportHeight * 0.9
+        let target = max(0, contentOffsetY + (turn == .forward ? distance : -distance))
+        withAnimation(.smooth(duration: 0.25)) {
+            position.scrollTo(y: target)
+        }
+    }
+
+    private func updateInterfaceVisibility(for offset: CGFloat) {
+        guard viewModel.settings.hidesInterfaceOnScroll else {
+            hideAnchorY = offset
+            return
+        }
+        let delta = offset - hideAnchorY
+        if delta > Self.hideThreshold {
+            if !viewModel.isInterfaceHidden {
+                withAnimation(.smooth(duration: 0.2)) {
+                    viewModel.isInterfaceHidden = true
+                }
+            }
+            hideAnchorY = offset
+        } else if delta < -Self.hideThreshold {
+            if viewModel.isInterfaceHidden {
+                withAnimation(.smooth(duration: 0.2)) {
+                    viewModel.isInterfaceHidden = false
+                }
+            }
+            hideAnchorY = offset
+        }
+    }
+
+    private func runAutoScroll() async {
+        guard viewModel.settings.autoScroll,
+              !viewModel.showsSettingsPanel,
+              !showsOCRSelection else {
+            return
+        }
+        let speed = CGFloat(viewModel.settings.autoScrollSpeed)
+        let frameInterval = 1.0 / 60
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(frameInterval))
+            guard !Task.isCancelled else { return }
+            position.scrollTo(y: contentOffsetY + speed * CGFloat(frameInterval))
+        }
     }
 
     private func topVisiblePageIndex(
@@ -954,7 +1613,7 @@ private struct MangaContinuousPageFramePreferenceKey: PreferenceKey {
 }
 
 @MainActor
-private final class MangaReaderPopupCoordinateSpace {
+final class MangaReaderPopupCoordinateSpace {
     weak var rootView: NSView?
 
     func topLeadingRect(_ rect: CGRect, from sourceView: NSView) -> CGRect {
@@ -989,6 +1648,30 @@ private struct MangaReaderCoordinateSpaceReader: NSViewRepresentable {
     }
 }
 
+private struct MangaWindowReader: NSViewRepresentable {
+    let onWindow: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = MangaWindowTrackingView()
+        view.onWindow = onWindow
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {}
+}
+
+private final class MangaWindowTrackingView: NSView {
+    var onWindow: ((NSWindow?) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        let window = window
+        DispatchQueue.main.async { [weak self] in
+            self?.onWindow?(window)
+        }
+    }
+}
+
 private struct MangaContinuousPageCanvas: NSViewRepresentable {
     let image: NSImage
     let pageIndex: Int
@@ -996,11 +1679,9 @@ private struct MangaContinuousPageCanvas: NSViewRepresentable {
     let ocrRegions: [MangaOCRTextRegion]
     let showsOCRSelection: Bool
     let popupCoordinateSpace: MangaReaderPopupCoordinateSpace
-    let zoomScale: Double
-    let onZoomScaleChange: (Double) -> Void
-    let onSetCover: ((Int) -> Void)?
-    let onDismissOCRSelection: () -> Void
-    let onOCRSelection: (MangaOCRTextRegion, CGRect) -> Int?
+    let style: MangaCanvasStyle
+    let actions: MangaCanvasActions
+    let interactionHost: MangaContinuousInteractionHost
 
     func makeNSView(context: Context) -> MangaSpreadDocumentView {
         let view = MangaSpreadDocumentView()
@@ -1009,6 +1690,9 @@ private struct MangaContinuousPageCanvas: NSViewRepresentable {
     }
 
     func updateNSView(_ view: MangaSpreadDocumentView, context: Context) {
+        view.interactionHost = interactionHost
+        view.actions = actions
+        view.applyStyle(style)
         view.setImages(
             [image],
             pageIndices: [pageIndex],
@@ -1018,10 +1702,10 @@ private struct MangaContinuousPageCanvas: NSViewRepresentable {
             [pageIndex: ocrRegions],
             pageIndices: [pageIndex],
             showsSelection: showsOCRSelection,
-            onDismissSelection: onDismissOCRSelection,
+            onDismissSelection: actions.onDismissOCRSelection,
             onSelection: { [weak view] region, documentRect in
                 guard let view else { return nil }
-                return onOCRSelection(
+                return actions.onOCRSelection(
                     region,
                     popupCoordinateSpace.topLeadingRect(
                         documentRect,
@@ -1031,16 +1715,17 @@ private struct MangaContinuousPageCanvas: NSViewRepresentable {
             }
         )
         view.configureContinuousZoom(
-            scale: zoomScale,
-            onScaleChange: onZoomScaleChange
+            scale: style.zoomScale,
+            onScaleChange: actions.onZoomScaleChange
         )
-        view.onSetCover = onSetCover
+        view.onSetCover = actions.onSetCover
     }
 }
 
 private struct MangaAsyncPage<Content: View>: View {
     let viewModel: MangaReaderViewModel
     let page: MangaPresentationPage
+    let placeholderHeight: CGFloat
     @ViewBuilder let content: (NSImage) -> Content
 
     @State private var image: NSImage?
@@ -1052,7 +1737,8 @@ private struct MangaAsyncPage<Content: View>: View {
             } else {
                 ProgressView()
                     .controlSize(.large)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: placeholderHeight)
             }
         }
         .task(id: page) {
@@ -1066,863 +1752,42 @@ private struct MangaAsyncPage<Content: View>: View {
     }
 }
 
-private struct MangaZoomableCanvas: NSViewRepresentable {
-    let images: [NSImage]
-    let pageIndices: [Int]
-    let sourcePageIndices: [Int]
-    let ocrRegions: [Int: [MangaOCRTextRegion]]
-    let showsOCRSelection: Bool
-    let zoomScale: Double
-    let onSetCover: ((Int) -> Void)?
-    let onZoomScaleChange: (Double) -> Void
-    let onWheelNavigation: (MangaWheelNavigation) -> Void
-    let onDismissOCRSelection: () -> Void
-    let onOCRSelection: (MangaOCRTextRegion, CGRect) -> Int?
+// MARK: - Display sleep
 
-    func makeNSView(context: Context) -> MangaZoomScrollView {
-        MangaZoomScrollView()
-    }
+/// Keeps the display awake while a manga is open, like Fushi's "keep screen
+/// on". The assertion is released when the reader closes.
+@MainActor
+final class MangaDisplaySleepGuard {
+    private var assertionID: IOPMAssertionID = 0
+    private var hasAssertion = false
 
-    func updateNSView(_ scrollView: MangaZoomScrollView, context: Context) {
-        scrollView.setContent(
-            images: images,
-            pageIndices: pageIndices,
-            sourcePageIndices: sourcePageIndices,
-            ocrRegions: ocrRegions,
-            showsOCRSelection: showsOCRSelection,
-            zoomScale: zoomScale,
-            onSetCover: onSetCover,
-            onZoomScaleChange: onZoomScaleChange,
-            onWheelNavigation: onWheelNavigation,
-            onDismissOCRSelection: onDismissOCRSelection,
-            onOCRSelection: onOCRSelection
-        )
-    }
-}
-
-private final class MangaZoomScrollView: NSScrollView {
-    private static let wheelNavigationCooldown: TimeInterval = 0.25
-
-    private let spreadView = MangaSpreadDocumentView()
-    private var wheelNavigationAccumulator = MangaWheelNavigationAccumulator()
-    private var representedImages: [NSImage] = []
-    private var lastViewportSize: NSSize = .zero
-    private var lastAppliedFitMagnification: CGFloat?
-    private var lastWheelNavigationTime: TimeInterval = -.infinity
-    private var isUpdatingFit = false
-    private var requestedZoomScale: CGFloat = 1
-    private var onZoomScaleChange: ((Double) -> Void)?
-    private var onWheelNavigation: ((MangaWheelNavigation) -> Void)?
-    private var onDismissOCRSelection: (() -> Void)?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        let centeredClipView = MangaCenteredClipView()
-        centeredClipView.onBlankAreaMouseDown = { [weak self] in
-            self?.onDismissOCRSelection?()
-        }
-        contentView = centeredClipView
-        drawsBackground = true
-        backgroundColor = .black
-        hasHorizontalScroller = true
-        hasVerticalScroller = true
-        autohidesScrollers = true
-        allowsMagnification = true
-        minMagnification = 0.1
-        maxMagnification = 8
-        documentView = spreadView
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layout() {
-        super.layout()
-        guard !representedImages.isEmpty, !isUpdatingFit else { return }
-        let viewportSize = contentSize
-        guard viewportSize.width > 0, viewportSize.height > 0,
-              viewportSize != lastViewportSize else {
-            return
-        }
-        let shouldFollowFit = lastAppliedFitMagnification.map {
-            abs(magnification - $0) < 0.002
-        } ?? true
-        lastViewportSize = viewportSize
-        updateFitMagnification(apply: shouldFollowFit)
-    }
-
-    override func scrollWheel(with event: NSEvent) {
-        let zoomModifiers: NSEvent.ModifierFlags = [.command, .control]
-        if !event.modifierFlags.intersection(zoomModifiers).isEmpty,
-           event.modifierFlags.intersection([.option, .shift]).isEmpty,
-           handleModifierWheelZoom(event) {
-            return
-        }
-
-        let disallowedModifiers: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
-        guard event.modifierFlags.intersection(disallowedModifiers).isEmpty else {
-            wheelNavigationAccumulator.reset()
-            super.scrollWheel(with: event)
-            return
-        }
-        guard !event.hasPreciseScrollingDeltas else {
-            wheelNavigationAccumulator.reset()
-            super.scrollWheel(with: event)
-            return
-        }
-        guard MangaWheelNavigationResolver.navigation(
-            deltaX: event.scrollingDeltaX,
-            deltaY: event.scrollingDeltaY,
-            hasPreciseScrollingDeltas: false
-        ) != nil else {
-            wheelNavigationAccumulator.reset()
-            super.scrollWheel(with: event)
-            return
-        }
-        guard event.timestamp - lastWheelNavigationTime >= Self.wheelNavigationCooldown else {
-            wheelNavigationAccumulator.reset()
-            return
-        }
-        guard let navigation = wheelNavigationAccumulator.consume(
-            deltaX: event.scrollingDeltaX,
-            deltaY: event.scrollingDeltaY,
-            hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas
-        ) else {
-            return
-        }
-
-        lastWheelNavigationTime = event.timestamp
-        onDismissOCRSelection?()
-        onWheelNavigation?(navigation)
-    }
-
-    func setContent(
-        images: [NSImage],
-        pageIndices: [Int],
-        sourcePageIndices: [Int],
-        ocrRegions: [Int: [MangaOCRTextRegion]],
-        showsOCRSelection: Bool,
-        zoomScale: Double,
-        onSetCover: ((Int) -> Void)?,
-        onZoomScaleChange: @escaping (Double) -> Void,
-        onWheelNavigation: @escaping (MangaWheelNavigation) -> Void,
-        onDismissOCRSelection: @escaping () -> Void,
-        onOCRSelection: @escaping (MangaOCRTextRegion, CGRect) -> Int?
-    ) {
-        let nextZoomScale = CGFloat(zoomScale)
-        let zoomChanged = abs(requestedZoomScale - nextZoomScale) > 0.001
-        requestedZoomScale = nextZoomScale
-        self.onZoomScaleChange = onZoomScaleChange
-        self.onWheelNavigation = onWheelNavigation
-        self.onDismissOCRSelection = onDismissOCRSelection
-        spreadView.onSetCover = onSetCover
-        spreadView.setOCRRegions(
-            ocrRegions,
-            pageIndices: pageIndices,
-            showsSelection: showsOCRSelection,
-            onDismissSelection: onDismissOCRSelection,
-            onSelection: { [weak self] region, documentRect in
-                guard let self else { return nil }
-                let localRect = self.convert(
-                    documentRect,
-                    from: self.spreadView
-                )
-                let localY = self.isFlipped
-                    ? localRect.minY
-                    : self.bounds.height - localRect.maxY
-                let topLeadingRect = CGRect(
-                    x: localRect.minX,
-                    y: localY,
-                    width: localRect.width,
-                    height: localRect.height
-                )
-                return onOCRSelection(region, topLeadingRect)
-            }
-        )
-        let imagesChanged = !images.isEmpty
-            && (representedImages.count != images.count
-                || !zip(representedImages, images).allSatisfy({ $0.0 === $0.1 }))
-        guard imagesChanged || zoomChanged else {
-            return
-        }
-        if imagesChanged {
-            wheelNavigationAccumulator.reset()
-            representedImages = images
-            spreadView.setImages(
-                images,
-                pageIndices: pageIndices,
-                sourcePageIndices: sourcePageIndices
-            )
-        }
-        layoutSubtreeIfNeeded()
-        lastViewportSize = contentSize
-        updateFitMagnification(apply: true)
-    }
-
-    private func handleModifierWheelZoom(_ event: NSEvent) -> Bool {
-        let imageSize = spreadView.frame.size
-        let viewportSize = contentSize
-        guard imageSize.width > 0, imageSize.height > 0,
-              viewportSize.width > 0, viewportSize.height > 0 else {
-            return false
-        }
-        let fit = min(
-            viewportSize.width / imageSize.width,
-            viewportSize.height / imageSize.height
-        )
-        let currentScale = Double(magnification / max(fit, 0.001))
-        guard let targetScale = MangaWheelZoomResolver.scale(
-            currentScale: currentScale,
-            deltaX: event.scrollingDeltaX,
-            deltaY: event.scrollingDeltaY,
-            hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas
-        ) else {
-            return false
-        }
-
-        let pointInClipView = contentView.convert(event.locationInWindow, from: nil)
-        let pointInDocument = spreadView.convert(pointInClipView, from: contentView)
-        let targetMagnification = fit * CGFloat(targetScale)
-        requestedZoomScale = CGFloat(targetScale)
-        lastAppliedFitMagnification = targetMagnification
-        setMagnification(targetMagnification, centeredAt: pointInDocument)
-        onDismissOCRSelection?()
-        onZoomScaleChange?(targetScale)
-        return true
-    }
-
-    private func updateFitMagnification(apply: Bool) {
-        let imageSize = spreadView.frame.size
-        let viewportSize = contentSize
-        guard imageSize.width > 0, imageSize.height > 0,
-              viewportSize.width > 0, viewportSize.height > 0 else {
-            return
-        }
-        let fit = min(
-            viewportSize.width / imageSize.width,
-            viewportSize.height / imageSize.height
-        )
-        let target = fit * requestedZoomScale
-        maxMagnification = max(8, fit * 2)
-        minMagnification = fit * 0.5
-        lastAppliedFitMagnification = target
-        guard apply else {
-            contentView.needsDisplay = true
-            return
-        }
-        isUpdatingFit = true
-        setMagnification(target, centeredAt: NSPoint(
-            x: imageSize.width / 2,
-            y: imageSize.height / 2
-        ))
-        isUpdatingFit = false
-        contentView.needsDisplay = true
-    }
-}
-
-private final class MangaSpreadDocumentView: NSView {
-    private struct ContextPage {
-        let index: Int
-        let image: NSImage
-        let frame: CGRect
-    }
-
-    private struct DisplayRegion {
-        let region: MangaOCRTextRegion
-        let rect: NSRect
-    }
-
-    private static let pageSpacing: CGFloat = 8
-    private var images: [NSImage] = []
-    private var pageIndices: [Int] = []
-    private var sourcePageIndices: [Int] = []
-    private var ocrRegions: [Int: [MangaOCRTextRegion]] = [:]
-    private var displayRegions: [DisplayRegion] = []
-    private var selectedRegionID: String?
-    private var selectedMatchedLength = 0
-    private var hoveredRegionID: String?
-    private var onSelection: ((MangaOCRTextRegion, CGRect) -> Int?)?
-    private var onDismissSelection: (() -> Void)?
-    private var hoverTrackingArea: NSTrackingArea?
-    private var pageImageViews: [NSImageView] = []
-    private var fitsSinglePageToBounds = false
-    private var lastLayoutSize: NSSize = .zero
-    private var contextPage: ContextPage?
-    private var contextMenuAnchor = CGRect.zero
-    private var sharingPicker: NSSharingServicePicker?
-    private var continuousZoomScale: Double?
-    private var onContinuousZoomScaleChange: ((Double) -> Void)?
-    var onSetCover: ((Int) -> Void)?
-
-    override var isFlipped: Bool { true }
-    override var acceptsFirstResponder: Bool { true }
-
-    func setFitsSinglePageToBounds() {
-        fitsSinglePageToBounds = true
-    }
-
-    func configureContinuousZoom(
-        scale: Double,
-        onScaleChange: @escaping (Double) -> Void
-    ) {
-        continuousZoomScale = scale
-        onContinuousZoomScaleChange = onScaleChange
-    }
-
-    func setImages(
-        _ images: [NSImage],
-        pageIndices: [Int],
-        sourcePageIndices: [Int]
-    ) {
-        let imagesChanged = self.images.count != images.count
-            || !zip(self.images, images).allSatisfy { $0.0 === $0.1 }
-        guard imagesChanged
-                || self.pageIndices != pageIndices
-                || self.sourcePageIndices != sourcePageIndices else {
-            return
-        }
-        self.images = images
-        self.pageIndices = pageIndices
-        self.sourcePageIndices = sourcePageIndices
-        if !fitsSinglePageToBounds {
-            let width = images.reduce(0) { $0 + $1.size.width }
-                + Self.pageSpacing * CGFloat(max(0, images.count - 1))
-            let height = images.map(\.size.height).max() ?? 0
-            frame = NSRect(x: 0, y: 0, width: width, height: height)
-        }
-        rebuildPageImageViews()
-        rebuildDisplayRegions()
-        needsDisplay = true
-    }
-
-    override func layout() {
-        super.layout()
-        guard fitsSinglePageToBounds,
-              bounds.size != lastLayoutSize else {
-            return
-        }
-        lastLayoutSize = bounds.size
-        rebuildPageImageViews()
-        rebuildDisplayRegions()
-        needsDisplay = true
-    }
-
-    func setOCRRegions(
-        _ regions: [Int: [MangaOCRTextRegion]],
-        pageIndices: [Int],
-        showsSelection: Bool,
-        onDismissSelection: @escaping () -> Void,
-        onSelection: @escaping (MangaOCRTextRegion, CGRect) -> Int?
-    ) {
-        ocrRegions = regions
-        self.pageIndices = pageIndices
-        self.onSelection = onSelection
-        self.onDismissSelection = onDismissSelection
-        if regions.isEmpty || !showsSelection {
-            selectedRegionID = nil
-            selectedMatchedLength = 0
-        }
-        rebuildDisplayRegions()
-        needsDisplay = true
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard !displayRegions.isEmpty else { return }
-        drawOCRTextOverlay()
-    }
-
-    override func scrollWheel(with event: NSEvent) {
-        let zoomModifiers: NSEvent.ModifierFlags = [.command, .control]
-        guard let continuousZoomScale,
-              !event.modifierFlags.intersection(zoomModifiers).isEmpty,
-              event.modifierFlags.intersection([.option, .shift]).isEmpty,
-              let targetScale = MangaWheelZoomResolver.scale(
-                  currentScale: continuousZoomScale,
-                  deltaX: event.scrollingDeltaX,
-                  deltaY: event.scrollingDeltaY,
-                  hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas
-              ) else {
-            super.scrollWheel(with: event)
-            return
-        }
-        self.continuousZoomScale = targetScale
-        onDismissSelection?()
-        onContinuousZoomScaleChange?(targetScale)
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        let hitSlop = 4 / max(enclosingScrollView?.magnification ?? 1, 0.01)
-        guard let displayRegion = displayRegions
-            .filter({ $0.rect.insetBy(dx: -hitSlop, dy: -hitSlop).contains(point) })
-            .min(by: { $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height }) else {
-            selectedRegionID = nil
-            selectedMatchedLength = 0
-            onDismissSelection?()
-            needsDisplay = true
-            super.mouseDown(with: event)
-            return
-        }
-        selectedRegionID = displayRegion.region.id
-        let anchorRect = blockRect(for: displayRegion.region)
-        selectedMatchedLength = onSelection?(displayRegion.region, anchorRect) ?? 0
-        if selectedMatchedLength == 0 {
-            selectedRegionID = nil
-        }
-        needsDisplay = true
-    }
-
-    override func rightMouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        guard let page = page(at: point),
-              let window = event.window,
-              let scrollView = ancestorScrollView else {
-            super.rightMouseDown(with: event)
-            return
-        }
-
-        let initialLocation = event.locationInWindow
-        var previousLocation = initialLocation
-        var isDragging = false
-        while let nextEvent = window.nextEvent(
-            matching: [.rightMouseDragged, .rightMouseUp]
-        ) {
-            switch nextEvent.type {
-            case .rightMouseDragged:
-                let location = nextEvent.locationInWindow
-                if !isDragging {
-                    let distance = hypot(
-                        location.x - initialLocation.x,
-                        location.y - initialLocation.y
-                    )
-                    if distance >= 4 {
-                        isDragging = true
-                        NSCursor.closedHand.push()
-                        onDismissSelection?()
-                    }
-                }
-                if isDragging {
-                    pan(
-                        scrollView,
-                        windowDelta: CGPoint(
-                            x: location.x - previousLocation.x,
-                            y: location.y - previousLocation.y
-                        )
-                    )
-                }
-                previousLocation = location
-            case .rightMouseUp:
-                if isDragging {
-                    NSCursor.pop()
-                } else {
-                    showContextMenu(for: page, event: event)
-                }
-                return
-            default:
-                continue
-            }
-        }
-        if isDragging {
-            NSCursor.pop()
+    var isActive = false {
+        didSet {
+            guard isActive != oldValue else { return }
+            isActive ? acquire() : release()
         }
     }
 
-    override func updateTrackingAreas() {
-        if let hoverTrackingArea {
-            removeTrackingArea(hoverTrackingArea)
+    private func acquire() {
+        guard !hasAssertion else { return }
+        let reason = "Reading manga" as CFString
+        hasAssertion = IOPMAssertionCreateWithName(
+            kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
+            IOPMAssertionLevel(kIOPMAssertionLevelOn),
+            reason,
+            &assertionID
+        ) == kIOReturnSuccess
+    }
+
+    private func release() {
+        guard hasAssertion else { return }
+        IOPMAssertionRelease(assertionID)
+        hasAssertion = false
+    }
+
+    deinit {
+        if hasAssertion {
+            IOPMAssertionRelease(assertionID)
         }
-        let area = NSTrackingArea(
-            rect: .zero,
-            options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved, .mouseEnteredAndExited],
-            owner: self
-        )
-        addTrackingArea(area)
-        hoverTrackingArea = area
-        super.updateTrackingAreas()
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        let nextHoveredID = hitRegion(at: point)?.region.id
-        guard nextHoveredID != hoveredRegionID else { return }
-        hoveredRegionID = nextHoveredID
-        needsDisplay = true
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        guard hoveredRegionID != nil else { return }
-        hoveredRegionID = nil
-        needsDisplay = true
-    }
-
-    override func resetCursorRects() {
-        super.resetCursorRects()
-        for displayRegion in displayRegions {
-            addCursorRect(displayRegion.rect, cursor: .pointingHand)
-        }
-    }
-
-    private func rebuildDisplayRegions() {
-        var regions: [DisplayRegion] = []
-        for (offset, pageFrame) in pageFrames.enumerated() {
-            guard pageIndices.indices.contains(offset) else { continue }
-            let pageIndex = pageIndices[offset]
-            for region in ocrRegions[pageIndex] ?? [] {
-                let normalized = region.normalizedBounds
-                let rect = CGRect(
-                    x: pageFrame.minX + normalized.minX * pageFrame.width,
-                    y: pageFrame.minY + (1 - normalized.maxY) * pageFrame.height,
-                    width: normalized.width * pageFrame.width,
-                    height: normalized.height * pageFrame.height
-                )
-                guard rect.width > 0, rect.height > 0 else { continue }
-                regions.append(DisplayRegion(region: region, rect: rect))
-            }
-        }
-        displayRegions = regions
-        discardCursorRects()
-        window?.invalidateCursorRects(for: self)
-    }
-
-    private func rebuildPageImageViews() {
-        pageImageViews.forEach { $0.removeFromSuperview() }
-        pageImageViews = []
-        for (image, pageFrame) in zip(images, pageFrames) {
-            let imageView = NSImageView(frame: pageFrame)
-            imageView.image = image
-            imageView.imageScaling = .scaleAxesIndependently
-            imageView.imageAlignment = .alignCenter
-            addSubview(imageView)
-            pageImageViews.append(imageView)
-        }
-    }
-
-    private func page(at point: CGPoint) -> ContextPage? {
-        for offset in pageFrames.indices where pageFrames[offset].contains(point) {
-            guard images.indices.contains(offset),
-                  sourcePageIndices.indices.contains(offset) else {
-                continue
-            }
-            return ContextPage(
-                index: sourcePageIndices[offset],
-                image: images[offset],
-                frame: pageFrames[offset]
-            )
-        }
-        return nil
-    }
-
-    private var ancestorScrollView: NSScrollView? {
-        var candidate = superview
-        while let view = candidate {
-            if let scrollView = view as? NSScrollView {
-                return scrollView
-            }
-            candidate = view.superview
-        }
-        return enclosingScrollView
-    }
-
-    private func pan(_ scrollView: NSScrollView, windowDelta: CGPoint) {
-        let scale = max(scrollView.magnification, 0.01)
-        var origin = scrollView.contentView.bounds.origin
-        origin.x -= windowDelta.x / scale
-        if scrollView.documentView?.isFlipped == true {
-            origin.y += windowDelta.y / scale
-        } else {
-            origin.y -= windowDelta.y / scale
-        }
-        scrollView.contentView.scroll(to: origin)
-        scrollView.reflectScrolledClipView(scrollView.contentView)
-    }
-
-    private func showContextMenu(for page: ContextPage, event: NSEvent) {
-        contextPage = page
-        let point = convert(event.locationInWindow, from: nil)
-        contextMenuAnchor = CGRect(x: point.x, y: point.y, width: 1, height: 1)
-
-        let menu = NSMenu()
-        menu.addItem(menuItem(
-            title: String(localized: "Copy Page Image"),
-            systemImage: "document.on.document",
-            action: #selector(copyPageImage)
-        ))
-        menu.addItem(menuItem(
-            title: String(localized: "Save Page Image…"),
-            systemImage: "square.and.arrow.down",
-            action: #selector(savePageImage)
-        ))
-        menu.addItem(menuItem(
-            title: String(localized: "Share Page Image…"),
-            systemImage: "square.and.arrow.up",
-            action: #selector(sharePageImage)
-        ))
-        if onSetCover != nil {
-            menu.addItem(.separator())
-            menu.addItem(menuItem(
-                title: String(localized: "Set as Manga Cover"),
-                systemImage: "photo.badge.checkmark",
-                action: #selector(setAsCover)
-            ))
-        }
-        NSMenu.popUpContextMenu(menu, with: event, for: self)
-    }
-
-    private func menuItem(
-        title: String,
-        systemImage: String,
-        action: Selector
-    ) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-        item.target = self
-        item.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)
-        return item
-    }
-
-    @objc private func copyPageImage() {
-        guard let image = contextPage?.image else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.writeObjects([image])
-    }
-
-    @objc private func savePageImage() {
-        guard let contextPage,
-              let tiffData = contextPage.image.tiffRepresentation,
-              let representation = NSBitmapImageRep(data: tiffData),
-              let pngData = representation.representation(using: .png, properties: [:]) else {
-            return
-        }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        let pageName = String(
-            format: String(localized: "Page %lld"),
-            Int64(contextPage.index + 1)
-        )
-        panel.nameFieldStringValue = "\(pageName).png"
-        let completion: (NSApplication.ModalResponse) -> Void = { response in
-            guard response == .OK, let url = panel.url else { return }
-            do {
-                try pngData.write(to: url, options: .atomic)
-            } catch {
-                NSApplication.shared.presentError(error)
-            }
-        }
-        if let window {
-            panel.beginSheetModal(for: window, completionHandler: completion)
-        } else {
-            completion(panel.runModal())
-        }
-    }
-
-    @objc private func sharePageImage() {
-        guard let image = contextPage?.image else { return }
-        let picker = NSSharingServicePicker(items: [image])
-        sharingPicker = picker
-        picker.show(
-            relativeTo: contextMenuAnchor,
-            of: self,
-            preferredEdge: .minY
-        )
-    }
-
-    @objc private func setAsCover() {
-        guard let pageIndex = contextPage?.index else { return }
-        onSetCover?(pageIndex)
-    }
-
-    private var pageFrames: [CGRect] {
-        if fitsSinglePageToBounds, let image = images.first {
-            let widthScale = bounds.width / max(image.size.width, 1)
-            let heightScale = bounds.height / max(image.size.height, 1)
-            let scale = min(widthScale, heightScale)
-            let size = CGSize(
-                width: image.size.width * scale,
-                height: image.size.height * scale
-            )
-            return [CGRect(
-                x: (bounds.width - size.width) / 2,
-                y: (bounds.height - size.height) / 2,
-                width: size.width,
-                height: size.height
-            )]
-        }
-
-        var frames: [CGRect] = []
-        var x: CGFloat = 0
-        for image in images {
-            frames.append(CGRect(
-                x: x,
-                y: (bounds.height - image.size.height) / 2,
-                width: image.size.width,
-                height: image.size.height
-            ))
-            x += image.size.width + Self.pageSpacing
-        }
-        return frames
-    }
-
-    /// Mirrors Mangatan/Chimahon's native canvas behavior: passive OCR regions
-    /// remain invisible, while hovering or tapping reveals the complete OCR
-    /// paragraph and the dictionary match receives a restrained accent highlight.
-    private func hitRegion(at point: CGPoint) -> DisplayRegion? {
-        let hitSlop = 4 / max(enclosingScrollView?.magnification ?? 1, 0.01)
-        return displayRegions
-            .filter({ $0.rect.insetBy(dx: -hitSlop, dy: -hitSlop).contains(point) })
-            .min(by: { $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height })
-    }
-
-    private func blockRect(for region: MangaOCRTextRegion) -> CGRect {
-        displayRegions
-            .lazy
-            .filter {
-                $0.region.pageIndex == region.pageIndex
-                    && $0.region.blockID == region.blockID
-            }
-            .map(\.rect)
-            .reduce(CGRect.null) { $0.union($1) }
-    }
-
-    private func drawOCRTextOverlay() {
-        let visibleRegionID = selectedRegionID ?? hoveredRegionID
-        guard let selected = displayRegions.first(where: {
-            $0.region.id == visibleRegionID
-        }) else {
-            return
-        }
-        let activeRegions = displayRegions
-            .filter {
-                $0.region.pageIndex == selected.region.pageIndex
-                    && $0.region.blockID == selected.region.blockID
-            }
-            .sorted { $0.region.utf16Offset < $1.region.utf16Offset }
-        let matchRange = NSRange(
-            location: selected.region.utf16Offset,
-            length: selectedRegionID == nil ? 0 : selectedMatchedLength
-        )
-        let sentence = selected.region.sentence as NSString
-
-        let lines = Dictionary(grouping: activeRegions, by: \.region.lineID)
-            .values
-            .sorted {
-                ($0.map(\.region.utf16Offset).min() ?? 0)
-                    < ($1.map(\.region.utf16Offset).min() ?? 0)
-            }
-        for lineRegions in lines {
-            let ordered = lineRegions.sorted {
-                $0.region.utf16Offset < $1.region.utf16Offset
-            }
-            guard let first = ordered.first,
-                  let last = ordered.last else {
-                continue
-            }
-            let lineRect = ordered
-                .map(\.rect)
-                .reduce(CGRect.null) { $0.union($1) }
-            guard !lineRect.isNull, lineRect.width > 0, lineRect.height > 0 else {
-                continue
-            }
-
-            NSColor.white.withAlphaComponent(0.72).setFill()
-            NSBezierPath(rect: lineRect).fill()
-            for displayRegion in ordered {
-                let characterRange = sentence.rangeOfComposedCharacterSequence(
-                    at: displayRegion.region.utf16Offset
-                )
-                if NSIntersectionRange(characterRange, matchRange).length > 0 {
-                    NSColor.controlAccentColor.withAlphaComponent(0.45).setFill()
-                    NSBezierPath(rect: displayRegion.rect).fill()
-                }
-            }
-
-            let lastRange = sentence.rangeOfComposedCharacterSequence(
-                at: last.region.utf16Offset
-            )
-            let lineRange = NSRange(
-                location: first.region.utf16Offset,
-                length: NSMaxRange(lastRange) - first.region.utf16Offset
-            )
-            let lineText = sentence.substring(with: lineRange)
-            if selected.region.isVertical {
-                drawVerticalOCRText(
-                    sentence: sentence,
-                    regions: ordered
-                )
-            } else {
-                drawHorizontalOCRText(lineText, in: lineRect)
-            }
-        }
-    }
-
-    private func drawHorizontalOCRText(_ text: String, in rect: CGRect) {
-        guard !text.isEmpty else { return }
-        let attributedText = NSAttributedString(
-            string: text,
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 20, weight: .regular),
-                .foregroundColor: NSColor.black,
-            ]
-        )
-        let textSize = attributedText.size()
-        guard textSize.width > 0, textSize.height > 0 else { return }
-        let scale = min(rect.width / textSize.width, rect.height / textSize.height)
-
-        NSGraphicsContext.saveGraphicsState()
-        let transform = NSAffineTransform()
-        transform.translateX(by: rect.midX, yBy: rect.midY)
-        transform.scale(by: scale)
-        transform.translateX(by: -textSize.width / 2, yBy: -textSize.height / 2)
-        transform.concat()
-        attributedText.draw(at: .zero)
-        NSGraphicsContext.restoreGraphicsState()
-    }
-
-    private func drawVerticalOCRText(
-        sentence: NSString,
-        regions: [DisplayRegion]
-    ) {
-        for displayRegion in regions {
-            let offset = displayRegion.region.utf16Offset
-            guard offset >= 0, offset < sentence.length else { continue }
-            let characterRange = sentence.rangeOfComposedCharacterSequence(at: offset)
-            let text = sentence.substring(with: characterRange)
-            let rect = displayRegion.rect
-            let fontSize = max(8, min(rect.width * 0.82, rect.height * 0.95))
-            let attributedText = NSAttributedString(
-                string: text,
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: fontSize, weight: .regular),
-                    .foregroundColor: NSColor.black,
-                ]
-            )
-            let textSize = attributedText.size()
-            attributedText.draw(at: NSPoint(
-                x: rect.midX - textSize.width / 2,
-                y: rect.midY - textSize.height / 2
-            ))
-        }
-    }
-}
-
-private final class MangaCenteredClipView: NSClipView {
-    var onBlankAreaMouseDown: (() -> Void)?
-
-    override func mouseDown(with event: NSEvent) {
-        onBlankAreaMouseDown?()
-        super.mouseDown(with: event)
-    }
-
-    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
-        var bounds = super.constrainBoundsRect(proposedBounds)
-        guard let documentView else { return bounds }
-        if documentView.frame.width < bounds.width {
-            bounds.origin.x = (documentView.frame.width - bounds.width) / 2
-        }
-        if documentView.frame.height < bounds.height {
-            bounds.origin.y = (documentView.frame.height - bounds.height) / 2
-        }
-        return bounds
     }
 }

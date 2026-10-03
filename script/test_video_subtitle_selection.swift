@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Subtitles/SubtitleSelectionResolver.swift Core/SelectionLookup/TextSelectionResolver.swift Models/Profile.swift
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

@@ -1,3 +1,4 @@
+// test-sources: Features/Reader/ReaderStatisticsPersistencePolicy.swift
 import Foundation
 
 @main

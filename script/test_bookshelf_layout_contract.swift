@@ -7,17 +7,19 @@ private let bookshelfModel = try String(contentsOfFile: "Features/Bookshelf/Book
 private let nativeBookshelf = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
 private let nativeRoot = try String(contentsOfFile: "NativeMac/NativeMacRootView.swift", encoding: .utf8)
 private let coverImage = try String(contentsOfFile: "Util/CoverImage.swift", encoding: .utf8)
-private let shelfManagement = try String(contentsOfFile: "Features/Bookshelf/ShelfManagementView.swift", encoding: .utf8)
+private let shelfSidebar = try String(contentsOfFile: "Features/Bookshelf/LibraryShelfSidebar.swift", encoding: .utf8)
 private let mangaLibrary = try String(contentsOfFile: "Features/Manga/MangaLibraryView.swift", encoding: .utf8)
 private let nativeDetail = try String(contentsOfFile: "NativeMac/NativeMacDetailView.swift", encoding: .utf8)
 private let nativeGlassSurface = try String(contentsOfFile: "NativeMac/NativeGlassSurface.swift", encoding: .utf8)
 private let bookshelfDropSupport = (try? String(contentsOfFile: "Features/Bookshelf/BookshelfDropSupport.swift", encoding: .utf8)) ?? ""
 private let extensions = try String(contentsOfFile: "Util/Extensions.swift", encoding: .utf8)
+private let aboutView = try String(contentsOfFile: "Features/Settings/AboutView.swift", encoding: .utf8)
+private let updatePresentation = try String(contentsOfFile: "NativeMac/NativeUpdatePresentation.swift", encoding: .utf8)
 private let project = try String(contentsOfFile: "Niratan.xcodeproj/project.pbxproj", encoding: .utf8)
 
 assertContains(
     nativeRoot,
-    "@State private var bookshelfViewModel = BookshelfViewModel()",
+    "var bookshelfViewModel = BookshelfViewModel()",
     "The main window should retain one novel Bookshelf model across sidebar switches"
 )
 
@@ -89,8 +91,8 @@ assertContains(
 
 assertContains(
     shelfView,
-    "minimum: BookshelfLayout.v050CoverWidth,\n                maximum: BookshelfLayout.v050CoverWidth",
-    "Shelf grid should pin adaptive columns to the v0.5.0 Bookshelf width instead of letting SwiftUI stretch them"
+    "minimum: coverWidth,\n                maximum: coverWidth",
+    "Shelf grid should pin adaptive columns to the user-adjustable cover width instead of letting SwiftUI stretch them"
 )
 
 assertContains(
@@ -101,14 +103,14 @@ assertContains(
 
 assertContains(
     bookView,
-    ".frame(width: BookshelfLayout.v050CoverWidth)",
-    "Book cards should pin the cover/title stack to the v0.5.0 visual width instead of stretching with the grid cell"
+    ".frame(width: coverWidth)",
+    "Book cards should pin the cover/title stack to the adjustable cover width instead of stretching with the grid cell"
 )
 
 assertContains(
     bookView,
-    "var width: CGFloat = BookshelfLayout.v050CoverWidth",
-    "Book covers should default to the v0.5.0 visual width before material/background is applied"
+    "@Entry var shelfCoverWidth: CGFloat = BookshelfLayout.v050CoverWidth",
+    "Book covers should default to the v0.5.0 visual width until the user adjusts the cover size"
 )
 
 assertContains(
@@ -215,7 +217,7 @@ assertContains(
 
 assertContains(
     shelfView,
-    "@State private var pendingExport: BookExportPresentation?",
+    "var pendingExport: BookExportPresentation?",
     "ShelfView should own local export presentation state for the exact grid cell that invoked export"
 )
 
@@ -233,7 +235,7 @@ assertContains(
 
 assertContains(
     shelfView,
-    "private func exportBinding(for bookID: UUID) -> Binding<URL?>",
+    "func exportBinding(for bookID: UUID) -> Binding<URL?>",
     "ShelfView should clear the pending export when the current cell's share picker has opened"
 )
 
@@ -275,8 +277,8 @@ assertContains(
 
 assertContains(
     shelfView,
-    "self._isCollapsed = State(initialValue: !section.isReading)",
-    "Regular bookshelf folders should start collapsed while the Reading shelf stays expanded"
+    "self._isCollapsed = State(initialValue: allowsCollapse && !section.isReading)",
+    "Stacked bookshelf folders may start collapsed, but the single shelf shown beside the shelf column stays expanded"
 )
 
 assertContains(
@@ -315,34 +317,76 @@ assertContains(
     "Native Bookshelf toolbar should include a visible Google Drive refresh action"
 )
 
-assertContains(
+assertNotContains(
     nativeBookshelf,
-    "@State private var updateChecker = UpdateChecker()",
-    "Native Bookshelf should own the shared update checker so the original Bookshelf update button is available on the native Mac path"
-)
-
-assertContains(
-    nativeBookshelf,
-    "await updateChecker.check(manual: true)",
-    "Native Bookshelf update button should reuse the existing manual update check action"
-)
-
-assertContains(
-    nativeBookshelf,
-    "Label(\"Check for Updates\", systemImage: updateChecker.hasAvailableUpdate ? \"arrow.down.circle.fill\" : \"arrow.triangle.2.circlepath\")",
-    "Native Bookshelf update button should use the same macOS 26 toolbar Label component as the other top-right actions"
+    "updateChecker",
+    "Update checks belong to Settings > About and the main window's background checks, not the Bookshelf toolbar"
 )
 
 assertNotContains(
     nativeBookshelf,
     "bookshelfHeaderActions",
-    "Native Bookshelf update button should stay in the top-right toolbar instead of adding custom in-content chrome"
+    "Native Bookshelf actions should stay in the top-right toolbar instead of adding custom in-content chrome"
+)
+
+assertContains(
+    nativeRoot,
+    ".nativeUpdatePresentation()",
+    "The main window should run the automatic GitHub release checks"
+)
+
+assertContains(
+    updatePresentation,
+    "await updateChecker.runAutomaticChecks()",
+    "Automatic update checks should run for the lifetime of the main window"
+)
+
+assertContains(
+    updatePresentation,
+    "await updateChecker.downloadAndOpenAvailableUpdate()",
+    "The available-update alert should download and open the matching DMG instead of sending users to GitHub"
+)
+
+assertContains(
+    aboutView,
+    "await updateChecker.check(manual: true)",
+    "Settings > About should offer the manual update check"
+)
+
+assertContains(
+    aboutView,
+    "isOn: $updateChecker.automaticChecksEnabled",
+    "Settings > About should let users turn automatic update checks off"
+)
+
+assertContains(
+    extensions,
+    "static let shared = UpdateChecker()",
+    "The main window and Settings should share one update checker"
+)
+
+assertNotContains(
+    nativeBookshelf,
+    "ToolbarItemGroup(placement: .navigation)",
+    "Native Bookshelf should keep every toolbar action on the top-right"
 )
 
 assertContains(
     nativeBookshelf,
-    "await updateChecker.downloadAndOpenAvailableUpdate()",
-    "Native Bookshelf available-update alert should download and open the matching DMG instead of sending users to GitHub"
+    ".searchable(text: $searchText, placement: .toolbar",
+    "Native Bookshelf should search books from the toolbar"
+)
+
+assertContains(
+    nativeBookshelf,
+    ".pickerStyle(.inline)",
+    "The Bookshelf sort menu should list its options directly instead of a nested submenu"
+)
+
+assertContains(
+    nativeBookshelf,
+    "LibraryCoverSizeButton(width: $coverWidth)",
+    "Native Bookshelf should let users adjust the cover size from the toolbar"
 )
 
 assertContains(
@@ -425,13 +469,13 @@ assertContains(
 
 assertContains(
     shelfView,
-    "dragCoordinateSpaceName: section.isReading ? nil : coordinateSpaceName",
+    "dragCoordinateSpaceName: section.allowsReordering ? coordinateSpaceName : nil",
     "Shelf should pass its named coordinate space into local book card drag gestures"
 )
 
 assertContains(
     shelfView,
-    "onDragChanged: section.isReading ? nil : { location in\n                                reorderBook(book.id, draggedTo: location)",
+    "onDragChanged: section.allowsReordering ? { location in\n                                reorderBook(book.id, draggedTo: location)",
     "Book drag gestures should route reorder drops through the same view-model command"
 )
 
@@ -467,7 +511,7 @@ assertContains(
 
 assertContains(
     shelfView,
-    "private let dragReorderAnimation: Animation = .smooth(duration: 0.22)",
+    "let dragReorderAnimation: Animation = .smooth(duration: 0.22)",
     "Bookshelf drag sorting should use a short SwiftUI animation for grid reflow"
 )
 
@@ -504,7 +548,7 @@ assertContains(
 for (path, source) in [
     ("Features/Bookshelf/BookView.swift", bookView),
     ("Features/Bookshelf/ShelfView.swift", shelfView),
-    ("Features/Bookshelf/ShelfManagementView.swift", shelfManagement),
+    ("Features/Bookshelf/LibraryShelfSidebar.swift", shelfSidebar),
     ("Features/Manga/MangaLibraryView.swift", mangaLibrary),
 ] {
     for forbidden in [".material", "Material", ".formStyle(.grouped)"] {
@@ -515,24 +559,6 @@ for (path, source) in [
         )
     }
 }
-
-assertContains(
-    shelfManagement,
-    "GlassEffectContainer(spacing: ShelfManagementLayout.sectionSpacing)",
-    "Novel and manga shelf management should group their custom glass surfaces in one container"
-)
-
-assertContains(
-    shelfManagement,
-    ".glassEffect(\n                .regular,",
-    "Shelf management sections should use direct single-layer macOS 26 glass"
-)
-
-assertNotContains(
-    shelfManagement,
-    "Form {",
-    "Shelf management should not reintroduce grouped Form material inside the system sheet"
-)
 
 assertContains(
     nativeDetail,
@@ -556,52 +582,61 @@ assertNotContains(
     "The shelf page background must not hide Material underneath macOS 26 glass components"
 )
 
-assertNotContains(
-    shelfManagement,
-    ".buttonStyle(.glassProminent)",
-    "Shelf management actions must not retain a filled Material-like button"
-)
+for (path, source) in [
+    ("NativeMac/NativeReuseViews.swift", nativeBookshelf),
+    ("Features/Manga/MangaLibraryView.swift", mangaLibrary),
+] {
+    assertContains(
+        source,
+        "LibraryShelfSidebar(",
+        "\(path) should show its shelves in the shared shelf column beside the grid"
+    )
+    assertContains(
+        source,
+        "LibraryShelfLayout.sidebarWidth(for: proxy.size.width)",
+        "\(path) should size the shelf column like the Settings inner sidebar"
+    )
+    assertNotContains(
+        source,
+        "Manage Shelves",
+        "\(path) should manage shelves directly in the shelf column instead of a separate sheet"
+    )
+}
 
-assertNotContains(
-    shelfManagement,
-    ".textFieldStyle(.roundedBorder)",
-    "Shelf management input must not retain a filled Material-like text field"
+assertContains(
+    shelfSidebar,
+    "contextMenu(forSelectionType: LibraryShelfSelection.self)",
+    "Shelf rows should offer rename and delete from the list context menu"
 )
 
 assertContains(
-    shelfManagement,
-    ".nativeSettingsTextField()",
-    "Shelf management should reuse the AnkiConnect-style macOS 26 capsule text field"
+    shelfSidebar,
+    "} primaryAction: { items in",
+    "Double-clicking a shelf should start renaming it inline"
 )
 
 assertContains(
-    shelfManagement,
-    ".toggleStyle(.switch)",
-    "The Reading control should use the native macOS 26 switch instead of a checkmark box"
+    shelfSidebar,
+    "TextField(\"Shelf name\", text: $draftName)",
+    "Shelves should be renamed in place inside the shelf column"
 )
 
 assertContains(
-    shelfManagement,
-    "static let panelWidth: CGFloat = 420",
-    "Shelf management should use a compact desktop panel width"
+    shelfSidebar,
+    ".onMove(perform: editingShelfID == nil ? onMove : nil)",
+    "Shelves should reorder by dragging in the shelf column"
 )
 
 assertContains(
-    shelfManagement,
-    "static let panelHeight: CGFloat = 460",
-    "Shelf management should use a compact desktop panel height and scroll longer shelf lists"
+    shelfSidebar,
+    "Label(\"New Shelf\", systemImage: \"plus\")",
+    "The shelf column should create shelves directly"
 )
 
 assertContains(
-    shelfManagement,
-    #"NativeReaderSheetPanel("Manage Shelves""#,
-    "Novel shelf management should use the same outer panel as Reader Sasayaki"
-)
-
-assertContains(
-    mangaLibrary,
-    #"NativeReaderSheetPanel("Manage Manga Shelves""#,
-    "Manga shelf management should use the same outer panel as Reader Sasayaki"
+    bookshelfModel,
+    "shelves[index].name = name",
+    "Renaming a novel shelf should keep its books and order in the existing shelves.json structure"
 )
 
 guard let nativeBookshelfStart = nativeBookshelf.range(of: "struct NativeBookshelfReuseView: View"),

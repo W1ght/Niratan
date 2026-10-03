@@ -1,3 +1,4 @@
+// test-sources: Features/Popup/PopupSystemSymbolRenderer.swift
 import AppKit
 import Foundation
 

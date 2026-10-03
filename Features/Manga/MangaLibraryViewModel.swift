@@ -5,8 +5,17 @@ nonisolated struct MangaShelfSection: Identifiable, Sendable {
     let shelf: MangaShelf?
     var items: [MangaLibraryItem]
     var isReading = false
+    var isAll = false
+
+    /// All and Reading mix items from several orders, so only real shelves and Unshelved reorder.
+    var allowsReordering: Bool {
+        !isReading && !isAll
+    }
 
     var id: String {
+        if isAll {
+            return "__all__"
+        }
         if isReading {
             return "__reading__"
         }
@@ -22,6 +31,7 @@ final class MangaLibraryViewModel {
     var isScanning = false
     var shouldShowError = false
     var errorMessage = ""
+    var shelfSelection: LibraryShelfSelection = .all
     var sortOption: MangaLibrarySortOption {
         didSet {
             MangaLibraryPreferences.save(sortOption: sortOption, in: preferences)
@@ -96,6 +106,84 @@ final class MangaLibraryViewModel {
         return sections
     }
 
+    /// The shelf column selection, falling back to All when its shelf no longer exists.
+    var resolvedShelfSelection: LibraryShelfSelection {
+        switch shelfSelection {
+        case .shelf(let key) where !catalog.shelves.contains(where: { $0.id.uuidString == key }):
+            return .all
+        case .googleDrive:
+            return .all
+        default:
+            return shelfSelection
+        }
+    }
+
+    func section(for selection: LibraryShelfSelection) -> MangaShelfSection {
+        switch selection {
+        case .all, .googleDrive:
+            return MangaShelfSection(
+                shelf: nil,
+                items: sort(visibleItems, using: readingManualOrder),
+                isAll: true
+            )
+        case .reading:
+            return MangaShelfSection(
+                shelf: nil,
+                items: sort(readingItems, using: readingManualOrder),
+                isReading: true
+            )
+        case .unshelved:
+            return MangaShelfSection(
+                shelf: nil,
+                items: sort(unshelvedItems, using: catalog.manualItemOrder)
+            )
+        case .shelf(let key):
+            guard let shelf = catalog.shelves.first(where: { $0.id.uuidString == key }) else {
+                return section(for: .all)
+            }
+            return MangaShelfSection(
+                shelf: shelf,
+                items: sort(
+                    visibleItems.filter { shelf.itemIDs.contains($0.id) },
+                    using: shelf.itemIDs
+                )
+            )
+        }
+    }
+
+    func itemCount(for selection: LibraryShelfSelection) -> Int {
+        switch selection {
+        case .all, .googleDrive:
+            return visibleItems.count
+        case .reading:
+            return readingItems.count
+        case .unshelved:
+            return unshelvedItems.count
+        case .shelf(let key):
+            guard let shelf = catalog.shelves.first(where: { $0.id.uuidString == key }) else {
+                return 0
+            }
+            let shelfIDs = Set(shelf.itemIDs)
+            return visibleItems.filter { shelfIDs.contains($0.id) }.count
+        }
+    }
+
+    func shelfID(containing itemID: String) -> UUID? {
+        catalog.shelves.first { $0.itemIDs.contains(itemID) }?.id
+    }
+
+    private var readingItems: [MangaLibraryItem] {
+        visibleItems.filter {
+            $0.lastReadAt != nil
+                && $0.progress < 0.999
+        }
+    }
+
+    private var unshelvedItems: [MangaLibraryItem] {
+        let shelvedIDs = Set(catalog.shelves.flatMap(\.itemIDs))
+        return visibleItems.filter { !shelvedIDs.contains($0.id) }
+    }
+
     func load() {
         guard !isLoadingCatalog else { return }
         isLoadingCatalog = true
@@ -132,19 +220,54 @@ final class MangaLibraryViewModel {
         catalog.sources.first { $0.id == item.sourceID }
     }
 
-    func createShelf(name: String) {
-        perform {
-            await self.store.createShelf(name: name)
+    /// Creates a shelf and returns its key. The shelf is shown right away so it can be renamed inline.
+    @discardableResult
+    func createShelf(name: String) -> String? {
+        guard let name = LibraryShelfNaming.normalized(name),
+              LibraryShelfNaming.isAvailable(name, among: catalog.shelves.map(\.name)) else {
+            return nil
         }
+        let shelf = MangaShelf(name: name)
+        catalog.shelves.append(shelf)
+        perform {
+            await self.store.createShelf(name: name, id: shelf.id)
+        }
+        return shelf.id.uuidString
+    }
+
+    /// Renames a shelf in place, keeping its items and position. Manga shelf keys never change.
+    @discardableResult
+    func renameShelf(id: UUID, to newName: String) -> String? {
+        guard let index = catalog.shelves.firstIndex(where: { $0.id == id }),
+              let name = LibraryShelfNaming.normalized(newName),
+              LibraryShelfNaming.isAvailable(
+                  name,
+                  among: catalog.shelves.map(\.name),
+                  excluding: catalog.shelves[index].name
+              ) else {
+            return nil
+        }
+        catalog.shelves[index].name = name
+        perform {
+            await self.store.renameShelf(id: id, name: name)
+        }
+        return id.uuidString
     }
 
     func deleteShelf(id: UUID) {
+        catalog.shelves.removeAll { $0.id == id }
         perform {
             await self.store.deleteShelf(id: id)
         }
     }
 
     func moveShelves(from source: IndexSet, to destination: Int) {
+        let movedShelves = source.map { catalog.shelves[$0] }
+        let insertionIndex = destination - source.count(in: 0..<destination)
+        for index in source.reversed() {
+            catalog.shelves.remove(at: index)
+        }
+        catalog.shelves.insert(contentsOf: movedShelves, at: insertionIndex)
         perform {
             await self.store.moveShelves(from: source, to: destination)
         }
@@ -163,7 +286,7 @@ final class MangaLibraryViewModel {
         in section: MangaShelfSection,
         before targetID: String
     ) {
-        guard !section.isReading else { return }
+        guard section.allowsReordering else { return }
         sortOption = .manual
         perform {
             await self.store.reorderItem(

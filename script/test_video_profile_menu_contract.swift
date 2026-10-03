@@ -13,6 +13,12 @@ private func source(_ path: String) throws -> String {
 
 let controls = try source("Features/Video/VideoControlsView.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
+    + source("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + source("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + source("Features/Video/VideoPlayerScreen+OSD.swift")
+    + source("Features/Video/VideoPlayerScreen+Mining.swift")
+    + source("Features/Video/VideoPlayerScreen+Opening.swift")
+    + source("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 
 require(
     !controls.contains("let profiles: [HoshiProfile]")

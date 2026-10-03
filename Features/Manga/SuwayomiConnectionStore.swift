@@ -5,7 +5,7 @@ actor SuwayomiConnectionStore {
     static let shared = SuwayomiConnectionStore()
 
     private let configurationFileName = "suwayomi.json"
-    private let keychainService = "moe.shishamo.hoshi.suwayomi"
+    private let keychainService = DevelopmentDataIsolation.keychainName("moe.shishamo.hoshi.suwayomi")
 
     func configuration(
         profileID: String

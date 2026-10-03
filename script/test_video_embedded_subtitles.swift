@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Playback/PlaybackEngine.swift Features/Video/Playback/VideoTrack.swift Features/Video/Subtitles/VideoSubtitleController.swift Features/Video/Remote/RemoteVideoSource.swift Models/Subtitle.swift Features/Video/Subtitles/SubtitleCueStore.swift Features/Video/Subtitles/SubtitleParser.swift Features/Video/Remote/YouTubeURLParser.swift Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift
 import Foundation
 
 // PlaybackEngine references the Video-only shader preset, but this focused

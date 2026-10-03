@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Remote/YouTubeInitialPlayerResponseParser.swift Features/Video/Remote/YouTubePageMetadataLoader.swift Features/Video/Remote/RemoteVideoSource.swift Features/Video/Remote/YouTubeMediaModels.swift Models/Subtitle.swift Features/Video/Remote/RemoteVideoResolver.swift Features/Video/Remote/YouTubeAndroidVRPlayerResponseParser.swift Features/Video/Remote/YouTubeURLParser.swift
 import Foundation
 
 private final class StubURLProtocol: URLProtocol, @unchecked Sendable {

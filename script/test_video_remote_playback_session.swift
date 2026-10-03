@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Remote/RemotePlaybackSession.swift Features/Video/Remote/RemoteVideoSource.swift Features/Video/Remote/RemoteVideoResolver.swift Features/Video/Playback/PlaybackEngine.swift Models/Subtitle.swift Features/Video/Remote/YouTubeURLParser.swift Features/Video/Playback/VideoTrack.swift Features/Video/Playback/VideoShaderPreset.swift
 import Foundation
 
 private actor ResolverRecorder {

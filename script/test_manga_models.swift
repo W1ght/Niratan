@@ -1,3 +1,4 @@
+// test-sources: Models/Manga.swift
 import Foundation
 
 @main

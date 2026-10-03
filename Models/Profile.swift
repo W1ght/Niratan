@@ -124,8 +124,12 @@ struct ReaderProfileSettings: Codable, Equatable, Sendable {
     var selectedFont: String
     var fontSize: Int
     var hideFurigana: Bool
+    var furiganaMode: String? = nil
     var continuousMode: Bool
     var twoColumnHorizontalPages: Bool? = nil
+    var paragraphMode: Bool? = nil
+    var textAnimation: Bool? = nil
+    var textSpeed: Int? = nil
     var horizontalPadding: Int
     var verticalPadding: Int
     var avoidPageBreak: Bool
@@ -137,6 +141,9 @@ struct ReaderProfileSettings: Codable, Equatable, Sendable {
     var paragraphSpacing: Double
     var showTitle: Bool
     var showCharacters: Bool
+    var showProgress: Bool? = nil
+    var showChapterProgress: Bool? = nil
+    var progressCount: String? = nil
     var showPercentage: Bool
     var showProgressTop: Bool
     var showStatisticsToggle: Bool
@@ -156,8 +163,12 @@ struct ReaderProfileSettings: Codable, Equatable, Sendable {
         selectedFont: "Hiragino Mincho ProN",
         fontSize: 22,
         hideFurigana: false,
+        furiganaMode: "Off",
         continuousMode: false,
         twoColumnHorizontalPages: false,
+        paragraphMode: false,
+        textAnimation: false,
+        textSpeed: 35,
         horizontalPadding: 5,
         verticalPadding: 0,
         avoidPageBreak: false,
@@ -169,6 +180,9 @@ struct ReaderProfileSettings: Codable, Equatable, Sendable {
         paragraphSpacing: 0,
         showTitle: true,
         showCharacters: true,
+        showProgress: true,
+        showChapterProgress: false,
+        progressCount: "Characters",
         showPercentage: true,
         showProgressTop: true,
         showStatisticsToggle: false,
@@ -192,6 +206,9 @@ struct DictionaryProfileSettings: Codable, Equatable, Sendable {
     var deduplicatePitchAccents: Bool
     var compactPitchAccents: Bool
     var customCSS: String
+    var frequencySortOrder: String? = nil
+    var frequencySortDictionary: String? = nil
+    var searchTextSize: Int? = nil
 
     static let defaults = DictionaryProfileSettings(
         dictionaryTabDefault: false,
@@ -206,6 +223,9 @@ struct DictionaryProfileSettings: Codable, Equatable, Sendable {
         harmonicFrequency: false,
         deduplicatePitchAccents: false,
         compactPitchAccents: true,
-        customCSS: ""
+        customCSS: "",
+        frequencySortOrder: "Auto",
+        frequencySortDictionary: "",
+        searchTextSize: 26
     )
 }

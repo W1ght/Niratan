@@ -121,7 +121,9 @@ nonisolated struct RemoteVideoLibraryItem: Codable, Equatable, Identifiable, Sen
             path: id,
             sourceID: VideoLibraryRemoteSource.id,
             title: identity.title,
-            parentFolder: String(localized: "YouTube Video"),
+            parentFolder: identity.isMediaServer
+                ? identity.provider?.displayName ?? String(localized: "Media Server")
+                : String(localized: "YouTube Video"),
             fileSize: 0,
             modifiedAt: lastResolvedAt,
             lastSeenAt: addedAt,

@@ -1,3 +1,4 @@
+// test-sources: Util/ReaderCharacterNormalizer.swift Models/Sasayaki.swift Features/Sasayaki/SasayakiMatcher.swift
 import Foundation
 
 @main

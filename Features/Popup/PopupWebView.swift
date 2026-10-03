@@ -205,6 +205,7 @@ struct PopupWebView: NSViewRepresentable {
     var onTapOutside: (() -> Void)? = nil
     var onSwipeDismiss: (() -> Void)? = nil
     var onRedirect: ((String) -> [[String: Any]])? = nil
+    var onKanjiRedirect: ((String) -> [String: Any]?)? = nil
     var scrollViewBounces: Bool = false
     var onScrollViewOffsetChanged: ((CGFloat) -> Void)? = nil
     var onScrollViewWillBeginDragging: (() -> Void)? = nil
@@ -224,6 +225,7 @@ struct PopupWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "tapOutside")
         config.userContentController.add(context.coordinator, name: "swipeDismiss")
         config.userContentController.add(context.coordinator, name: "playWordAudio")
+        config.userContentController.add(context.coordinator, name: "audioSourceMenu")
         config.userContentController.add(context.coordinator, name: "buttonFrames")
         config.userContentController.add(context.coordinator, name: "prepareContextMining")
         config.userContentController.add(context.coordinator, name: "miningFeedback")
@@ -232,6 +234,7 @@ struct PopupWebView: NSViewRepresentable {
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "duplicateCheck")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "getEntries")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "lookupRedirect")
+        config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "kanjiRedirect")
         config.userContentController.addScriptMessageHandler(context.coordinator, contentWorld: .page, name: "queryTextSelected")
         config.setURLSchemeHandler(AudioHandler(), forURLScheme: "audio")
         config.setURLSchemeHandler(ImageHandler(), forURLScheme: "image")
@@ -251,7 +254,7 @@ struct PopupWebView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.parent = self
-        let loadConfiguration = "\(profileID)|\(contentLanguageID)|\(scanNonJapaneseText)|\(scanLength)|\(hoverLookupDelayMs)"
+        let loadConfiguration = "\(profileID)|\(contentLanguageID)|\(scanNonJapaneseText)|\(scanLength)|\(hoverLookupDelayMs)|\(kanjiLookupEnabled)"
         if !context.coordinator.wasLoaded
             || context.coordinator.currentContent != content
             || context.coordinator.loadConfiguration != loadConfiguration {
@@ -317,6 +320,7 @@ struct PopupWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "tapOutside")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "swipeDismiss")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "playWordAudio")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "audioSourceMenu")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "buttonFrames")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "prepareContextMining")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "miningFeedback")
@@ -325,6 +329,7 @@ struct PopupWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "duplicateCheck", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "getEntries", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "lookupRedirect", contentWorld: .page)
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "kanjiRedirect", contentWorld: .page)
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "queryTextSelected", contentWorld: .page)
     }
 
@@ -405,6 +410,37 @@ struct PopupWebView: NSViewRepresentable {
             }
         }
 
+        /// Mac counterpart of upstream's long-press audio menu: lists every result of every enabled source.
+        private func showAudioSourceMenu(_ body: [String: Any], in webView: WKWebView) {
+            guard let entryIndex = body["entryIndex"] as? Int else { return }
+            let names = body["names"] as? [String] ?? []
+            let selected = body["selected"] as? Int ?? -1
+            let x = body["x"] as? CGFloat ?? 0
+            let y = body["y"] as? CGFloat ?? 0
+
+            let menu = NSMenu()
+            if names.isEmpty {
+                let item = NSMenuItem(title: String(localized: "No audio found"), action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                menu.addItem(item)
+            } else {
+                for (index, name) in names.enumerated() {
+                    let item = NSMenuItem(title: name, action: #selector(audioSourceSelected(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.state = index == selected ? .on : .off
+                    item.representedObject = [entryIndex, index]
+                    menu.addItem(item)
+                }
+            }
+            let location = webView.isFlipped ? NSPoint(x: x, y: y) : NSPoint(x: x, y: webView.bounds.height - y)
+            menu.popUp(positioning: nil, at: location, in: webView)
+        }
+
+        @objc private func audioSourceSelected(_ sender: NSMenuItem) {
+            guard let indices = sender.representedObject as? [Int], indices.count == 2 else { return }
+            webView?.evaluateJavaScript("playEntryAudio(\(indices[0]), \(indices[1]))")
+        }
+
         private func symbolName(kind: String, state: String) -> String {
             if kind == "audio" {
                 return state == "error" ? "speaker.slash" : "speaker.wave.2"
@@ -457,6 +493,7 @@ struct PopupWebView: NSViewRepresentable {
                 window.contextMiningAvailable = contextMiningAvailable;
                 window.contextMiningLabel = contextMiningLabel;
                 window.viewAnkiNoteLabel = viewAnkiNoteLabel;
+                window.hoshiLabels = hoshiLabels;
                 window.dictionaryStyles = dictionaryStyles;
                 window.entryCount = entryCount;
                 window.twoColumnLayout = twoColumnLayout;
@@ -473,6 +510,14 @@ struct PopupWebView: NSViewRepresentable {
                     "contextMiningAvailable": parent.onPrepareContextMining != nil,
                     "contextMiningLabel": String(localized: "Select Context"),
                     "viewAnkiNoteLabel": String(localized: "View added note in Anki"),
+                    "hoshiLabels": [
+                        "average": String(localized: "Average"),
+                        "playAudio": String(localized: "Play Audio"),
+                        "addToAnki": String(localized: "Add to Anki"),
+                        "preparingCard": String(localized: "Preparing card…"),
+                        "unknownError": String(localized: "Unknown error"),
+                        "prepareCardFailed": String(localized: "Unable to prepare the card: %@"),
+                    ],
                     "duplicateSymbolDataURL": duplicateSymbolDataURL,
                     "viewNoteSymbolDataURL": viewNoteSymbolDataURL,
                 ],
@@ -486,7 +531,7 @@ struct PopupWebView: NSViewRepresentable {
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
             if message.name == "mineEntry", let content = message.body as? [String: String] {
-                let result = await parent.onMine?(content) ?? .failed("Unable to add card.")
+                let result = await parent.onMine?(content) ?? .failed(String(localized: "Unable to add card."))
                 return (result.webPayload, nil)
             }
             if message.name == "openAnkiNote",
@@ -511,6 +556,9 @@ struct PopupWebView: NSViewRepresentable {
                 entries = parent.onRedirect?(query) ?? []
                 return (entries.count, nil)
             }
+            if message.name == "kanjiRedirect", let kanji = message.body as? String {
+                return (parent.onKanjiRedirect?(kanji) ?? nil, nil)
+            }
             if message.name == "queryTextSelected",
                let body = message.body as? [String: Any],
                let query = body["text"] as? String,
@@ -533,6 +581,10 @@ struct PopupWebView: NSViewRepresentable {
                 message.webView?.evaluateJavaScript("window.hoshiSelection.clearLookupSelection?.()")
             } else if message.name == "swipeDismiss" {
                 parent.onSwipeDismiss?()
+            } else if message.name == "audioSourceMenu",
+                      let body = message.body as? [String: Any],
+                      let webView = message.webView {
+                showAudioSourceMenu(body, in: webView)
             } else if message.name == "buttonFrames",
                       let frames = message.body as? [[String: Any]] {
                 guard let webView = message.webView else { return }
@@ -586,6 +638,10 @@ struct PopupWebView: NSViewRepresentable {
         }
     }
 
+    private var kanjiLookupEnabled: Bool {
+        onKanjiRedirect != nil && LookupEngine.shared.hasKanjiDictionaries
+    }
+
     private func constructHtml(content: String) -> String {
         """
         <!DOCTYPE html>
@@ -602,6 +658,7 @@ struct PopupWebView: NSViewRepresentable {
             <script>
                 window.scanNonJapaneseText = \(scanNonJapaneseText);
                 window.scanLength = \(scanLength);
+                window.kanjiLookupEnabled = \(kanjiLookupEnabled);
                 window.twoColumnLayout = \(twoColumnLayout);
             </script>
             <script src="selection.js"></script>

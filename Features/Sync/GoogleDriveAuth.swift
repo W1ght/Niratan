@@ -54,6 +54,59 @@ class GoogleDriveAuth: NSObject {
     var isAuthenticated: Bool {
         cachedCredentials != nil || TokenStorage.hasStoredCredentials
     }
+
+    /// OAuth client bundled with this build for the Google Drive provider
+    /// (`NIRATAN_GOOGLE_CLIENT_ID` build setting); empty in builds without one.
+    static var bundledClientId: String? {
+        let value = (Bundle.main.object(forInfoDictionaryKey: "NiratanGoogleClientID") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return isValidGoogleClientId(value) ? value : nil
+    }
+
+    /// The Google Drive provider prefers the bundled client and otherwise uses the client ID
+    /// entered in Settings; the ッツ/ttu provider always needs the user's own client.
+    static func clientId(for provider: SyncProvider) -> String {
+        let userClientId = (UserDefaults.standard.string(forKey: "googleClientId") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        switch provider {
+        case .gdrive:
+            return bundledClientId ?? userClientId
+        case .ttu:
+            return userClientId
+        }
+    }
+
+    private static let connectedClientIdKey = "googleDriveConnectedClientId"
+
+    /// Whether the stored authorization belongs to the client the provider uses. Compares the
+    /// non-secret client id recorded at sign-in instead of reading the Keychain item.
+    func isAuthenticated(for provider: SyncProvider) -> Bool {
+        guard isAuthenticated else { return false }
+        let connected = UserDefaults.standard.string(forKey: Self.connectedClientIdKey)
+            ?? UserDefaults.standard.string(forKey: "googleClientId")?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let configured = Self.clientId(for: provider)
+        return !configured.isEmpty && connected == configured
+    }
+
+    func authenticate(provider: SyncProvider) async throws {
+        let clientId = Self.clientId(for: provider)
+        guard Self.isValidGoogleClientId(clientId) else {
+            throw GoogleDriveAuthError.invalidClientId
+        }
+        let previousClientId = UserDefaults.standard.string(forKey: Self.connectedClientIdKey)
+
+        let manager = GoogleDriveSyncManager.shared
+        await manager.stop()
+        defer {
+            manager.start()
+        }
+
+        _ = previousClientId
+        try await authenticate(clientId: clientId)
+        // Any new authorization may belong to another Google account.
+        try manager.resetConnection()
+        GoogleDriveHandler.clearCache()
+    }
     
     func getAccessToken() throws -> String {
         try credentials().accessToken
@@ -84,6 +137,7 @@ class GoogleDriveAuth: NSObject {
         let code = try await getAuthorizationCode(from: authURL, callbackScheme: scheme)
         let credentials = try await exchangeCode(code: code, clientId: clientId, redirectUri: redirectUri)
         storeCredentials(credentials)
+        UserDefaults.standard.set(clientId, forKey: Self.connectedClientIdKey)
         Self.logger.info("Google Drive authentication completed; stored credentials available: \(self.isAuthenticated, privacy: .public)")
     }
     
@@ -204,6 +258,7 @@ class GoogleDriveAuth: NSObject {
     private func clearCredentials() {
         cachedCredentials = nil
         TokenStorage.clear()
+        UserDefaults.standard.removeObject(forKey: Self.connectedClientIdKey)
     }
     
     private static func isValidGoogleClientId(_ clientId: String) -> Bool {

@@ -61,7 +61,7 @@ final class RemoteSubtitleLoader {
             throw RemoteSubtitleLoaderError.untrustedDownloadURL
         }
         var request = URLRequest(url: option.url)
-        request.timeoutInterval = 30
+        request.timeoutInterval = option.downloadTimeout ?? 30
         for (name, value) in headers {
             request.setValue(value, forHTTPHeaderField: name)
         }

@@ -1,4 +1,35 @@
 import Foundation
+import Synchronization
+
+/// Receives playback progress for remote sources whose provider tracks it
+/// server-side, such as media servers.
+@MainActor
+protocol RemotePlaybackReporting: AnyObject {
+    func playbackDidUpdate(position: TimeInterval, duration: TimeInterval, isPlaying: Bool)
+    func playbackDidStop(position: TimeInterval, duration: TimeInterval)
+}
+
+/// Feature modules register reporter factories at launch so the player model
+/// stays independent of them.
+nonisolated enum RemotePlaybackReporterCatalog {
+    typealias Factory = @MainActor @Sendable (ResolvedRemoteVideoSource) -> (any RemotePlaybackReporting)?
+
+    private static let factories = Mutex<[Factory]>([])
+
+    static func register(_ factory: @escaping Factory) {
+        factories.withLock { $0.append(factory) }
+    }
+
+    @MainActor
+    static func makeReporter(for source: ResolvedRemoteVideoSource) -> (any RemotePlaybackReporting)? {
+        for factory in factories.withLock({ $0 }) {
+            if let reporter = factory(source) {
+                return reporter
+            }
+        }
+        return nil
+    }
+}
 
 nonisolated struct RemotePlaybackAttempt: Equatable, Sendable {
     let source: ResolvedRemoteVideoSource
@@ -126,7 +157,9 @@ actor RemotePlaybackSession {
             selectedSubtitleLanguage: currentSource.selectedSubtitleLanguage,
             resolvedAt: currentSource.resolvedAt,
             expiresAt: currentSource.expiresAt,
-            qualityOptions: currentSource.qualityOptions
+            qualityOptions: currentSource.qualityOptions,
+            providerContext: currentSource.providerContext,
+            resumeHint: currentSource.resumeHint
         )
         generation &+= 1
         return .retry(currentAttempt())

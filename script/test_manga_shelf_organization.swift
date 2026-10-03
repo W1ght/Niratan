@@ -1,3 +1,5 @@
+// test-sources: Features/Bookshelf/LibraryShelfSelection.swift Features/Manga/MangaLibraryStore.swift Features/Manga/MangaLibraryViewModel.swift Features/Manga/MangaPageLoader.swift Models/Manga.swift Features/Manga/MangaEPUBParser.swift Features/Manga/MangaMokuroParser.swift
+// test-modules: ZIPFoundation
 import Foundation
 import ZIPFoundation
 
@@ -93,6 +95,22 @@ private enum MangaShelfOrganizationTests {
             catalog.shelves.first?.itemIDs == [item.id],
             "moving a manga should persist shelf membership"
         )
+
+        let explicitShelfID = UUID()
+        await store.createShelf(name: "Later", id: explicitShelfID)
+        await store.renameShelf(id: shelf.id, name: "  Best  ")
+        await store.renameShelf(id: explicitShelfID, name: "best")
+        catalog = await store.snapshot()
+        require(
+            catalog.shelves.map(\.id) == [shelf.id, explicitShelfID]
+                && catalog.shelves.map(\.name) == ["Best", "Later"],
+            "renaming a manga shelf should keep its id and position, trim the name, and reject duplicates"
+        )
+        require(
+            catalog.shelves.first?.itemIDs == [item.id],
+            "renaming a manga shelf should keep its items"
+        )
+        await store.deleteShelf(id: explicitShelfID)
         require(
             catalog.items.first?.displayTitle == "Renamed Manga",
             "renaming should persist a display title"

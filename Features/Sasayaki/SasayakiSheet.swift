@@ -33,6 +33,14 @@ private enum SasayakiSheetTab: String, CaseIterable, Identifiable {
         case .settings: "Settings"
         }
     }
+
+    var systemImage: String {
+        switch self {
+        case .resources: "tray.and.arrow.down"
+        case .chapters: "list.bullet"
+        case .settings: "gearshape"
+        }
+    }
 }
 
 struct SasayakiSheet: View {
@@ -48,6 +56,7 @@ struct SasayakiSheet: View {
     @State private var subtitleURL: URL?
     @State private var selectedTab: SasayakiSheetTab = .resources
     @State private var userSelectedTab = false
+    @State private var scrubTime: Double?
 
     private static let audioContentTypes = ["mp3", "m4b"].compactMap { UTType(filenameExtension: $0) }
     private static let subtitleContentTypes: [UTType] = {
@@ -56,29 +65,24 @@ struct SasayakiSheet: View {
     }()
 
     var body: some View {
-        NativeReaderSheetPanel("Sasayaki", onClose: onDismiss) {
-            VStack(spacing: 0) {
-                if player.hasAudio {
-                    playbackHeader
-                }
+        VStack(spacing: 0) {
+            NativeReaderInspectorHeader(title: "Sasayaki", subtitle: currentChapterTitle, onClose: onDismiss)
 
-                HStack {
-                    Spacer(minLength: 0)
-                    NativeGlassSegmentedPicker(
-                        selection: selectedTabBinding,
-                        values: SasayakiSheetTab.allCases,
-                        minSegmentWidth: 72
-                    ) { tab in
-                        Text(tab.title)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 10)
-
-                selectedContent
+            if player.hasAudio {
+                playbackHeader
             }
+
+            NativeReaderInspectorTabBar(
+                tabs: SasayakiSheetTab.allCases,
+                selection: selectedTabBinding,
+                title: \.title,
+                systemImage: \.systemImage
+            )
+            .padding(.bottom, 10)
+
+            selectedContent
         }
+        .environment(\.nativeSettingsPresentation, .inspector)
         .fileImporter(
             isPresented: $isFileImporterPresented,
             allowedContentTypes: allowedContentTypes(for: pendingFileImportKind)
@@ -138,24 +142,18 @@ struct SasayakiSheet: View {
     }
 
     private var playbackHeader: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 14) {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
                 audiobookCover
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(player.audiobookMetadata.title ?? bookTitle)
                         .font(.headline)
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     if let artist = player.audiobookMetadata.artist {
                         Text(artist)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    if let currentChapterTitle {
-                        Text(currentChapterTitle)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -163,12 +161,33 @@ struct SasayakiSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            audioControls
-            Text("\(Self.formatTime(player.currentTime)) / \(Self.formatTime(player.duration))")
+            VStack(spacing: 2) {
+                Slider(
+                    value: Binding(
+                        get: { scrubTime ?? player.currentTime },
+                        set: { scrubTime = $0 }
+                    ),
+                    in: 0...max(player.duration, 1)
+                ) { isEditing in
+                    if !isEditing, let target = scrubTime {
+                        player.seekRelative(target - player.currentTime)
+                        scrubTime = nil
+                    }
+                }
+                .controlSize(.small)
+
+                HStack {
+                    Text(Self.formatTime(scrubTime ?? player.currentTime))
+                    Spacer()
+                    Text("-" + Self.formatTime(max(player.duration - (scrubTime ?? player.currentTime), 0)))
+                }
+                .font(.caption2.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .monospacedDigit()
+            }
+
+            audioControls
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 18)
         .padding(.bottom, 14)
     }
 
@@ -178,9 +197,10 @@ struct SasayakiSheet: View {
             fallbackURL: bookCoverURL,
             audioURL: player.audioURL
         )
-        .frame(width: 72, height: 72)
+        .frame(width: 64, height: 64)
         .background(Color.secondary.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
     }
 
     private var currentChapterTitle: String? {
@@ -245,39 +265,34 @@ struct SasayakiSheet: View {
             ContentUnavailableView("No Chapters", systemImage: "list.bullet")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List(player.audiobookChapters) { chapter in
-                Button {
-                    player.seekToAudiobookChapter(chapter)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(chapter.title)
-                                .lineLimit(1)
-                            if player.currentAudiobookChapterID == chapter.id {
-                                Text("Current Chapter")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(player.audiobookChapters) { chapter in
+                        let isCurrent = player.currentAudiobookChapterID == chapter.id
+                        Button {
+                            player.seekToAudiobookChapter(chapter)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: isCurrent ? "speaker.wave.2.fill" : "circle.fill")
+                                    .font(.system(size: isCurrent ? 11 : 4))
+                                    .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary.opacity(0.5))
+                                    .frame(width: 14)
+                                Text(chapter.title)
+                                    .font(.callout.weight(isCurrent ? .semibold : .regular))
+                                    .lineLimit(2)
+                                Spacer(minLength: 8)
+                                Text(Self.formatChapterTime(chapter.startTime))
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(.tertiary)
                             }
                         }
-                        Spacer(minLength: 12)
-                        Text(Self.formatChapterTime(chapter.startTime))
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+                        .buttonStyle(NativeReaderInspectorRowButtonStyle(isSelected: isCurrent))
+                        .accessibilityValue(isCurrent ? Text("Current Chapter") : Text(""))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .listRowBackground(
-                    player.currentAudiobookChapterID == chapter.id
-                        ? Color.accentColor.opacity(0.14)
-                        : Color.clear
-                )
+                .padding(.horizontal, 10)
+                .padding(.bottom, 14)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
         }
     }
 
@@ -366,41 +381,33 @@ struct SasayakiSheet: View {
     }
 
     private var audioControls: some View {
-        HStack(spacing: 20) {
-            Button {
+        HStack(spacing: 10) {
+            NativeGlassCircleButton(systemName: "15.arrow.trianglehead.counterclockwise", diameter: 34, fontSize: 14) {
                 player.skip(forward: false)
-            } label: {
-                Image(systemName: "15.arrow.trianglehead.counterclockwise")
             }
-
-            Button {
+            NativeGlassCircleButton(systemName: "backward.fill", diameter: 34, fontSize: 13) {
                 player.prevCue()
-            } label: {
-                Image(systemName: "backward.fill")
             }
 
             Button {
                 player.togglePlayback()
             } label: {
                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 30))
+                    .font(.system(size: 20, weight: .semibold))
+                    .frame(width: 48, height: 48)
+                    .contentShape(Circle())
             }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .help(player.isPlaying ? Text("Pause") : Text("Play"))
 
-            Button {
+            NativeGlassCircleButton(systemName: "forward.fill", diameter: 34, fontSize: 13) {
                 player.nextCue()
-            } label: {
-                Image(systemName: "forward.fill")
             }
-
-            Button {
+            NativeGlassCircleButton(systemName: "15.arrow.trianglehead.clockwise", diameter: 34, fontSize: 14) {
                 player.skip(forward: true)
-            } label: {
-                Image(systemName: "15.arrow.trianglehead.clockwise")
             }
         }
-        .buttonStyle(.borderless)
-        .font(.title2)
-        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity)
     }
 

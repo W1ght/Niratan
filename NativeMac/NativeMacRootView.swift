@@ -46,7 +46,32 @@ struct NativeMacRootView: View {
         .task {
             mangaLibraryViewModel.load()
         }
+        .onChange(of: bookshelfViewModel.books.count, initial: true) {
+            FushiProgressCoordinator.shared.syncAllOnLaunchIfNeeded(books: bookshelfViewModel.books)
+        }
+        // Lives on the main window rather than the bookshelf so a conflict found at
+        // launch or after a book closes is asked about whichever section is open.
+        .sheet(isPresented: fushiConflictPromptBinding) {
+            FushiConflictSheet(includePostponed: false) {
+                FushiProgressCoordinator.shared.bookshelfPromptRequested = false
+            }
+        }
         .onOpenURL(perform: handleOpenURL)
+        .nativeUpdatePresentation()
+    }
+
+    private var fushiConflictPromptBinding: Binding<Bool> {
+        Binding(
+            get: {
+                let coordinator = FushiProgressCoordinator.shared
+                return coordinator.bookshelfPromptRequested && !coordinator.bookshelfConflicts.isEmpty
+            },
+            set: { isPresented in
+                if !isPresented {
+                    FushiProgressCoordinator.shared.bookshelfPromptRequested = false
+                }
+            }
+        )
     }
 
     private var selectedSection: NativeMacSection {

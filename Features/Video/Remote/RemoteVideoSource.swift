@@ -2,9 +2,31 @@ import Foundation
 
 nonisolated enum RemoteVideoProvider: String, Codable, Hashable, Sendable {
     case youtube
+    case jellyfin
+    case emby
+    case plex
 
     var id: String { rawValue }
-    var displayName: String { "YouTube" }
+
+    var displayName: String {
+        switch self {
+        case .youtube: "YouTube"
+        case .jellyfin: "Jellyfin"
+        case .emby: "Emby"
+        case .plex: "Plex"
+        }
+    }
+
+    var isMediaServer: Bool {
+        self != .youtube
+    }
+}
+
+/// Server-side resume point; the player keeps whichever of it and the local
+/// history entry was written last.
+nonisolated struct RemoteVideoResumeHint: Equatable, Hashable, Sendable {
+    let position: TimeInterval
+    let updatedAt: Date
 }
 
 nonisolated enum VideoMediaIdentity: Codable, Equatable, Hashable, Sendable {
@@ -90,6 +112,14 @@ nonisolated struct RemoteVideoIdentity: Codable, Equatable, Hashable, Sendable {
 
     var isYouTube: Bool {
         YouTubeURLParser.isYouTubeURL(canonicalURL ?? originalURL)
+    }
+
+    var isMediaServer: Bool {
+        provider?.isMediaServer == true
+    }
+
+    var supportsQualitySelection: Bool {
+        isYouTube || isMediaServer
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -192,6 +222,9 @@ nonisolated struct RemoteVideoSubtitleOption: Equatable, Hashable, Sendable {
     let format: SubtitleFormat?
     let isAutomatic: Bool
     let httpHeaders: [String: String]
+    /// Media servers extract embedded tracks on first request, which can take
+    /// far longer than a static file download.
+    var downloadTimeout: TimeInterval? = nil
 
     var selectionIdentity: RemoteVideoSubtitleSelectionIdentity {
         RemoteVideoSubtitleSelectionIdentity(
@@ -207,6 +240,8 @@ nonisolated struct RemoteVideoQualityOption: Equatable, Hashable, Sendable {
     let height: Int
     let playbackStream: RemoteVideoStream
     let audioStream: RemoteVideoStream?
+    /// Shown instead of "<height>p" when set.
+    var label: String? = nil
 }
 
 nonisolated struct ResolvedRemoteVideoSource: Equatable, Hashable, Sendable {
@@ -220,6 +255,10 @@ nonisolated struct ResolvedRemoteVideoSource: Equatable, Hashable, Sendable {
     let resolvedAt: Date
     let expiresAt: Date?
     let qualityOptions: [RemoteVideoQualityOption]
+    /// Provider-owned values the player hands back unchanged, such as a media
+    /// server's playback session ids.
+    let providerContext: [String: String]
+    let resumeHint: RemoteVideoResumeHint?
 
     init(
         identity: RemoteVideoIdentity,
@@ -231,7 +270,9 @@ nonisolated struct ResolvedRemoteVideoSource: Equatable, Hashable, Sendable {
         selectedSubtitleLanguage: String?,
         resolvedAt: Date,
         expiresAt: Date?,
-        qualityOptions: [RemoteVideoQualityOption] = []
+        qualityOptions: [RemoteVideoQualityOption] = [],
+        providerContext: [String: String] = [:],
+        resumeHint: RemoteVideoResumeHint? = nil
     ) {
         self.identity = identity
         self.playbackStream = playbackStream
@@ -243,6 +284,8 @@ nonisolated struct ResolvedRemoteVideoSource: Equatable, Hashable, Sendable {
         self.resolvedAt = resolvedAt
         self.expiresAt = expiresAt
         self.qualityOptions = qualityOptions
+        self.providerContext = providerContext
+        self.resumeHint = resumeHint
     }
 
     var httpHeaders: [String: String] {
@@ -326,7 +369,9 @@ nonisolated struct ResolvedRemoteVideoSource: Equatable, Hashable, Sendable {
             selectedSubtitleLanguage: selectedSubtitleLanguage,
             resolvedAt: resolvedAt,
             expiresAt: expiresAt,
-            qualityOptions: qualityOptions
+            qualityOptions: qualityOptions,
+            providerContext: providerContext,
+            resumeHint: resumeHint
         )
     }
 }

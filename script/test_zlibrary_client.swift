@@ -1,3 +1,4 @@
+// test-sources: Core/ZLibraryClient.swift NativeMac/DevelopmentDataIsolation.swift
 import Foundation
 
 private final class ZLibraryMockProtocol: URLProtocol, @unchecked Sendable {

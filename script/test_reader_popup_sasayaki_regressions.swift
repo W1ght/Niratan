@@ -1,3 +1,4 @@
+// test-sources: Features/Reader/ReaderWebView/ReaderViewportGeometry.swift
 import CoreGraphics
 import Foundation
 
@@ -121,13 +122,13 @@ enum ReaderPopupSasayakiRegressionTest {
         let nativeFullscreenImageView = sourceSection(
             nativeReader,
             from: "struct NativeFullscreenImageView",
-            to: "private struct NativeFullscreenImageWebView",
+            to: "struct NativeFullscreenImageWebView",
             "native Reader should define a fullscreen image overlay"
         )
         let nativeFullscreenImageWebView = sourceSection(
             nativeReader,
-            from: "private struct NativeFullscreenImageWebView",
-            to: "private func nsColorHex",
+            from: "struct NativeFullscreenImageWebView",
+            to: "func nsColorHex",
             "native Reader should define a fullscreen image WebView"
         )
         let popupView = try String(
@@ -311,7 +312,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             selectionScript,
-            "closest('p, .glossary-content, .expr-tag, .dictionary-query-source')",
+            "closest('p, .kanji-entry li, .glossary-content, .expr-tag, .dictionary-query-source')",
             "Reader and Dictionary lookup should not scan across expression-tag or query-line boundaries"
         )
         let lookupHighlightSection = sourceSection(
@@ -427,6 +428,56 @@ enum ReaderPopupSasayakiRegressionTest {
             "let horizontalSpreadColumnGap = 32",
             "native Reader two-column horizontal spreads should use a fixed center gutter"
         )
+        let paragraphScript = try String(
+            contentsOf: root.appendingPathComponent("Features/Reader/ReaderWebView/paragraph.js"),
+            encoding: .utf8
+        )
+        for field in ["paragraphMode: Bool? = nil", "textAnimation: Bool? = nil", "textSpeed: Int? = nil"] {
+            assertContains(profileSource, "var \(field)", "Reader Profile paragraph settings must stay optional so existing profile JSON decodes")
+        }
+        assertContains(
+            userConfigSource,
+            "paragraphMode = settings.paragraphMode ?? false",
+            "Reader Profile restore should default old profiles to regular pagination"
+        )
+        assertContains(
+            readerIdentityBlock,
+            "userConfig.paragraphMode",
+            "native Reader reload identity should include paragraph mode"
+        )
+        assertContains(
+            nativeReader,
+            "&& !paragraphMode ? 2 : 1",
+            "paragraph mode should render one paragraph per single-column page"
+        )
+        assertContains(
+            nativeReader,
+            "document.fonts.ready.then(() => window.hoshiParagraph.layoutParagraphs())",
+            "paragraph layout must run after fonts load and before node offsets, cues and restore"
+        )
+        assertContains(
+            nativeReader,
+            "if (window.hoshiParagraph?.finishTextAnimation()) {",
+            "a click during text animation should finish the animation instead of looking up"
+        )
+        assertContains(
+            nativeReader,
+            "margin-block-start: 0 !important;\n                break-before: column !important;",
+            "paragraph pages must not start with an empty page from publisher paragraph margins"
+        )
+        assertContains(
+            paragraphScript,
+            "const position = vertical ? rect.top : rect.left;",
+            "paragraph page detection must follow Mac vertical top-to-bottom pagination"
+        )
+        assertContains(
+            appearanceSettings,
+            "!userConfig.continuousMode && !userConfig.verticalWriting && !userConfig.paragraphMode",
+            "two-column spreads should be hidden while paragraph mode controls pagination"
+        )
+        for key in ["Paragraph Mode", "Text Animation", "Text Speed", "%lld/s"] {
+            assertLocalized(localizationStrings, key, languages: ["en", "zh-Hans", "zh-Hant"], "paragraph mode settings should be localized")
+        }
         assertContains(
             nativeReader,
             "? \"max(1px, calc((var(--page-width, 100vw) - \\(horizontalPadding)vw - \\(horizontalSpreadColumnGap)px) / 2))\"",
@@ -888,33 +939,13 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "activeSheet = .goTo",
-            "native Reader menu must open the unified Go to sheet"
+            "toggleSidePanel(.goTo)",
+            "native Reader must open the unified Go to side panel from its bottom-right button"
         )
         assertContains(
             readerGoToView,
-            "ReaderLiquidGlassSegmentedControl(selection: $selectedTab)",
-            "Reader Go to tabs must use the custom liquid glass segmented control"
-        )
-        assertContains(
-            readerGoToView,
-            "GlassEffectContainer",
-            "Reader Go to tabs must group their custom glass elements in one container"
-        )
-        assertContains(
-            readerGoToView,
-            ".glassEffect(.regular.interactive(), in: Capsule())",
-            "Reader Go to tabs must use an interactive Liquid Glass capsule on macOS 26"
-        )
-        assertContains(
-            readerGoToView,
-            ".frame(minWidth: 58, minHeight: 28)",
-            "Reader Go to tabs must stay compact inside the Go to sheet"
-        )
-        assertContains(
-            readerGoToView,
-            ".padding(2)",
-            "Reader Go to tabs must use compact capsule padding"
+            "NativeReaderInspectorTabBar(\n                tabs: ReaderGoToTab.allCases,\n                selection: $selectedTab,",
+            "Reader Go to should switch Search, Chapters and Highlights with the side-panel tab bar"
         )
         assertNotContains(
             readerGoToView,
@@ -928,7 +959,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             readerGoToView,
-            "private var chapterLabelBySpineIndex: [Int: String]",
+            "var chapterLabelBySpineIndex: [Int: String]",
             "Reader Go to highlight grouping should build chapter labels with duplicate-spine TOC entries safely"
         )
         assertNotContains(
@@ -1072,7 +1103,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private static func cgFloatValue(_ value: Any?) -> CGFloat?",
+            "static func cgFloatValue(_ value: Any?) -> CGFloat?",
             "native Reader should decode WKScriptMessage numeric coordinates regardless of NSNumber or Double bridging"
         )
         assertContains(
@@ -1184,7 +1215,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var sepiaInverted: Bool",
+            "var sepiaInverted: Bool",
             "native Reader should support sepia dark inversion"
         )
         assertContains(
@@ -1199,7 +1230,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var effectiveReaderColorScheme: ColorScheme",
+            "var effectiveReaderColorScheme: ColorScheme",
             "native Reader should resolve effective colors separately from its optional appearance override"
         )
         assertNotContains(
@@ -1224,13 +1255,18 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "userConfig.theme == .sepia && userConfig.sepiaInvertInDark",
-            "native Reader sepia inversion should only apply to the sepia theme"
+            "userConfig.usesDarkSepia(in: systemColorScheme)",
+            "native Reader should use dark sepia only for the sepia theme in macOS Dark Mode"
+        )
+        assertContains(
+            nativeReader,
+            "context.coordinator.syncBackgroundColor()",
+            "native Reader should update the page background when the theme or macOS appearance changes"
         )
         assertContains(
             nativeApp,
-            "userConfig.theme == .sepia && userConfig.sepiaInvertInDark",
-            "native app appearance should not let sepia inversion affect other themes"
+            "userConfig.preferredColorScheme",
+            "native app appearance should share the follow-system theme rule"
         )
         assertContains(
             nativeReader,
@@ -1264,8 +1300,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "userConfig.readerShowCharacters",
-            "native Reader progress should respect the character count visibility setting"
+            "userConfig.readerProgressCount != .off",
+            "native Reader progress should respect the progress count setting"
         )
         assertContains(
             nativeReader,
@@ -1283,7 +1319,7 @@ enum ReaderPopupSasayakiRegressionTest {
             "native Reader pagination should use the same complete viewport size as WebKit"
         )
         for identityInput in [
-            "userConfig.readerHideFurigana",
+            "userConfig.readerFuriganaMode",
             "userConfig.horizontalPadding",
             "userConfig.verticalPadding",
             "userConfig.avoidPageBreak",
@@ -1307,7 +1343,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            ".background(readerBackgroundColor.ignoresSafeArea())\n        .overlay(alignment: .top)",
+            ".background(readerBackgroundColor.ignoresSafeArea())\n        .overlay {",
             "native Reader background should extend behind the transparent window chrome while overlays stay controlled by Reader layout"
         )
         assertNotContains(
@@ -1460,12 +1496,12 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             shortcutManager,
-            "private static var sharedMonitor: Any?",
+            "static var sharedMonitor: Any?",
             "ShortcutManager should install only one process-wide AppKit local monitor"
         )
         assertContains(
             shortcutManager,
-            "private static var installedManagers: [InstalledManager]",
+            "static var installedManagers: [InstalledManager]",
             "ShortcutManager should dispatch the shared local monitor to installed managers"
         )
         assertContains(
@@ -1495,7 +1531,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var canHandleSasayakiShortcut: Bool {\n        (activeSheet == nil || activeSheet == .sasayaki)",
+            "var canHandleSasayakiShortcut: Bool {\n        (activeSheet == nil || activeSheet == .sasayaki)",
             "Sasayaki playback shortcuts should keep working while the Sasayaki sheet is open"
         )
         assertNotContains(
@@ -1530,12 +1566,12 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var backHistory: [NativeReaderPosition] = []",
+            "var backHistory: [NativeReaderPosition] = []",
             "native Reader should retain backward jump history"
         )
         assertContains(
             nativeReader,
-            "private var forwardHistory: [NativeReaderPosition] = []",
+            "var forwardHistory: [NativeReaderPosition] = []",
             "native Reader should retain forward jump history"
         )
         assertOccurrenceCountAtLeast(
@@ -1591,12 +1627,12 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private func persistBookmark(_ newProgress: Double)",
+            "func persistBookmark(_ newProgress: Double)",
             "native Reader should separate bookmark persistence from reading-statistics checkpoints"
         )
         assertContains(
             nativeReader,
-            "private func establishProgrammaticDestination(_ progress: Double)",
+            "func establishProgrammaticDestination(_ progress: Double)",
             "programmatic Reader navigation should persist its destination and reset the statistics baseline"
         )
         assertOccurrenceCountAtLeast(
@@ -1644,7 +1680,7 @@ enum ReaderPopupSasayakiRegressionTest {
         let internalLinkSection = sourceSection(
             nativeReader,
             from: "func jumpToLink(_ url: URL) -> Bool",
-            to: "private func recordPosition()",
+            to: "func recordPosition()",
             "native Reader should expose the internal-link jump section"
         )
         assertNotContains(
@@ -1654,8 +1690,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         let historyRestoreSection = sourceSection(
             nativeReader,
-            from: "private func restorePosition(_ position: NativeReaderPosition)",
-            to: "private func characterProgress(for position: NativeReaderPosition)",
+            from: "func restorePosition(_ position: NativeReaderPosition)",
+            to: "func characterProgress(for position: NativeReaderPosition)",
             "native Reader should expose the history restoration section"
         )
         assertContains(
@@ -1670,7 +1706,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var statisticsString: String",
+            "var statisticsString: String",
             "native Reader should format session statistics for its information chrome"
         )
         assertContains(
@@ -1710,7 +1746,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "contentLanguage.displayCount(forRawCharacters: model.sessionStatistics.lastReadingSpeed)",
+            "contentLanguage.displayCount(forRawCharacters: model.sessionStatistics.readingSpeed)",
             "native Reader speed should use the active Profile's display units"
         )
         assertContains(
@@ -1725,12 +1761,12 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var isReaderWindowActive = false\n    private var isStatisticsSheetActive = false\n    private var isReaderContentCovered = false",
+            "var isReaderWindowActive = false\n    private var isStatisticsSheetActive = false\n    private var isReaderContentCovered = false",
             "native Reader should retain focus sources plus explicit covered-content state"
         )
         assertContains(
             nativeReader,
-            "private var isStatisticsContextActive: Bool {\n        isStatisticsSheetActive || (isReaderWindowActive && !isReaderContentCovered)\n    }",
+            "var isStatisticsContextActive: Bool {\n        isStatisticsSheetActive || (isReaderWindowActive && !isReaderContentCovered)\n    }",
             "native Reader should count only on an approved, unobscured reading or statistics surface"
         )
         let statisticsStartSection = sourceSection(
@@ -1782,8 +1818,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         let statisticsSheetSection = sourceSection(
             nativeReader,
-            from: "private struct NativeReaderStatisticsSheet: View",
-            to: "private struct NativeReaderGlassIconButton: View",
+            from: "struct NativeReaderStatisticsSheet: View",
+            to: "struct NativeReaderGlassIconButton: View",
             "native Reader should expose an observable Statistics sheet wrapper"
         )
         assertContains(
@@ -1808,7 +1844,12 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "case .statistics:\n                NativeReaderStatisticsSheet(",
+            "NativeReaderSidePanel(edge: .trailing",
+            "native Reader should present Statistics in the trailing side panel"
+        )
+        assertContains(
+            nativeReader,
+            "} else {\n                        NativeReaderStatisticsSheet(",
             "native Reader should present the observable Statistics sheet wrapper"
         )
         assertContains(
@@ -1843,7 +1884,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var statisticsAutostartMode: StatisticsAutostartMode = .off",
+            "var statisticsAutostartMode: StatisticsAutostartMode = .off",
             "native Reader should retain the configured statistics autostart mode for every navigation source"
         )
         assertContains(
@@ -1858,8 +1899,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         let sasayakiChapterLoadSection = sourceSection(
             nativeReader,
-            from: "private func loadChapterForSasayaki(index: Int)",
-            to: "private func loadCurrentChapterState()",
+            from: "func loadChapterForSasayaki(index: Int)",
+            to: "func loadCurrentChapterState()",
             "native Reader should expose the Sasayaki cross-chapter load boundary"
         )
         assertContains(
@@ -1889,7 +1930,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private func sasayakiCueProgress(for chapterIndex: Int) -> Double?",
+            "func sasayakiCueProgress(for chapterIndex: Int) -> Double?",
             "native Reader should derive cross-chapter progress from the pending Sasayaki cue"
         )
         assertContains(
@@ -1946,7 +1987,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             sasayakiPlayer,
-            "private func navigateToCue(_ cue: SasayakiMatch,",
+            "func navigateToCue(_ cue: SasayakiMatch,",
             "Sasayaki manual cue navigation should handle cross-chapter targets explicitly"
         )
         assertContains(
@@ -1994,7 +2035,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         let jumpToCueSection = sourceSection(
             nativeReader,
-            from: "private func jumpToSasayakiCue()",
+            from: "func jumpToSasayakiCue()",
             to: "var body: some View",
             "native Reader should expose the popup Sasayaki jump path"
         )
@@ -2005,8 +2046,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         let popupLayerSection = sourceSection(
             nativeReader,
-            from: "private func popupLayer(screenSize: CGSize)",
-            to: "private var nativeTopInfoOverlay",
+            from: "func popupLayer(screenSize: CGSize)",
+            to: "var nativeTopInfoOverlay",
             "native Reader should wire popup dismissal callbacks"
         )
         assertContains(
@@ -2031,13 +2072,18 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReader,
-            "private var nativeBottomControls: some View {\n        if !focusMode {\n            ZStack {\n                nativeBottomInfoOverlay",
+            "var nativeBottomControls: some View {\n        if !focusMode {\n            ZStack {\n                nativeBottomInfoOverlay",
             "native Reader bottom progress should share the same vertical row as bottom controls"
+        )
+        assertNotContains(
+            nativeReader,
+            "nativeReaderGlassCapsuleSurface",
+            "native Reader title and progress use upstream's plain bar text instead of glass capsules"
         )
         assertContains(
             nativeReader,
-            "nativeReaderGlassCapsuleSurface",
-            "native Reader info capsules should use Liquid Glass surfaces"
+            "if !focusMode && model.imageURL == nil {",
+            "native Reader edge effects should follow upstream and hide with the bars"
         )
         assertNotContains(
             nativeReader,
@@ -2126,8 +2172,8 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             sasayakiSheet,
-            "NativeReaderSheetPanel(\"Sasayaki\", onClose: onDismiss)",
-            "native Sasayaki sheet should use the shared Reader panel"
+            "NativeReaderInspectorHeader(title: \"Sasayaki\", subtitle: currentChapterTitle, onClose: onDismiss)",
+            "native Sasayaki side panel should use the shared Reader side-panel header"
         )
         assertContains(
             nativeReuseViews,
@@ -2141,7 +2187,7 @@ enum ReaderPopupSasayakiRegressionTest {
         )
         assertContains(
             nativeReuseViews,
-            "nativeSettingsCardGlass",
+            ".nativeGlassCardSurface(cornerRadius: 18)",
             "native settings cards should participate in macOS Liquid Glass on supported systems"
         )
         assertContains(

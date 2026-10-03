@@ -158,8 +158,8 @@ private struct XboxControllerRecorderRow: View {
             Button {
                 onRecord(action)
             } label: {
-                XboxControllerValuePill {
-                    Text(isRecording ? "Press controller..." : displayLabel)
+                NativeSettingsValuePill {
+                    Text(isRecording ? String(localized: "Press controller...") : displayLabel)
                         .foregroundStyle(isRecording ? Color.accentColor : .secondary)
                 }
             }
@@ -181,19 +181,5 @@ private struct XboxControllerRecorderRow: View {
             Label("Controller Conflict", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
         }
-    }
-}
-
-private struct XboxControllerValuePill<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        content()
-            .font(.body.monospaced())
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.thinMaterial, in: Capsule())
     }
 }

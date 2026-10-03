@@ -1,3 +1,5 @@
+// test-sources: Models/Aidoku.swift
+// test-modules: AidokuRuntime ZIPFoundation SwiftSoup Wasm3 wasm3-c wasm3-support AidokuRuntimeWatchdog
 import AidokuRuntime
 import Foundation
 

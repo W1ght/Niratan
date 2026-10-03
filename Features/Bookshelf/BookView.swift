@@ -18,13 +18,26 @@ nonisolated enum BookshelfLayout {
     static let progressTrackHeight: CGFloat = 3
     static let progressTextSize: CGFloat = 9
     static let progressRowSpacing: CGFloat = 5
+    static let coverWidthRange: ClosedRange<Double> = 110...240
+    static let coverWidthStep: Double = 10
+
+    static func clampedCoverWidth(_ width: Double) -> CGFloat {
+        CGFloat(min(max(width, coverWidthRange.lowerBound), coverWidthRange.upperBound))
+    }
+}
+
+extension EnvironmentValues {
+    /// Cover card width of the local library grids; adjustable from the toolbar cover size control.
+    @Entry var shelfCoverWidth: CGFloat = BookshelfLayout.v050CoverWidth
 }
 
 struct BookView: View {
     let book: BookMetadata
     let progress: Double
     var isSelected: Bool = false
-    
+    /// Download progress of a book that so far only exists on Google Drive.
+    var downloadProgress: Double? = nil
+
     var body: some View {
         ShelfBookCard(
             title: book.displayTitle,
@@ -39,11 +52,31 @@ struct BookView: View {
                 Color.gray.opacity(0.3)
                     .aspectRatio(0.709, contentMode: .fit)
             }
+            .overlay(alignment: .topTrailing) {
+                if book.epub == nil {
+                    Image(systemName: "icloud.and.arrow.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .padding(7)
+                        .glassEffect(.regular, in: Circle())
+                        .padding(6)
+                        .help(String(localized: "Stored on Google Drive. Open to download."))
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let downloadProgress {
+                    ProgressView(value: min(max(downloadProgress, 0), 1))
+                        .progressViewStyle(.linear)
+                        .padding(8)
+                        .glassEffect(.regular, in: Capsule())
+                        .padding(6)
+                }
+            }
         }
     }
 }
 
 struct ShelfBookCard<CoverContent: View>: View {
+    @Environment(\.shelfCoverWidth) private var coverWidth
     let title: String
     let progress: Double?
     var isSelected = false
@@ -58,12 +91,12 @@ struct ShelfBookCard<CoverContent: View>: View {
             )
 
             Text(title)
-                .font(.system(size: 16))
+                .font(.system(size: coverWidth < 140 ? 13 : 16))
                 .lineLimit(2)
                 .frame(height: BookshelfLayout.titleHeight, alignment: .top)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: BookshelfLayout.v050CoverWidth)
+        .frame(width: coverWidth)
     }
 }
 
@@ -71,7 +104,7 @@ struct BookCover: View {
     let book: BookMetadata
     var progress: Double? = nil
     var isSelected: Bool = false
-    var width: CGFloat = BookshelfLayout.v050CoverWidth
+    var width: CGFloat?
     
     var body: some View {
         ShelfCoverFrame(
@@ -92,17 +125,23 @@ struct BookCover: View {
 }
 
 struct ShelfCoverFrame<CoverContent: View>: View {
+    @Environment(\.shelfCoverWidth) private var environmentWidth
     var progress: Double?
     var isSelected = false
-    var width: CGFloat = BookshelfLayout.v050CoverWidth
+    /// Explicit width for compact previews; defaults to the adjustable library cover width.
+    var width: CGFloat?
     @ViewBuilder let coverContent: () -> CoverContent
 
     private let innerCornerRadius: CGFloat = 6
     private let outerCornerRadius: CGFloat = 7
     private let contentPadding: CGFloat = 3
 
+    private var resolvedWidth: CGFloat {
+        width ?? environmentWidth
+    }
+
     private var contentWidth: CGFloat {
-        max(width - (contentPadding * 2), 0)
+        max(resolvedWidth - (contentPadding * 2), 0)
     }
 
     var body: some View {
@@ -132,7 +171,7 @@ struct ShelfCoverFrame<CoverContent: View>: View {
             }
         }
         .padding(contentPadding)
-        .frame(width: width)
+        .frame(width: resolvedWidth)
         .glassEffect(
             .regular.interactive(),
             in: RoundedRectangle(cornerRadius: outerCornerRadius, style: .continuous)

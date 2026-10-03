@@ -261,6 +261,30 @@ enum DuplicateScope: String, Codable, CaseIterable {
     case collection
     case deck
     case deckroot
+
+    /// AnkiConnect `addNote` options for this duplicate policy.
+    func ankiConnectOptions(deck: String, allowDuplicates: Bool, checkAllModels: Bool) -> [String: Any] {
+        var options: [String: Any] = ["allowDuplicate": allowDuplicates]
+        var scopeOptions: [String: Any] = [:]
+        switch self {
+        case .collection:
+            options["duplicateScope"] = "collection"
+        case .deck:
+            options["duplicateScope"] = "deck"
+        case .deckroot:
+            options["duplicateScope"] = "deck"
+            let rootDeck = deck.split(separator: "::", maxSplits: 1).first.map(String.init) ?? deck
+            scopeOptions["deckName"] = rootDeck
+            scopeOptions["checkChildren"] = true
+        }
+        if checkAllModels {
+            scopeOptions["checkAllModels"] = true
+        }
+        if !scopeOptions.isEmpty {
+            options["duplicateScopeOptions"] = scopeOptions
+        }
+        return options
+    }
 }
 
 struct AnkiConnectConfig: Codable {
@@ -468,6 +492,18 @@ enum Handlebars: String, CaseIterable {
     case glossaryFirst = "{glossary-first}"
     case glossaryFirstBrief = "{glossary-first-brief}"
     case glossaryFirstNoDictionary = "{glossary-first-no-dictionary}"
+    case monolingualDefinition = "{monolingual-definition}"
+    case monolingualDefinitionBrief = "{monolingual-definition-brief}"
+    case monolingualDefinitionNoDictionary = "{monolingual-definition-no-dictionary}"
+    case bilingualDefinition = "{bilingual-definition}"
+    case bilingualDefinitionBrief = "{bilingual-definition-brief}"
+    case bilingualDefinitionNoDictionary = "{bilingual-definition-no-dictionary}"
+    case monolingualDefinitionFallback = "{monolingual-definition-fallback}"
+    case monolingualDefinitionFallbackBrief = "{monolingual-definition-fallback-brief}"
+    case monolingualDefinitionFallbackNoDictionary = "{monolingual-definition-fallback-no-dictionary}"
+    case bilingualDefinitionFallback = "{bilingual-definition-fallback}"
+    case bilingualDefinitionFallbackBrief = "{bilingual-definition-fallback-brief}"
+    case bilingualDefinitionFallbackNoDictionary = "{bilingual-definition-fallback-no-dictionary}"
     case selectedGlossary = "{selected-glossary}"
     case selectedGlossaryFallback = "{selected-glossary-fallback}"
     case selectedGlossaryBrief = "{selected-glossary-brief}"

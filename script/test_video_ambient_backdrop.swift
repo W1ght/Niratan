@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Playback/PlaybackEngine.swift Features/Video/VideoAmbientBackdropModel.swift Features/Video/VideoAmbientBackdrop.swift Features/Video/Playback/VideoTrack.swift Features/Video/Remote/RemoteVideoSource.swift Features/Video/Playback/VideoShaderPreset.swift Models/Subtitle.swift Features/Video/Remote/YouTubeURLParser.swift
 import AppKit
 import Foundation
 

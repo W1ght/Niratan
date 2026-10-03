@@ -290,15 +290,28 @@ actor MangaLibraryStore {
         saveAndNotify()
     }
 
-    func createShelf(name: String) {
+    func createShelf(name: String, id: UUID = UUID()) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               !catalog.shelves.contains(where: {
-                  $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame
+                  $0.id == id || $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame
               }) else {
             return
         }
-        catalog.shelves.append(MangaShelf(name: trimmed))
+        catalog.shelves.append(MangaShelf(id: id, name: trimmed))
+        saveAndNotify()
+    }
+
+    func renameShelf(id: UUID, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let index = catalog.shelves.firstIndex(where: { $0.id == id }),
+              !catalog.shelves.contains(where: {
+                  $0.id != id && $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame
+              }) else {
+            return
+        }
+        catalog.shelves[index].name = trimmed
         saveAndNotify()
     }
 

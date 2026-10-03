@@ -1,3 +1,4 @@
+// test-sources: Features/Video/VideoLibraryStore.swift Features/Video/Remote/RemoteVideoSource.swift Features/Video/VideoMediaTypes.swift Models/Subtitle.swift Features/Video/Remote/YouTubeURLParser.swift
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

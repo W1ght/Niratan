@@ -35,8 +35,15 @@ func sourceBlock(
 let controls = try source("Features/Video/VideoControlsView.swift")
 let subtitles = try source("Features/Video/Subtitles/SubtitleOverlayView.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
+    + source("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + source("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + source("Features/Video/VideoPlayerScreen+OSD.swift")
+    + source("Features/Video/VideoPlayerScreen+Mining.swift")
+    + source("Features/Video/VideoPlayerScreen+Opening.swift")
+    + source("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let lookupCoordinator = try source("Features/Video/VideoLookupCoordinator.swift")
 let playbackEngine = try source("Features/Video/Playback/PlaybackEngine.swift")
+    + source("Features/Video/Playback/VideoTrack.swift")
 let mpvEngine = try source("Features/Video/Playback/MpvPlayerEngine.swift")
 let clientHeader = try source("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = try source("Features/Video/Playback/HSMpvClient.mm")
@@ -56,23 +63,23 @@ require(
 
 let floatingControls = sourceBlock(
     controls,
-    from: "private var floatingControls: some View",
-    to: "private var compactBottomControls: some View"
+    from: "var floatingControls: some View",
+    to: "var compactBottomControls: some View"
 )
 let compactBottomControls = sourceBlock(
     controls,
-    from: "private var compactBottomControls: some View",
-    to: "private var compactBottomScrim: some View"
+    from: "var compactBottomControls: some View",
+    to: "var compactBottomScrim: some View"
 )
 let condensedControlGroup = sourceBlock(
     controls,
-    from: "private var condensedControlGroup: some View",
-    to: "private var minimalControlGroup: some View"
+    from: "var condensedControlGroup: some View",
+    to: "var minimalControlGroup: some View"
 )
 let minimalControlGroup = sourceBlock(
     controls,
-    from: "private var minimalControlGroup: some View",
-    to: "private var utilityControlGroup: some View"
+    from: "var minimalControlGroup: some View",
+    to: "var utilityControlGroup: some View"
 )
 
 require(
@@ -91,9 +98,8 @@ require(
 )
 
 require(
-    screen.contains("useSelectedMpvTrackRenderer: Bool = false")
-        && screen.contains("useSelectedMpvTrackRenderer: true")
-        && screen.contains("VideoSubtitleRenderingPolicy.initialMode(for: selectedTrack)")
+    screen.contains("loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)")
+        && screen.contains("VideoSubtitleRenderingPolicy.initialMode(forSubtitleURL: url)")
         && playbackEngine.contains("case preparingASS")
         && screen.contains("applyPreparedSubtitleRendering(logicalTrackID: logicalTrackID)"),
     "automatically matched ASS sidecars should stay hidden during preparation and atomically reveal their final render plan"
@@ -127,7 +133,7 @@ require(
         && screen.contains("isEnabled: shouldHandleVideoSurfaceVolumeScroll")
         && screen.contains("onScroll: { delta in")
         && screen.contains("adjustVolume(by: delta)")
-        && screen.contains("private var shouldHandleVideoSurfaceVolumeScroll: Bool")
+        && screen.contains("var shouldHandleVideoSurfaceVolumeScroll: Bool")
         && screen.contains("model.currentURL != nil")
         && screen.contains("!hasActiveVideoPopup")
         && !screen.contains("&& !isInspectorVisible")
@@ -187,22 +193,22 @@ require(
         && controls.contains("floatingControls")
         && controls.contains("compactBottomScrim")
         && controls.contains("activeChromeWidth")
-        && controls.contains("private static let floatingControlsWidth: CGFloat = 690")
-        && controls.contains("private static let floatingControlsHeight: CGFloat = 74")
-        && controls.contains("private static let floatingProgressHorizontalInset: CGFloat = 58")
-        && controls.contains("private static let compactProgressHorizontalInset: CGFloat = 0")
+        && controls.contains("static let floatingControlsWidth: CGFloat = 760")
+        && controls.contains("static let floatingControlsHeight: CGFloat = 90")
+        && controls.contains("static let floatingProgressHorizontalInset: CGFloat = 54")
+        && controls.contains("static let compactProgressHorizontalInset: CGFloat = 0")
         && controls.contains("bottomInset: 0")
         && controls.contains(".frame(width: activeChromeWidth, height: Self.metrics(for: .compactBottom).chromeSize.height, alignment: .bottom)")
-        && controls.contains("private var controlTreatment: VideoControlTreatment")
+        && controls.contains("var controlTreatment: VideoControlTreatment")
         && controls.contains("VideoGlassIconButtonStyle(treatment: controlTreatment)")
-        && controls.contains("VideoSpeedControlButtonStyle(treatment: controlTreatment)")
+        && controls.contains("VideoSpeedControlButtonStyle(treatment: controlTreatment, isActive: isSpeedPanelVisible)")
         && controls.contains("VideoPlaybackButtonStyle(treatment: controlTreatment)")
         && !controls.contains("VideoProfileMenuTint")
         && !controls.contains("private var profileMenu")
         && !controls.contains("Image(systemName: \"person.crop.circle\")")
         && controls.contains(".foregroundStyle(compactControlForeground)")
         && !controls.contains(".padding(.bottom, 4)")
-        && !controls.contains(".padding(.bottom, 8)")
+        && controls.contains(".padding(.bottom, 12)\n        .frame(width: activeChromeWidth, height: Self.metrics(for: .compactBottom).chromeSize.height, alignment: .bottom)")
         && !controls.contains("VideoCompactControlSurface")
         && controls.contains("timelineProgressControl")
         && controls.contains(".padding(.horizontal, Self.compactProgressHorizontalInset)")
@@ -226,7 +232,7 @@ require(
         && controls.contains("width: min(floatingControlsWidth, max(availableWidth - 32, 1))")
         && controls.contains("return CGSize(width: availableWidth, height: defaultSize.height)")
         && controls.contains("Self.chromeSize(for: layout, availableWidth: availableWidth).width")
-        && screen.contains("private func playbackChromeSize(in size: CGSize) -> CGSize")
+        && screen.contains("func playbackChromeSize(in size: CGSize) -> CGSize")
         && screen.contains("VideoControlsView.chromeSize(")
         && screen.contains("availableWidth: size.width")
         && !controls.contains("max(availableWidth, Self.controlsWidth)")
@@ -235,11 +241,11 @@ require(
 )
 
 require(
-    controls.contains("private enum ControlDensity")
+    controls.contains("enum ControlDensity")
         && controls.contains("case full")
         && controls.contains("case condensed")
         && controls.contains("case minimal")
-        && controls.contains("private var controlDensity: ControlDensity")
+        && controls.contains("var controlDensity: ControlDensity")
         && controls.contains("if activeChromeWidth >= 390")
         && controls.contains("return .condensed")
         && controls.contains("return .minimal")
@@ -298,7 +304,7 @@ require(
         && screen.contains("playbackChromeSize(in: size)")
         && screen.contains("playbackChromeBottomEdgeInset")
         && screen.contains("bottomInset: videoControlsMetrics.popupBottomInset")
-        && screen.contains("private var videoControlsMetrics: VideoControlsMetrics"),
+        && screen.contains("var videoControlsMetrics: VideoControlsMetrics"),
     "video screen should keep playback chrome and popup placement layout-aware"
 )
 
@@ -345,7 +351,7 @@ require(
 )
 
 require(
-    screen.contains("@State private var timelinePreview: VideoTimelinePreview?")
+    screen.contains("var timelinePreview: VideoTimelinePreview?")
         && screen.contains("timelinePreview: timelinePreview")
         && screen.contains("onTimelinePreviewTimeChanged: { time in")
         && screen.contains("updateTimelinePreview(at: time)")

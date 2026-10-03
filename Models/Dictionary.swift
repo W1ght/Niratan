@@ -12,6 +12,13 @@ enum DictionaryType: String, Codable, Sendable {
     case term = "Term"
     case frequency = "Frequency"
     case pitch = "Pitch"
+    case kanji = "Kanji"
+}
+
+enum DictionaryCategory: String, Codable, CaseIterable, Identifiable, Sendable {
+    case none, monolingual, bilingual, exclude
+
+    var id: String { rawValue }
 }
 
 enum DictionaryReorder {
@@ -108,6 +115,7 @@ nonisolated struct DictionaryRecommendation: Identifiable, Equatable, Sendable {
         .init(id: "jmnedict", name: "JMnedict", type: .term, indexURL: "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMnedict.json", downloadURL: nil, language: .japanese),
         .init(id: "jiten", name: "Jiten", type: .frequency, indexURL: "https://api.jiten.moe/api/frequency-list/index", downloadURL: nil, language: .japanese),
         .init(id: "jitendex", name: "Jitendex", type: .term, indexURL: "https://jitendex.org/static/yomitan.json", downloadURL: nil, language: .japanese),
+        .init(id: "kanjidic", name: "KANJIDIC", type: .kanji, indexURL: "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/KANJIDIC_english.json", downloadURL: nil, language: .japanese),
         .init(id: "wty-en-en", name: "Wiktionary English-English", type: .term, indexURL: "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-en-index.json?download=true", downloadURL: nil, language: .english),
         .init(id: "wty-en-en-ipa", name: "Wiktionary English-English IPA", type: .pitch, indexURL: "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-en-ipa-index.json?download=true", downloadURL: nil, language: .english),
         .init(id: "wty-simple-simple", name: "Wiktionary Simple English-Simple English", type: .term, indexURL: "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-simple-simple-index.json?download=true", downloadURL: nil, language: .english),
@@ -124,13 +132,15 @@ struct DictionaryInfo: Identifiable, Codable {
     let path: URL
     var isEnabled: Bool
     var order: Int
+    var category: DictionaryCategory
     
-    init(id: UUID = UUID(), index: DictionaryIndex, path: URL, isEnabled: Bool = true, order: Int = 0) {
+    init(id: UUID = UUID(), index: DictionaryIndex, path: URL, isEnabled: Bool = true, order: Int = 0, category: DictionaryCategory = .none) {
         self.id = id
         self.index = index
         self.path = path
         self.isEnabled = isEnabled
         self.order = order
+        self.category = category
     }
 }
 
@@ -138,11 +148,13 @@ struct DictionaryConfig: Codable {
     var termDictionaries: [DictionaryEntry]
     var frequencyDictionaries: [DictionaryEntry]
     var pitchDictionaries: [DictionaryEntry]
+    var kanjiDictionaries: [DictionaryEntry]?
     
     struct DictionaryEntry: Codable {
         let fileName: String
         var isEnabled: Bool
         var order: Int
+        var category: DictionaryCategory? = nil
     }
 }
 

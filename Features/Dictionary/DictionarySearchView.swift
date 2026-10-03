@@ -106,6 +106,15 @@ struct DictionarySearchView: View {
                         }
                         return entries
                     },
+                    onKanjiRedirect: { kanji in
+                        closePopups()
+                        let data = LookupEngine.shared.queryKanji(kanji)
+                        if data != nil {
+                            backCount += 1
+                            forwardCount = 0
+                        }
+                        return data
+                    },
                     scrollViewBounces: true,
                     onScrollViewOffsetChanged: { newOffset in
                         if scrollViewInitialContentOffset == nil {
@@ -267,6 +276,9 @@ struct DictionarySearchView: View {
                         forwardCount = 0
                     }
                     return entries
+                },
+                onKanjiRedirect: { kanji in
+                    LookupEngine.shared.queryKanji(kanji)
                 }
             )
             .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
@@ -459,6 +471,10 @@ struct DictionarySearchView: View {
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]") : "[]"
         let audioSources = (try? JSONEncoder().encode(userConfig.enabledAudioSources))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let audioSourceNames = (try? JSONEncoder().encode(userConfig.audioSources.filter(\.isEnabled).map(\.name)))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let excludedDictionaries = (try? JSONEncoder().encode(DictionaryManager.shared.excludedDictionaries))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let scaledCSS = userConfig.customCSS.replacingOccurrences(of: #"(-?(?:\d+(?:\.\d+)?|\.\d+))px"#, with: "calc($1px * var(--popup-scale))", options: .regularExpression)
         let customCSS = (try? JSONSerialization.data(withJSONObject: scaledCSS, options: .fragmentsAllowed))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
@@ -468,7 +484,7 @@ struct DictionarySearchView: View {
 
         let overlayPadding = includeOverlayPadding ? "<style>.overlay { padding-bottom: 90px; }</style>" : ""
         let querySourceMarkup = querySource == nil ? "" : """
-        <div id="dictionary-query-source" class="dictionary-query-source"></div>
+        <div id="dictionary-query-source" class="dictionary-query-source" style="font-size: \(userConfig.searchTextSize)px; min-height: calc(\(userConfig.searchTextSize)px * 1.4);"></div>
         <hr class="dictionary-query-source-divider">
         """
 
@@ -479,12 +495,14 @@ struct DictionarySearchView: View {
             window.expandFirstDictionary = \(userConfig.expandFirstDictionary);
             window.twoColumnLayout = \(userConfig.twoColumnLayout);
             window.collapsedDictionaries = \(collapsedDictionaries);
+            window.excludedDictionaries = \(excludedDictionaries);
             window.compactGlossaries = \(userConfig.compactGlossaries);
             window.showExpressionTags = \(userConfig.showExpressionTags);
             window.harmonicFrequency = \(userConfig.harmonicFrequency);
             window.deduplicatePitchAccents = \(userConfig.deduplicatePitchAccents);
             window.compactPitchAccents = \(userConfig.compactPitchAccents);
             window.audioSources = \(audioSources);
+            window.audioSourceNames = \(audioSourceNames);
             window.audioEnableAutoplay = \(userConfig.audioEnableAutoplay);
             window.audioPlaybackMode = "\(userConfig.audioPlaybackMode.rawValue)";
             window.needsAudio = \(AnkiManager.shared.needsAudio);
@@ -604,6 +622,7 @@ private struct NativeDictionaryPopupView: View {
     let onTapOutside: () -> Void
     let onDismiss: () -> Void
     let onRedirect: (String) -> [[String: Any]]
+    let onKanjiRedirect: (String) -> [String: Any]?
 
     @State private var backCount = 0
     @State private var forwardCount = 0
@@ -692,6 +711,14 @@ private struct NativeDictionaryPopupView: View {
                                     forwardCount = 0
                                 }
                                 return entries
+                            },
+                            onKanjiRedirect: { kanji in
+                                let data = onKanjiRedirect(kanji)
+                                if data != nil {
+                                    backCount += 1
+                                    forwardCount = 0
+                                }
+                                return data
                             }
                         )
                     }
@@ -717,7 +744,7 @@ private struct NativeDictionaryPopupView: View {
         } else {
             content
                 .background(
-                    userConfig.popupDisableTransparency ? AnyShapeStyle(Color(nsColor: .windowBackgroundColor)) : AnyShapeStyle(.ultraThinMaterial),
+                    Color(nsColor: .windowBackgroundColor),
                     in: RoundedRectangle(cornerRadius: 8)
                 )
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
@@ -843,11 +870,11 @@ fileprivate struct SearchResetInset: View {
     private let isResettingTextField: Bool
 
     private var pullTitle: String {
-        isQueryEmpty ? "Pull down to show keyboard" : "Pull down to clear"
+        isQueryEmpty ? String(localized: "Pull down to show keyboard") : String(localized: "Pull down to clear")
     }
 
     private var releaseTitle: String {
-        isQueryEmpty && !isResettingTextField ? "Release to show keyboard" : "Release to clear"
+        isQueryEmpty && !isResettingTextField ? String(localized: "Release to show keyboard") : String(localized: "Release to clear")
     }
 
     private var height: CGFloat {

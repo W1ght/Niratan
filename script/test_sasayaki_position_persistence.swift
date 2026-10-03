@@ -1,3 +1,4 @@
+// test-sources: Models/Sasayaki.swift
 import Foundation
 
 @main

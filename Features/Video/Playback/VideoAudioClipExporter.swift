@@ -19,7 +19,7 @@ enum VideoAudioClipExporter {
     ) async throws {
         guard end > start else {
             throw VideoAudioClipExporterError.failed(
-                "Unable to determine the video audio range."
+                String(localized: "Unable to determine the video audio range.")
             )
         }
         let result: (Bool, String?) = await Task.detached(priority: .userInitiated) {
@@ -37,7 +37,7 @@ enum VideoAudioClipExporter {
         }.value
         guard result.0 else {
             throw VideoAudioClipExporterError.failed(
-                result.1 ?? "The bundled audio encoder could not export this subtitle range."
+                result.1 ?? String(localized: "The bundled audio encoder could not export this subtitle range.")
             )
         }
     }

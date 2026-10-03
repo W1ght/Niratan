@@ -15,6 +15,14 @@ private enum ReaderGoToTab: String, CaseIterable, Identifiable {
         case .highlights: "Highlights"
         }
     }
+
+    var systemImage: String {
+        switch self {
+        case .search: "magnifyingglass"
+        case .chapters: "list.bullet"
+        case .highlights: "highlighter"
+        }
+    }
 }
 
 struct ReaderGoToView: View {
@@ -53,24 +61,22 @@ struct ReaderGoToView: View {
     }
 
     var body: some View {
-        NativeReaderSheetPanel("Go to", onClose: onDismiss) {
-            VStack(spacing: 0) {
-                HeaderView(
-                    title: displayTitle,
-                    currentCharacterCount: contentLanguage.displayCount(forRawCharacters: currentCharacter),
-                    totalCharacterCount: contentLanguage.displayCount(forRawCharacters: bookInfo.characterCount),
-                    coverURL: coverURL,
-                    onJumpTo: {
-                        jumpInput = ""
-                        showJumpAlert = true
-                    }
-                )
+        VStack(spacing: 0) {
+            NativeReaderInspectorHeader(title: "Go to", onClose: onDismiss)
 
-                ReaderLiquidGlassSegmentedControl(selection: $selectedTab)
-                .padding(.bottom, 10)
+            bookSummary
+                .padding(.horizontal, 18)
+                .padding(.bottom, 14)
 
-                selectedContent
-            }
+            NativeReaderInspectorTabBar(
+                tabs: ReaderGoToTab.allCases,
+                selection: $selectedTab,
+                title: \.title,
+                systemImage: \.systemImage
+            )
+            .padding(.bottom, 10)
+
+            selectedContent
         }
         .onAppear {
             refreshChapterRows()
@@ -98,6 +104,45 @@ struct ReaderGoToView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(contentLanguage == .english ? "Please enter a valid word count" : "Please enter a valid character count")
+        }
+    }
+
+    private var bookSummary: some View {
+        let progress = bookInfo.characterCount > 0
+            ? min(max(Double(currentCharacter) / Double(bookInfo.characterCount), 0), 1)
+            : 0
+        return HStack(alignment: .top, spacing: 12) {
+            CoverImage(url: coverURL, maxPixelSize: 256) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle().fill(Color.secondary.opacity(0.18))
+            }
+            .frame(width: 46, height: 66)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(displayTitle)
+                    .font(.headline)
+                    .lineLimit(2)
+                ProgressView(value: progress)
+                    .controlSize(.small)
+                HStack(spacing: 8) {
+                    Text(progressText(rawCharacter: currentCharacter))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Button {
+                        jumpInput = ""
+                        showJumpAlert = true
+                    } label: {
+                        Label("Jump to", systemImage: "arrow.right.to.line")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+                }
+            }
         }
     }
 
@@ -136,10 +181,10 @@ struct ReaderGoToView: View {
                 .help("Search")
             }
             .padding(.horizontal, 12)
-            .frame(height: 38)
-            .background(.quaternary.opacity(0.35), in: Capsule())
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+            .frame(height: 34)
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .padding(.horizontal, 18)
+            .padding(.bottom, 10)
 
             searchResultsContent
         }
@@ -164,52 +209,82 @@ struct ReaderGoToView: View {
             ContentUnavailableView("No matches", systemImage: "magnifyingglass")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List {
-                ForEach(groupedSearchResults) { section in
-                    Section {
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(groupedSearchResults) { section in
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(section.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            Text(resultCountText(section.results.count))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.top, 10)
+                        .padding(.bottom, 2)
+
                         ForEach(section.results) { result in
                             Button {
                                 onSearchResultJump(result)
                             } label: {
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 3) {
                                     Text(highlightedSnippet(for: result))
-                                        .font(.body)
-                                        .lineLimit(4)
+                                        .font(.callout)
+                                        .lineLimit(3)
                                     Text(progressText(rawCharacter: result.character))
-                                        .font(.caption)
+                                        .font(.caption2.monospacedDigit())
                                         .foregroundStyle(.secondary)
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-                        }
-                    } header: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(section.title)
-                                .font(.headline)
-                            Text(resultCountText(section.results.count))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            .buttonStyle(NativeReaderInspectorRowButtonStyle())
                         }
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 14)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
         }
     }
 
     private var chaptersTab: some View {
-        List {
-            ForEach(chapterRows) { row in
-                ChapterView(row: row, contentLanguage: contentLanguage) {
-                    onChapterJump(row.spineIndex, row.fragment)
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(chapterRows) { row in
+                        Button {
+                            onChapterJump(row.spineIndex, row.fragment)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(row.label)
+                                    .font(row.indentLevel > 0 ? .callout : .callout.weight(.medium))
+                                    .foregroundStyle(row.indentLevel > 0 ? .secondary : .primary)
+                                    .lineLimit(2)
+                                Spacer(minLength: 8)
+                                if let count = row.characterCount {
+                                    Text("\(contentLanguage.displayCount(forRawCharacters: count))")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .padding(.leading, CGFloat(row.indentLevel) * 14)
+                        }
+                        .buttonStyle(NativeReaderInspectorRowButtonStyle(isSelected: row.isCurrent))
+                        .id(row.id)
+                    }
                 }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 14)
+            }
+            .onAppear {
+                scrollToCurrentChapter(proxy)
+            }
+            .onChange(of: chapterRows.map(\.id)) { _, _ in
+                scrollToCurrentChapter(proxy)
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .overlay {
             if chapterRows.isEmpty {
                 ContentUnavailableView("No Chapters", systemImage: "list.bullet")
@@ -217,33 +292,44 @@ struct ReaderGoToView: View {
         }
     }
 
+    private func scrollToCurrentChapter(_ proxy: ScrollViewProxy) {
+        guard let current = chapterRows.last(where: \.isCurrent) else { return }
+        proxy.scrollTo(current.id, anchor: .center)
+    }
+
     private var highlightsTab: some View {
-        List {
-            ForEach(highlightSections) { section in
-                Section(section.label) {
+        ScrollView(.vertical) {
+            LazyVStack(alignment: .leading, spacing: 2) {
+                ForEach(highlightSections) { section in
+                    if !section.label.isEmpty {
+                        Text(section.label)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 10)
+                            .padding(.bottom, 2)
+                    }
                     ForEach(section.highlights) { highlight in
                         Button {
                             onHighlightJump(highlight)
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(highlight.text.trimmingCharacters(in: .whitespacesAndNewlines))
-                                    .font(.body)
-                                    .lineLimit(5)
+                                    .font(.callout)
+                                    .lineLimit(4)
                                 Text("\(highlight.createdAt.formatted(date: .abbreviated, time: .shortened)) (\(contentLanguage.displayCount(forRawCharacters: highlight.character)))")
-                                    .font(.caption)
+                                    .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
-                            .padding(.leading, 16)
-                            .padding(.vertical, 4)
+                            .padding(.leading, 10)
                             .overlay(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 2)
                                     .fill(highlight.color.swatch)
-                                    .frame(width: 4)
+                                    .frame(width: 3)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(NativeReaderInspectorRowButtonStyle())
                         .contextMenu {
                             Button(role: .destructive) {
                                 onHighlightDelete(highlight)
@@ -252,14 +338,11 @@ struct ReaderGoToView: View {
                             }
                         }
                     }
-                    .onDelete { indexSet in
-                        indexSet.forEach { onHighlightDelete(section.highlights[$0]) }
-                    }
                 }
             }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 14)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .overlay {
             if highlights.isEmpty {
                 ContentUnavailableView("No Highlights", systemImage: "highlighter")
@@ -385,81 +468,4 @@ private struct SearchResultSection: Identifiable {
     let id: Int
     let title: String
     let results: [ReaderSearchResult]
-}
-
-private struct ReaderLiquidGlassSegmentedControl: View {
-    @Binding var selection: ReaderGoToTab
-
-    var body: some View {
-        HStack {
-            Spacer(minLength: 0)
-            controlBody
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal)
-    }
-
-    @ViewBuilder
-    private var controlBody: some View {
-        GlassEffectContainer(spacing: 0) {
-            segments
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.white.opacity(0.16), lineWidth: 0.7)
-                }
-                .glassEffect(.regular.interactive(), in: Capsule())
-        }
-    }
-
-    private var segments: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(ReaderGoToTab.allCases.enumerated()), id: \.element.id) { index, tab in
-                if index > 0 {
-                    divider(before: tab)
-                }
-                Button {
-                    withAnimation(.snappy(duration: 0.18)) {
-                        selection = tab
-                    }
-                } label: {
-                    Text(tab.title)
-                        .font(.system(size: 13, weight: selection == tab ? .semibold : .medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                        .foregroundStyle(selection == tab ? Color.white : Color.primary.opacity(0.78))
-                        .frame(minWidth: 58, minHeight: 28)
-                        .padding(.horizontal, 2)
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .background {
-                    if selection == tab {
-                        Capsule()
-                            .fill(Color.accentColor.opacity(0.92))
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(.white.opacity(0.24), lineWidth: 0.55)
-                            }
-                    }
-                }
-                .accessibilityAddTraits(selection == tab ? .isSelected : [])
-            }
-        }
-        .padding(2)
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    @ViewBuilder
-    private func divider(before tab: ReaderGoToTab) -> some View {
-        let previousIndex = max((ReaderGoToTab.allCases.firstIndex(of: tab) ?? 1) - 1, 0)
-        let previous = ReaderGoToTab.allCases[previousIndex]
-        if selection != tab && selection != previous {
-            Rectangle()
-                .fill(.separator.opacity(0.42))
-                .frame(width: 1, height: 18)
-        } else {
-            Color.clear
-                .frame(width: 1, height: 18)
-        }
-    }
 }

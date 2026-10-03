@@ -88,7 +88,7 @@ struct MiningContextSelectionView: View {
                     }
                     .padding(isCurrent ? 18 : 15)
                     .background(
-                        isCurrent ? AnyShapeStyle(Color.accentColor.opacity(0.16)) : AnyShapeStyle(.regularMaterial),
+                        isCurrent ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.05),
                         in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                     )
                     .overlay {

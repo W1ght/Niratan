@@ -30,6 +30,12 @@ private func read(_ path: String) -> String {
 }
 
 let screen = read("Features/Video/VideoPlayerScreen.swift")
+    + read("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + read("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + read("Features/Video/VideoPlayerScreen+OSD.swift")
+    + read("Features/Video/VideoPlayerScreen+Mining.swift")
+    + read("Features/Video/VideoPlayerScreen+Opening.swift")
+    + read("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let anki = read("Core/AnkiManager.swift")
 let ankiView = read("Features/Settings/AnkiView.swift")
 let ankiModels = read("Models/Anki.swift")
@@ -37,6 +43,7 @@ let exporter = read("Features/Video/Playback/VideoAudioClipExporter.swift")
 let animatedExporterHeader = read("Features/Video/Playback/HSMpvAnimatedAVIFExporter.h")
 let animatedExporter = read("Features/Video/Playback/HSMpvAnimatedAVIFExporter.mm")
 let playbackEngine = read("Features/Video/Playback/PlaybackEngine.swift")
+    + read("Features/Video/Playback/VideoTrack.swift")
 let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
 let clientHeader = read("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
@@ -184,7 +191,7 @@ require(
 require(
     anki.contains("AnkiMediaProcessor.image(")
         && anki.contains("if FileManager.default.fileExists(atPath: destination.path(percentEncoded: false))")
-        && sasayakiPlayer.contains("private var miningAudioCache:")
+        && sasayakiPlayer.contains("var miningAudioCache:")
         && sasayakiPlayer.contains("if let cached = miningAudioCache[cacheKey]")
         && mediaStore.contains("claimDirectMediaGeneration(at destination:")
         && mediaStore.contains("waitForDirectMediaGeneration(at destination:")
@@ -236,7 +243,7 @@ require(
         && mining.contains("ProfileRepository.shared.activeProfile.id == profileID")
         && popup.contains("let miningProfileID = profileRepository.activeProfile.id")
         && popup.contains("profileRepository.activeProfile.id == miningProfileID")
-        && anki.contains("private struct NoteBuildConfiguration")
+        && anki.contains("struct NoteBuildConfiguration")
         && anki.contains("configuration: configuration"),
     "Anki mining must retain one explicit Profile and snapshot its field configuration across asynchronous media and AnkiConnect work"
 )

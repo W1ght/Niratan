@@ -28,6 +28,20 @@ enum ReaderLyricsVisualSpec {
     static let vocalGroupWidthCoefficient: CGFloat = 0.85
     static let lineTapProgressFreezeDuration: Double = 0.1
     static let lineFinishProgressAnimationDuration: Double = 0.25
+    static let listFontScale: CGFloat = 0.86
+    static let listRowSpacing: CGFloat = 4
+    static let listRowHorizontalPadding: CGFloat = 14
+    static let listRowVerticalPadding: CGFloat = 10
+    static let listRowHoverCornerRadius: CGFloat = 16
+    static let listDeselectedLineScale: CGFloat = 0.96
+    static let contextLineOpacities: [Double] = [0.46, 0.36, 0.3, 0.26]
+    static let browsingLineOpacity: Double = 0.6
+    static let listEdgeFadeFraction: CGFloat = 0.08
+    static let hoveredLineOpacity: Double = 0.84
+    static let pausedArtworkScale: CGFloat = 0.88
+    static let scrubberHeight: CGFloat = 34
+    static let manualScrollFollowResumeDelay: Double = 4
+    static let maxAnimatedFollowDistance = 12
 }
 
 struct ReaderLyricsLayoutMetrics: Equatable {
@@ -100,6 +114,12 @@ struct ReaderLyricsLayoutMetrics: Equatable {
             max(focusedFontSize * ReaderLyricsVisualSpec.contextFontScale, 21),
             ReaderLyricsVisualSpec.defaultFocusedFontSize
         )
+    }
+
+    /// One size for every row of the full cue list, so focus changes never
+    /// resize rows while the list is scrolling.
+    var lyricsListFontSize: CGFloat {
+        min(max(focusedFontSize * ReaderLyricsVisualSpec.listFontScale, 24), 42)
     }
 
     var emptyStateFontSize: CGFloat {

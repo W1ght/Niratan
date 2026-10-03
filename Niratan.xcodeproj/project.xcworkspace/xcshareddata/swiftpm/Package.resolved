@@ -13,9 +13,17 @@
     {
       "identity" : "hoshidicts",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/HuangAntimony/hoshidicts.git",
+      "location" : "https://github.com/W1ght/hoshidicts.git",
       "state" : {
-        "revision" : "c60de40bf5f000a28bd6d309383761cd881b196b"
+        "revision" : "885c49fb1c8b74e6b2811a10007c3236f0d7c881"
+      }
+    },
+    {
+      "identity" : "onnxruntime-swift-package-manager",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/microsoft/onnxruntime-swift-package-manager.git",
+      "state" : {
+        "revision" : "b7fb7f7dea8a2469e6335d95a61b8f36d0dc83b2"
       }
     },
     {

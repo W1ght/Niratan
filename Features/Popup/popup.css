@@ -129,6 +129,34 @@ body {
     white-space: nowrap;
 }
 
+.kanji-char {
+    cursor: pointer;
+}
+
+.kanji-char:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+}
+
+.kanji {
+    font-size: calc(120px * var(--popup-scale));
+    line-height: 1;
+    font-family: 'KanjiStrokeOrders_v4.005', 'YuKyokasho', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;
+}
+
+.kanji-separator {
+    border: none;
+    border-top: 1px solid currentColor;
+    opacity: 0.2;
+    margin: var(--popup-space-6) 0;
+}
+
+.kanji-reading-label {
+    opacity: 0.6;
+    margin-right: var(--popup-space-6);
+}
+
 .expression rt {
     font-size: var(--popup-expression-reading-size);
     -webkit-user-select: none;

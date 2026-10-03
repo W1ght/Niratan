@@ -1,3 +1,4 @@
+// test-sources: NativeMac/ReaderWindowGeometry.swift
 import AppKit
 import Foundation
 

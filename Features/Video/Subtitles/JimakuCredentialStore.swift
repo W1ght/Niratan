@@ -14,7 +14,7 @@ actor JimakuCredentialStore {
     private let service: String
 
     init(service: String = "moe.shishamo.hoshi.jimaku") {
-        self.service = service
+        self.service = DevelopmentDataIsolation.keychainName(service)
     }
     private let account = "api-key"
 

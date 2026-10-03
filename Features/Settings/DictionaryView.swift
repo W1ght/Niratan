@@ -24,12 +24,16 @@ struct DictionaryView: View {
     @State private var dropTargetDictionaryID: UUID?
     @State private var activeDictionaryDragSourceID: UUID?
     @State private var dictionaryRowFrames: [UUID: CGRect] = [:]
+    @State private var isDownloadingKanjiFont = false
+    @State private var hasKanjiStrokeOrderFont = FontManager.shared.hasKanjiStrokeOrderFont
+    @State private var showFontDownloadConfirmation = false
 
     private var dictionaries: [DictionaryInfo] {
         switch selectedType {
         case .term: return dictionaryManager.termDictionaries
         case .frequency: return dictionaryManager.frequencyDictionaries
         case .pitch: return dictionaryManager.pitchDictionaries
+        case .kanji: return dictionaryManager.kanjiDictionaries
         }
     }
 
@@ -85,15 +89,68 @@ struct DictionaryView: View {
                         Text("Download Recommended Dictionaries", tableName: "Dictionaries")
                     }
                     .disabled(dictionaryManager.isImporting || dictionaryManager.recommendedDictionaries.isEmpty)
+
+                    Button {
+                        isImporting = true
+                    } label: {
+                        Label("Import", systemImage: "plus")
+                    }
+                    .fileImporter(
+                        isPresented: $isImporting,
+                        allowedContentTypes: [.zip],
+                        allowsMultipleSelection: true,
+                        onCompletion: { result in
+                            if case .success(let urls) = result {
+                                dictionaryManager.importDictionary(from: urls)
+                            }
+                        }
+                    )
+                    .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
+
+                    Button {
+                        showCSSEditor = true
+                    } label: {
+                        Label {
+                            Text("Custom CSS", tableName: "Dictionaries")
+                        } icon: {
+                            Image(systemName: "curlybraces")
+                        }
+                    }
+                    .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
                 }
                 NativeSettingsSeparator()
                 NativeSettingsRow {
                     Text("Supported Formats", tableName: "Dictionaries")
                 } accessory: {
-                    Text("Yomitan term, frequency and pitch dictionaries (.zip) are supported", tableName: "Dictionaries")
+                    Text("Yomitan term, frequency, pitch and kanji dictionaries (.zip) are supported", tableName: "Dictionaries")
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .multilineTextAlignment(.trailing)
+                }
+            }
+
+            if !dictionaryManager.kanjiDictionaries.isEmpty {
+                NativeSettingsSectionCard {
+                    Text("Kanji", tableName: "Dictionaries")
+                } content: {
+                    NativeSettingsRow {
+                        Text("Stroke Order Font", tableName: "Dictionaries")
+                    } accessory: {
+                        if hasKanjiStrokeOrderFont {
+                            Text("Installed", tableName: "Dictionaries")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Button {
+                                showFontDownloadConfirmation = true
+                            } label: {
+                                Text("Download", tableName: "Dictionaries")
+                            }
+                            .buttonStyle(NativeSettingsActionButtonStyle())
+                            .disabled(isDownloadingKanjiFont)
+                        }
+                    }
+                } footer: {
+                    Text("Shows stroke order diagrams for the character in kanji entries.", tableName: "Dictionaries")
                 }
             }
 
@@ -189,6 +246,12 @@ struct DictionaryView: View {
                                 }
                             }
                         } accessory: {
+                            if selectedType == .term {
+                                DictionaryCategoryPicker(selection: Binding(
+                                    get: { dict.category },
+                                    set: { dictionaryManager.setDictionaryCategory(id: dict.id, category: $0) }
+                                ))
+                            }
                             Toggle("", isOn: Binding(
                                 get: { dict.isEnabled },
                                 set: { dictionaryManager.toggleDictionary(id: dict.id, enabled: $0, type: selectedType) }
@@ -251,39 +314,25 @@ struct DictionaryView: View {
                 dictionaryManager.updateDictionaries(selectedDictionaries, refreshAvailabilityAfterUpdate: true)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    showCSSEditor = true
-                } label: {
-                    Image(systemName: "curlybraces")
-                }
-                .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
-            }
-
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    isImporting = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .fileImporter(
-                    isPresented: $isImporting,
-                    allowedContentTypes: [.zip],
-                    allowsMultipleSelection: true,
-                    onCompletion: { result in
-                        if case .success(let urls) = result {
-                            dictionaryManager.importDictionary(from: urls)
-                        }
-                    }
-                )
-                .disabled(dictionaryManager.isImporting || dictionaryManager.isUpdating)
-            }
-        }
         .overlay {
             if dictionaryManager.isImporting || dictionaryManager.isUpdating || dictionaryManager.isCheckingUpdates {
                 LoadingOverlay(dictionaryManager.currentImport)
+            } else if isDownloadingKanjiFont {
+                LoadingOverlay(String(localized: "Downloading Stroke Order Font", table: "Dictionaries"))
             }
+        }
+        .alert(String(localized: "Download Font", table: "Dictionaries"), isPresented: $showFontDownloadConfirmation) {
+            Button {
+                downloadKanjiStrokeOrderFont()
+            } label: {
+                Text("Download", tableName: "Dictionaries")
+            }
+            Button(role: .cancel) {
+            } label: {
+                Text("Cancel", tableName: "Dictionaries")
+            }
+        } message: {
+            Text("This will download and automatically import the kanji stroke order font (17 MB).", tableName: "Dictionaries")
         }
         .navigationTitle(String(localized: "Dictionaries", table: "Dictionaries"))
         .alert(String(localized: "Error", table: "Dictionaries"), isPresented: $dictionaryManager.shouldShowError) {
@@ -301,6 +350,19 @@ struct DictionaryView: View {
             }
         } message: {
             Text("All dictionaries are already up to date.", tableName: "Dictionaries")
+        }
+    }
+
+    private func downloadKanjiStrokeOrderFont() {
+        isDownloadingKanjiFont = true
+        Task {
+            let success = await FontManager.downloadKanjiStrokeOrderFont()
+            isDownloadingKanjiFont = false
+            hasKanjiStrokeOrderFont = FontManager.shared.hasKanjiStrokeOrderFont
+            if !success {
+                dictionaryManager.errorMessage = String(localized: "Failed to download the stroke order font", table: "Dictionaries")
+                dictionaryManager.shouldShowError = true
+            }
         }
     }
 
@@ -394,7 +456,7 @@ struct DictionaryView: View {
     private var dictionaryTypePicker: some View {
         NativeGlassSegmentedPicker(
             selection: $selectedType,
-            values: [DictionaryType.term, .frequency, .pitch],
+            values: [DictionaryType.term, .frequency, .pitch, .kanji],
             minSegmentWidth: 72
         ) { type in
             switch type {
@@ -404,6 +466,8 @@ struct DictionaryView: View {
                 Text("Frequency", tableName: "Dictionaries")
             case .pitch:
                 Text("Pitch", tableName: "Dictionaries")
+            case .kanji:
+                Text("Kanji", tableName: "Dictionaries")
             }
         }
     }
@@ -685,6 +749,37 @@ private struct DictionarySelectionRow<Label: View>: View {
     }
 }
 
+/// Category used by the monolingual/bilingual Anki handlebars; Exclude leaves the dictionary out of `{glossary}`.
+private struct DictionaryCategoryPicker: View {
+    @Binding var selection: DictionaryCategory
+
+    var body: some View {
+        Picker(selection: $selection) {
+            ForEach(DictionaryCategory.allCases) { category in
+                categoryText(category).tag(category)
+            }
+        } label: {
+            Text("Category", tableName: "Dictionaries")
+        }
+        .labelsHidden()
+        .fixedSize()
+        .help(String(localized: "Category for Anki definition fields", table: "Dictionaries"))
+    }
+
+    private func categoryText(_ category: DictionaryCategory) -> Text {
+        switch category {
+        case .none:
+            Text("No Category", tableName: "Dictionaries")
+        case .monolingual:
+            Text("Monolingual", tableName: "Dictionaries")
+        case .bilingual:
+            Text("Bilingual", tableName: "Dictionaries")
+        case .exclude:
+            Text("Exclude", tableName: "Dictionaries")
+        }
+    }
+}
+
 private struct DictionaryTypeBadge: View {
     let type: DictionaryType
 
@@ -706,6 +801,8 @@ private struct DictionaryTypeBadge: View {
             Text("Frequency", tableName: "Dictionaries")
         case .pitch:
             Text("Pitch", tableName: "Dictionaries")
+        case .kanji:
+            Text("Kanji", tableName: "Dictionaries")
         }
     }
 }
@@ -751,6 +848,61 @@ private struct DictionaryBehaviorSettingsSections: View {
                         .fontWeight(.semibold)
                     Stepper(value: $userConfig.scanLength, in: 1...64) {
                         Text("Scan Length", tableName: "Dictionaries")
+                    }
+                    .labelsHidden()
+                }
+                NativeSettingsSeparator()
+                NativeSettingsRow {
+                    Text("Frequency Sorting", tableName: "Dictionaries")
+                } accessory: {
+                    Picker(selection: $userConfig.frequencySortOrder) {
+                        ForEach(LookupFrequencySortOrder.allCases, id: \.self) { order in
+                            frequencySortOrderText(order).tag(order)
+                        }
+                    } label: {
+                        Text("Frequency Sorting", tableName: "Dictionaries")
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                if userConfig.frequencySortOrder != .auto {
+                    NativeSettingsSeparator()
+                    NativeSettingsRow {
+                        Text("Frequency Dictionary", tableName: "Dictionaries")
+                    } accessory: {
+                        Picker(selection: $userConfig.frequencySortDictionary) {
+                            if !frequencyDictionaryTitles.contains(userConfig.frequencySortDictionary) {
+                                Text("None", tableName: "Dictionaries").tag(userConfig.frequencySortDictionary)
+                            }
+                            ForEach(frequencyDictionaryTitles, id: \.self) { title in
+                                Text(verbatim: title).tag(title)
+                            }
+                        } label: {
+                            Text("Frequency Dictionary", tableName: "Dictionaries")
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
+            } footer: {
+                if userConfig.frequencySortOrder != .auto {
+                    Text(
+                        "Results with the same match are ranked by the selected frequency dictionary. Results without a value are listed last.",
+                        tableName: "Dictionaries"
+                    )
+                }
+            }
+
+            NativeSettingsSectionCard {
+                Text("Search Text", tableName: "Dictionaries")
+            } content: {
+                NativeSettingsRow {
+                    Text("Text Size", tableName: "Dictionaries")
+                } accessory: {
+                    Text(verbatim: "\(userConfig.searchTextSize)")
+                        .fontWeight(.semibold)
+                    Stepper(value: $userConfig.searchTextSize, in: 12...48) {
+                        Text("Text Size", tableName: "Dictionaries")
                     }
                     .labelsHidden()
                 }
@@ -819,6 +971,23 @@ private struct DictionaryBehaviorSettingsSections: View {
                     tableName: "Dictionaries"
                 )
             }
+        }
+    }
+
+    private var frequencyDictionaryTitles: [String] {
+        DictionaryManager.shared.frequencyDictionaries
+            .filter(\.isEnabled)
+            .map(\.index.title)
+    }
+
+    private func frequencySortOrderText(_ order: LookupFrequencySortOrder) -> Text {
+        switch order {
+        case .auto:
+            Text("Auto", tableName: "Dictionaries")
+        case .ascending:
+            Text("Ascending", tableName: "Dictionaries")
+        case .descending:
+            Text("Descending", tableName: "Dictionaries")
         }
     }
 

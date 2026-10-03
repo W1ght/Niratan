@@ -32,7 +32,7 @@ struct NativeMacSidebarView: View {
             .scrollContentBackground(.hidden)
         }
         .background {
-            NativeGlassPageBackground(isolatesContainerMaterial: true)
+            NativeGlassPageBackground()
                 .ignoresSafeArea(.container, edges: .top)
         }
         .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)

@@ -70,12 +70,12 @@ enum SasayakiPlaybackLifecycleTest {
         )
         assertContains(
             nativeReader,
-            "private var statisticsTimerTask: Task<Void, Never>?",
+            "var statisticsTimerTask: Task<Void, Never>?",
             "each Reader model should own at most one statistics timer"
         )
         assertContains(
             nativeReader,
-            "private var didSyncOnOpen = false",
+            "var didSyncOnOpen = false",
             "duplicate SwiftUI views should not start the same Reader open-sync more than once"
         )
         assertContains(
@@ -198,7 +198,7 @@ enum SasayakiPlaybackLifecycleTest {
         let terminationLifecycle = sourceSection(
             nativeReader,
             from: ".onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification))",
-            to: ".sheet(item: $activeSheet)",
+            to: "if activeSheet == .gallery {",
             "native Reader should expose its app-termination lifecycle handler"
         )
         assertContains(
@@ -226,8 +226,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let shortcutHandlers = sourceSection(
             nativeReader,
-            from: "private var sasayakiShortcutHandlers:",
-            to: "private func handleReaderPreviousPageShortcut()",
+            from: "var sasayakiShortcutHandlers:",
+            to: "func handleReaderPreviousPageShortcut()",
             "native Reader should map Sasayaki shortcut actions to handlers"
         )
         assertContains(
@@ -238,8 +238,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let jumpCueHandler = sourceSection(
             nativeReader,
-            from: "private func handleSasayakiJumpCueShortcut()",
-            to: "private func registerKeyboardShortcuts()",
+            from: "func handleSasayakiJumpCueShortcut()",
+            to: "func registerKeyboardShortcuts()",
             "native Reader should expose its Sasayaki jump shortcut handler"
         )
         assertContains(
@@ -250,7 +250,7 @@ enum SasayakiPlaybackLifecycleTest {
 
         let jumpToCue = sourceSection(
             nativeReader,
-            from: "private func jumpToSasayakiCue()",
+            from: "func jumpToSasayakiCue()",
             to: "var body: some View",
             "native Reader should expose the popup Sasayaki jump path"
         )
@@ -294,8 +294,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let popupLayerSection = sourceSection(
             nativeReader,
-            from: "private func popupLayer(screenSize: CGSize)",
-            to: "private var nativeTopInfoOverlay",
+            from: "func popupLayer(screenSize: CGSize)",
+            to: "var nativeTopInfoOverlay",
             "native Reader should wire popup dismissal callbacks"
         )
         assertContains(
@@ -323,8 +323,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let popupSasayakiControls = sourceSection(
             popupView,
-            from: "private func sasayakiControls(",
-            to: "private func popupContent(",
+            from: "func sasayakiControls(",
+            to: "func popupContent(",
             "shared popup view should expose Sasayaki controls"
         )
         assertContains(
@@ -344,7 +344,7 @@ enum SasayakiPlaybackLifecycleTest {
         )
         assertContains(
             popupSasayakiControls,
-            "private func popupControlIcon(_ systemName: String) -> some View",
+            "func popupControlIcon(_ systemName: String) -> some View",
             "popup Sasayaki controls should centralize their transparent hit target"
         )
         assertContains(
@@ -431,8 +431,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let pauseSection = sourceSection(
             sasayakiPlayer,
-            from: "private func pausePlayback()",
-            to: "private func tick(",
+            from: "func pausePlayback()",
+            to: "func tick(",
             "Sasayaki player should expose its pause persistence boundary"
         )
         assertContains(
@@ -443,8 +443,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let tickSection = sourceSection(
             sasayakiPlayer,
-            from: "private func tick(",
-            to: "private func seek(",
+            from: "func tick(",
+            to: "func seek(",
             "Sasayaki player should expose its periodic playback tick"
         )
         assertContains(
@@ -476,8 +476,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let seekSection = sourceSection(
             sasayakiPlayer,
-            from: "private func seek(",
-            to: "private func setupPlayer(url: URL)",
+            from: "func seek(",
+            to: "func setupPlayer(url: URL)",
             "Sasayaki player should expose its seek boundary"
         )
         assertContains(
@@ -519,8 +519,8 @@ enum SasayakiPlaybackLifecycleTest {
 
         let persistSection = sourceSection(
             sasayakiPlayer,
-            from: "private func persistPlaybackPosition(",
-            to: "private func setupPlayer(url: URL)",
+            from: "func persistPlaybackPosition(",
+            to: "func setupPlayer(url: URL)",
             "Sasayaki player should expose immediate playback position persistence"
         )
         assertContains(

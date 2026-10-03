@@ -147,7 +147,7 @@ struct NativeReaderLoader: View {
 
 @Observable
 @MainActor
-final class NativeReaderModel {
+final class NativeReaderModel: SyncOpenReader {
     let instanceID = UUID()
     let book: BookMetadata
     let bridge = WebViewBridge()
@@ -163,16 +163,23 @@ final class NativeReaderModel {
     var imageURL: URL?
     var highlights: [Highlight] = []
     var highlightRevision = 0
+    /// Until the open-time library sync finishes, a newer remote position may still move the
+    /// reader; afterwards the local position is never changed under the user.
+    private(set) var acceptsSyncedPosition = true
     var loadRevision = 0
     var pendingFragment: String?
     var isTracking = false
     var isPaused = false
     var lastTimestamp: Date = .now
     var lastCount = 0
-    var stats: [Statistics] = []
-    var sessionStatistics = NativeReaderModel.defaultStatistic(title: "")
-    var todaysStatistics = NativeReaderModel.defaultStatistic(title: "")
-    var allTimeStatistics = NativeReaderModel.defaultStatistic(title: "")
+    private var sessionID = UUID().uuidString
+    private(set) var currentSession = ReadingSession.starting(at: .now)
+    private var statisticsHistory: ReadingSessionRecords = [:]
+    private var historyDayTotals: [String: ReadingTotal] = [:]
+    private var historyTotal = ReadingTotal()
+    private(set) var pageIndex = ReaderPageIndex(spinePageStarts: [], spineStartCharacters: [])
+    private var currentSpinePage: (url: URL, page: Int)?
+    private var lastSavedSessionModified: Int64 = 0
     var sasayakiPlayer: SasayakiPlayer?
     var wasPaused = false
 
@@ -187,6 +194,19 @@ final class NativeReaderModel {
     private var syncStats = false
     private var statsSyncMode: StatisticsSyncMode = .merge
     private var syncAudioBook = false
+    private var fushiAutoSyncEnabled = false
+    /// A Fushi progress conflict found while opening the book, asked about before
+    /// reading starts. While it is shown here the main window does not ask again.
+    var fushiConflict: FushiProgressConflict? {
+        didSet {
+            if let oldValue, oldValue.book.id != fushiConflict?.book.id {
+                FushiProgressCoordinator.shared.endReaderPrompt(for: oldValue.book.id)
+            }
+            if let fushiConflict {
+                FushiProgressCoordinator.shared.beginReaderPrompt(for: fushiConflict.book.id)
+            }
+        }
+    }
     private var pendingAutoExport = false
     private var didPrepareForReaderLifecycleClose = false
     private var didSyncOnOpen = false
@@ -211,6 +231,25 @@ final class NativeReaderModel {
         NativeReaderPosition(index: index, progress: progress)
     }
 
+    var sessionStatistics: ReadingTotal {
+        currentSession.total
+    }
+
+    var todaysStatistics: ReadingTotal {
+        let today = StatisticsDayBoundary.dateKey(for: .now, resetMinutes: statisticsResetTime)
+        var total = historyDayTotals[today] ?? ReadingTotal()
+        if ReadingSessionLog.dateKey(for: currentSession, resetMinutes: statisticsResetTime) == today {
+            total.add(currentSession)
+        }
+        return total
+    }
+
+    var allTimeStatistics: ReadingTotal {
+        var total = historyTotal
+        total.add(currentSession)
+        return total
+    }
+
     var backTarget: Int? {
         backHistory.last.flatMap(characterProgress)
     }
@@ -229,11 +268,12 @@ final class NativeReaderModel {
         statisticsResetTime = StatisticsDayBoundary.normalizedResetMinutes(
             userConfig.statisticsResetTime
         )
-        autoSyncEnabled = userConfig.enableSync && userConfig.enableAutoSync
+        autoSyncEnabled = userConfig.enableSync && userConfig.enableAutoSync && userConfig.syncProvider == .ttu
         syncBookData = userConfig.enableSync && userConfig.syncUploadBooks
         syncStats = userConfig.enableSync && userConfig.statisticsEnableSync
         statsSyncMode = userConfig.statisticsSyncMode
         syncAudioBook = userConfig.enableSasayaki && userConfig.sasayakiEnableSync
+        fushiAutoSyncEnabled = FushiProgressCoordinator.shared.isAutoSyncActive
     }
 
     func updateStatisticsResetTime(_ resetTime: Int) {
@@ -250,12 +290,7 @@ final class NativeReaderModel {
         statisticsResetTime = normalized
 
         if enableStatistics, document != nil {
-            let currentDateKey = Self.formattedDate(
-                date: .now,
-                resetTime: statisticsResetTime
-            )
-            todaysStatistics = stats.first(where: { $0.dateKey == currentDateKey })
-                ?? Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
+            regroupStatisticsHistory()
             resetTrackingBaseline()
         }
     }
@@ -476,22 +511,57 @@ final class NativeReaderModel {
     func syncOnOpenIfNeeded() async {
         guard !didSyncOnOpen else { return }
         didSyncOnOpen = true
-        guard autoSyncEnabled else {
+        let librarySync = GoogleDriveSyncManager.shared
+        if librarySync.enabled {
+            await librarySync.sync(book: book)
+            acceptsSyncedPosition = false
+            loadCurrentChapterState()
+            resetTrackingBaseline()
+            // Fushi interconnect is independent of the selected Google Drive provider.
+            guard fushiAutoSyncEnabled else { return }
+        }
+        acceptsSyncedPosition = false
+        guard autoSyncEnabled || fushiAutoSyncEnabled else {
             resetTrackingBaseline()
             return
         }
-        let result = try? await SyncManager.shared.syncBook(
-            book: book,
-            direction: nil,
-            syncBookData: syncBookData,
-            syncStats: syncStats,
-            statsSyncMode: statsSyncMode,
-            syncAudioBook: syncAudioBook,
-            importOnly: true
-        )
-        if case .imported = result {
+        var shouldReloadBookmark = false
+        if autoSyncEnabled {
+            let result = try? await SyncManager.shared.syncBook(
+                book: book,
+                direction: nil,
+                syncBookData: syncBookData,
+                syncStats: syncStats,
+                statsSyncMode: statsSyncMode,
+                syncAudioBook: syncAudioBook,
+                importOnly: true
+            )
+            if case .imported = result {
+                shouldReloadBookmark = true
+            }
+        }
+        if fushiAutoSyncEnabled {
+            switch await FushiProgressCoordinator.shared.syncBook(book, trigger: .readerOpen) {
+            case .pulled:
+                shouldReloadBookmark = true
+            case .conflict(let conflict):
+                fushiConflict = conflict
+            default:
+                break
+            }
+        }
+        if shouldReloadBookmark {
             reloadBookmark()
         }
+        loadCurrentChapterState()
+        resetTrackingBaseline()
+    }
+
+    /// Moves the open book to the position chosen in a Fushi conflict.
+    func applyResolvedFushiProgress(_ choice: FushiConflictChoice) {
+        fushiConflict = nil
+        guard choice == .useFushi else { return }
+        reloadBookmark()
         loadCurrentChapterState()
         resetTrackingBaseline()
     }
@@ -524,11 +594,33 @@ final class NativeReaderModel {
 
     var galleryImages: [ReaderGalleryImage] {
         let currentCharacter = currentCharacter
+        let chapterLabels = galleryChapterLabels
         return (bookInfo.images ?? []).compactMap { path in
             guard let url = galleryImageURLCache[path] else { return nil }
-            let isRead = bookInfo.imagePositions?[path].map { $0 <= currentCharacter } ?? true
-            return ReaderGalleryImage(url: url, isRead: isRead)
+            let position = bookInfo.imagePositions?[path]
+            let isRead = position.map { $0 <= currentCharacter } ?? true
+            var spine = position.flatMap { bookInfo.resolveCharacterPosition($0)?.spineIndex } ?? -1
+            while spine > 0, chapterLabels[spine] == nil {
+                spine -= 1
+            }
+            return ReaderGalleryImage(
+                url: url,
+                isRead: isRead,
+                chapterIndex: spine,
+                chapterTitle: chapterLabels[spine] ?? ""
+            )
         }
+    }
+
+    /// First TOC label for each spine item, used to group gallery images.
+    private var galleryChapterLabels: [Int: String] {
+        guard let document else { return [:] }
+        var labels: [Int: String] = [:]
+        for row in ChapterListViewModel(document: document, bookInfo: bookInfo, currentCharacter: 0).rows
+        where !row.label.isEmpty && labels[row.spineIndex] == nil {
+            labels[row.spineIndex] = row.label
+        }
+        return labels
     }
 
     var currentCharacter: Int {
@@ -558,6 +650,66 @@ final class NativeReaderModel {
 
     var currentChapterCharactersRemaining: Int {
         currentTOCChapterRange.remaining(at: currentCharacter)
+    }
+
+    /// TOC chapter for progress display. At the very end of a spine item the
+    /// character offset equals the next item's start, so look up the last character.
+    var currentProgressChapterRange: ReaderChapterIndex.ChapterRange {
+        let tableOfContentsItems = document.map {
+            BookProcessor.tableOfContentsItemPaths(in: $0.tableOfContents)
+        } ?? []
+        let starts = ReaderChapterIndex.chapterStarts(
+            tableOfContentsItems: tableOfContentsItems,
+            bookInfo: bookInfo
+        )
+        let spineEnd = chapterRange?.end ?? 0
+        let lookup = spineEnd > 0 ? min(currentCharacter, spineEnd - 1) : currentCharacter
+        return ReaderChapterIndex.chapterRange(
+            containing: lookup,
+            chapterStarts: starts,
+            bookCharacterCount: bookInfo.characterCount
+        )
+    }
+
+    var spineURLs: [URL] {
+        guard let document else { return [] }
+        return document.spine.items.compactMap { item in
+            document.manifest.items[item.idref].map { document.contentDirectory.appendingPathComponent($0.path) }
+        }
+    }
+
+    func updatePages(_ spinePageStarts: [[Int]]) {
+        guard let document else { return }
+        let spineStarts = document.spine.items.map { item in
+            document.manifest.items[item.idref].flatMap { bookInfo.chapterInfo[$0.path]?.currentTotal } ?? 0
+        }
+        pageIndex = ReaderPageIndex(spinePageStarts: spinePageStarts, spineStartCharacters: spineStarts)
+    }
+
+    func updateCurrentPage(url: URL, page: Int) {
+        currentSpinePage = (Self.urlWithoutFragment(url).standardizedFileURL, page)
+    }
+
+    var pageProgress: ReaderPageIndex.Progress? {
+        guard !pageIndex.isEmpty else { return nil }
+        let page: Int?
+        if let currentSpinePage,
+           let chapterURL = currentChapterURL,
+           currentSpinePage.url == chapterURL.standardizedFileURL {
+            page = pageIndex.page(spineIndex: index, localPage: currentSpinePage.page)
+        } else if progress <= 0 {
+            page = pageIndex.page(spineIndex: index, localPage: 0)
+        } else {
+            page = pageIndex.page(at: currentCharacter, spineIndex: index)
+        }
+        guard let page else { return nil }
+        let chapter = currentProgressChapterRange
+        return pageIndex.progress(
+            page: page,
+            chapterStart: chapter.start,
+            chapterCount: chapter.count,
+            bookCharacterCount: bookInfo.characterCount
+        )
     }
 
     private var chapterRange: (start: Int, end: Int)? {
@@ -759,6 +911,9 @@ final class NativeReaderModel {
             startStatisticsTimerIfNeeded()
             return
         }
+        if !currentSession.hasActivity {
+            currentSession = .starting(at: .now)
+        }
         isTracking = true
         isPaused = !isStatisticsContextActive
         resetTrackingBaseline()
@@ -829,25 +984,22 @@ final class NativeReaderModel {
     func updateStats() {
         guard enableStatistics else { return }
         let currentCharacter = currentCharacter
-        let currentDateKey = Self.formattedDate(
-            date: .now,
-            resetTime: statisticsResetTime
-        )
-        if todaysStatistics.dateKey != currentDateKey {
-            if let index = stats.firstIndex(where: { $0.dateKey == todaysStatistics.dateKey }) {
-                stats[index] = todaysStatistics
-            } else {
-                stats.append(todaysStatistics)
-            }
-            todaysStatistics = stats.first(where: { $0.dateKey == currentDateKey })
-                ?? Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
+        let now = Date.now
+        // A session belongs to the reporting day it started on. A Mac Reader can stay open
+        // across the reset time, so close the old session and continue in a new one.
+        if currentSession.hasActivity,
+           ReadingSessionLog.dateKey(for: currentSession, resetMinutes: statisticsResetTime)
+            != StatisticsDayBoundary.dateKey(for: now, resetMinutes: statisticsResetTime) {
+            saveStats()
+            sessionID = UUID().uuidString
+            lastSavedSessionModified = 0
+            currentSession = .starting(at: now)
+            regroupStatisticsHistory()
         }
 
-        let now = Date.now
         let timeDiff = now.timeIntervalSince(lastTimestamp)
         let charDiff = currentCharacter - lastCount
-        let finalCharDiff = charDiff < 0 && abs(charDiff) > sessionStatistics.charactersRead ? -sessionStatistics.charactersRead : charDiff
-        let lastStatisticModified = Int(now.timeIntervalSince1970 * 1000)
+        let finalCharDiff = max(charDiff, -currentSession.charactersRead)
         guard timeDiff > 0 else { return }
         readerStatisticsLogger.notice(
             "reader.statistics.update book=\(self.book.folder, privacy: .public) timeDiff=\(timeDiff, privacy: .public) current=\(currentCharacter, privacy: .public) last=\(self.lastCount, privacy: .public) charDiff=\(charDiff, privacy: .public) finalCharDiff=\(finalCharDiff, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public)"
@@ -859,9 +1011,7 @@ final class NativeReaderModel {
             )
         }
 
-        updateStatistic(to: &sessionStatistics, timeDiff: timeDiff, characterDiff: finalCharDiff, lastStatisticModified: lastStatisticModified)
-        updateStatistic(to: &todaysStatistics, timeDiff: timeDiff, characterDiff: finalCharDiff, lastStatisticModified: lastStatisticModified)
-        updateStatistic(to: &allTimeStatistics, timeDiff: timeDiff, characterDiff: finalCharDiff, lastStatisticModified: lastStatisticModified)
+        currentSession.track(characters: finalCharDiff, time: timeDiff, until: now)
 
         lastTimestamp = now
         lastCount = currentCharacter
@@ -894,10 +1044,40 @@ final class NativeReaderModel {
 
     func reloadStatisticsAfterExternalMutation() {
         guard enableStatistics else { return }
-        let currentSessionStatistics = sessionStatistics
         loadStatistics()
-        sessionStatistics = currentSessionStatistics
         resetTrackingBaseline()
+    }
+
+    /// Library sync applied remote statistics or highlights to this book's files. The reading
+    /// position is left alone while the book is open.
+    func applySyncedState(bookmarkChanged: Bool) {
+        if bookmarkChanged && acceptsSyncedPosition {
+            reloadBookmark()
+        }
+        reloadStatisticsAfterExternalMutation()
+        guard let rootURL else { return }
+        let stored = BookStorage.loadHighlights(root: rootURL) ?? []
+        if stored != highlights {
+            highlights = stored
+            highlightRevision += 1
+            loadRevision += 1
+            isLoading = true
+        }
+    }
+
+    /// The book was deleted on another device: keep this session's statistics, then close.
+    func closeForSyncedDeletion() {
+        prepareForReaderLifecycleClose()
+        ReaderWindowPresenter.shared.closeWindow()
+    }
+
+    func reloadSyncedSasayakiMatch() {
+        guard let rootURL, let match = BookStorage.loadSasayakiMatch(root: rootURL) else { return }
+        sasayakiPlayer?.updateMatchData(match)
+    }
+
+    var syncFolder: String {
+        book.folder
     }
 
     private func startStatisticsTimerIfNeeded() {
@@ -1032,6 +1212,7 @@ final class NativeReaderModel {
         guard let rootURL else { return }
         highlights.removeAll { $0.id == highlight.id }
         try? BookStorage.save(highlights, inside: rootURL, as: FileNames.highlights)
+        GoogleDriveSyncManager.shared.schedule()
         highlightRevision += 1
         loadRevision += 1
         isLoading = true
@@ -1048,6 +1229,7 @@ final class NativeReaderModel {
             createdAt: Date()
         ))
         try? BookStorage.save(highlights, inside: rootURL, as: FileNames.highlights)
+        GoogleDriveSyncManager.shared.schedule()
     }
 
     func handleSelection(
@@ -1367,7 +1549,8 @@ final class NativeReaderModel {
     }
 
     private func scheduleAutoExport() {
-        guard autoSyncEnabled else { return }
+        GoogleDriveSyncManager.shared.schedule()
+        guard autoSyncEnabled || fushiAutoSyncEnabled else { return }
         pendingAutoExport = true
         guard debounceTask == nil else { return }
         debounceTask = Task { [weak self] in
@@ -1379,60 +1562,92 @@ final class NativeReaderModel {
             await MainActor.run {
                 self?.debounceTask = nil
             }
-            await self?.runAutoExport(direction: .exportToTtu)
+            await self?.runAutoExport(direction: .exportToTtu, fushiTrigger: .readerActivity)
         }
     }
 
     func flushAutoSync() async {
         debounceTask?.cancel()
         debounceTask = nil
-        await runAutoExport(direction: .exportToTtu)
+        // Closing the Reader with the question still open counts as "decide later".
+        if let fushiConflict {
+            FushiProgressCoordinator.shared.postpone([fushiConflict])
+            self.fushiConflict = nil
+        }
+        let didExport = await runAutoExport(direction: .exportToTtu, fushiTrigger: .readerClose)
+        // A conflict deferred while reading still needs its prompt after the book
+        // closes, even when nothing changed since the last export.
+        if !didExport,
+           fushiAutoSyncEnabled,
+           FushiProgressCoordinator.shared.pendingConflict(for: book.id) != nil {
+            _ = await FushiProgressCoordinator.shared.syncBook(book, trigger: .readerClose)
+        }
     }
 
-    private func runAutoExport(direction: SyncDirection?) async {
+    @discardableResult
+    private func runAutoExport(direction: SyncDirection?, fushiTrigger: FushiSyncTrigger) async -> Bool {
         if let exportTask {
             await exportTask.value
         }
 
-        guard pendingAutoExport else { return }
+        guard pendingAutoExport else { return false }
         pendingAutoExport = false
 
         let task = Task { [weak self] in
             guard let self else { return }
-            _ = try? await SyncManager.shared.syncBook(
-                book: book,
-                direction: direction,
-                syncBookData: syncBookData,
-                syncStats: syncStats,
-                statsSyncMode: statsSyncMode,
-                syncAudioBook: syncAudioBook
-            )
+            if autoSyncEnabled {
+                _ = try? await SyncManager.shared.syncBook(
+                    book: book,
+                    direction: direction,
+                    syncBookData: syncBookData,
+                    syncStats: syncStats,
+                    statsSyncMode: statsSyncMode,
+                    syncAudioBook: syncAudioBook
+                )
+            }
+            if fushiAutoSyncEnabled {
+                _ = await FushiProgressCoordinator.shared.syncBook(book, trigger: fushiTrigger)
+            }
         }
         exportTask = task
         await task.value
         exportTask = nil
+        return true
     }
 
     private func loadStatistics() {
-        guard enableStatistics else { return }
-        let title = title
-        stats = Self.deduplicateStatistics(BookStorage.loadStatistics(root: rootURL ?? rootDirectory ?? URL(filePath: "/")) ?? [])
-        sessionStatistics = Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
-        let currentDateKey = Self.formattedDate(
-            date: .now,
-            resetTime: statisticsResetTime
-        )
-        todaysStatistics = stats.first(where: { $0.dateKey == currentDateKey })
-            ?? Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
-        allTimeStatistics = Self.defaultStatistic(title: title, resetTime: statisticsResetTime)
+        guard enableStatistics, let root = rootURL ?? rootDirectory else { return }
+        applyStatisticsHistory(StatisticsStorage.load(root: root, resetMinutes: statisticsResetTime))
+    }
 
-        for stat in stats {
-            allTimeStatistics.readingTime += stat.readingTime
-            allTimeStatistics.charactersRead += stat.charactersRead
-            allTimeStatistics.lastReadingSpeed = allTimeStatistics.readingTime > 0
-                ? Int((Double(allTimeStatistics.charactersRead) / allTimeStatistics.readingTime) * 3600.0)
-                : 0
+    /// Mirrors upstream: the open session is never part of the history, and an
+    /// external deletion of it (Statistics editor, sync replace) starts a fresh one.
+    /// An external edit made after this model last saved replaces the live values.
+    private func applyStatisticsHistory(_ records: ReadingSessionRecords) {
+        if let record = records[sessionID] {
+            if let session = record.value {
+                if record.modified > lastSavedSessionModified, session != currentSession {
+                    currentSession = session
+                    lastSavedSessionModified = record.modified
+                }
+            } else {
+                sessionID = UUID().uuidString
+                lastSavedSessionModified = 0
+                currentSession = .starting(at: .now)
+            }
         }
+        statisticsHistory = records
+        regroupStatisticsHistory()
+    }
+
+    private func regroupStatisticsHistory() {
+        let saved = statisticsHistory.filter { $0.key != sessionID }
+        historyDayTotals = Dictionary(
+            uniqueKeysWithValues: ReadingSessionLog.days(saved, resetMinutes: statisticsResetTime).map {
+                ($0.dateKey, $0.total)
+            }
+        )
+        historyTotal = ReadingSessionLog.total(saved)
     }
 
     private func saveStats() {
@@ -1453,24 +1668,24 @@ final class NativeReaderModel {
             )
             return
         }
-        if let index = stats.firstIndex(where: { $0.dateKey == todaysStatistics.dateKey }) {
-            stats[index] = todaysStatistics
-        } else {
-            stats.append(todaysStatistics)
-        }
-        stats = Self.deduplicateStatistics(stats)
-        let url = rootURL.appendingPathComponent(FileNames.statistics)
+        var records = StatisticsStorage.load(root: rootURL, resetMinutes: statisticsResetTime)
+        applyStatisticsHistory(records)
+        guard currentSession.hasActivity, records[sessionID]?.value != currentSession else { return }
+        let modified = max(StatisticsClock.milliseconds(.now), lastSavedSessionModified + 1)
+        records[sessionID] = Timestamped(modified: modified, value: currentSession)
         readerStatisticsLogger.notice(
-            "reader.statistics.save.start book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) date=\(self.todaysStatistics.dateKey, privacy: .public) characters=\(self.todaysStatistics.charactersRead, privacy: .public) readingTime=\(self.todaysStatistics.readingTime, privacy: .public)"
+            "reader.statistics.save.start book=\(self.book.folder, privacy: .public) session=\(self.sessionID, privacy: .public) characters=\(self.currentSession.charactersRead, privacy: .public) readingTime=\(self.currentSession.readingTime, privacy: .public)"
         )
         do {
-            try BookStorage.save(stats, inside: rootURL, as: FileNames.statistics)
+            try StatisticsStorage.save(records, root: rootURL, resetMinutes: statisticsResetTime)
+            statisticsHistory = records
+            lastSavedSessionModified = modified
             readerStatisticsLogger.notice(
-                "reader.statistics.save.success book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) date=\(self.todaysStatistics.dateKey, privacy: .public) characters=\(self.todaysStatistics.charactersRead, privacy: .public) readingTime=\(self.todaysStatistics.readingTime, privacy: .public)"
+                "reader.statistics.save.success book=\(self.book.folder, privacy: .public) session=\(self.sessionID, privacy: .public)"
             )
         } catch {
             readerStatisticsLogger.error(
-                "reader.statistics.save.failure book=\(self.book.folder, privacy: .public) path=\(url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                "reader.statistics.save.failure book=\(self.book.folder, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
         }
     }
@@ -1485,61 +1700,6 @@ final class NativeReaderModel {
             return (item.path, -1, -1)
         }
         return (item.path, chapterInfo.currentTotal, chapterInfo.chapterCount)
-    }
-
-    private func updateStatistic(
-        to statistic: inout Statistics,
-        timeDiff: Double,
-        characterDiff: Int,
-        lastStatisticModified: Int
-    ) {
-        statistic.readingTime += timeDiff
-        statistic.charactersRead = max(statistic.charactersRead + characterDiff, 0)
-        statistic.lastReadingSpeed = statistic.readingTime > 0
-            ? Int((Double(statistic.charactersRead) / statistic.readingTime) * 3600.0)
-            : 0
-        statistic.maxReadingSpeed = max(statistic.maxReadingSpeed, statistic.lastReadingSpeed)
-        statistic.minReadingSpeed = statistic.minReadingSpeed != 0
-            ? min(statistic.minReadingSpeed, statistic.lastReadingSpeed)
-            : statistic.lastReadingSpeed
-        if characterDiff != 0 {
-            statistic.altMinReadingSpeed = statistic.altMinReadingSpeed != 0
-                ? min(statistic.altMinReadingSpeed, statistic.lastReadingSpeed)
-                : statistic.lastReadingSpeed
-        }
-        statistic.lastStatisticModified = lastStatisticModified
-    }
-
-    private static func defaultStatistic(title: String, resetTime: Int = 0) -> Statistics {
-        Statistics(
-            title: title,
-            dateKey: formattedDate(date: .now, resetTime: resetTime),
-            charactersRead: 0,
-            readingTime: 0,
-            minReadingSpeed: 0,
-            altMinReadingSpeed: 0,
-            lastReadingSpeed: 0,
-            maxReadingSpeed: 0,
-            lastStatisticModified: 0
-        )
-    }
-
-    private static func deduplicateStatistics(_ statistics: [Statistics]) -> [Statistics] {
-        var grouped: [String: Statistics] = [:]
-        for statistic in statistics {
-            if let existing = grouped[statistic.dateKey] {
-                if statistic.lastStatisticModified > existing.lastStatisticModified {
-                    grouped[statistic.dateKey] = statistic
-                }
-            } else {
-                grouped[statistic.dateKey] = statistic
-            }
-        }
-        return Array(grouped.values)
-    }
-
-    private static func formattedDate(date: Date, resetTime: Int = 0) -> String {
-        StatisticsDayBoundary.dateKey(for: date, resetMinutes: resetTime)
     }
 
     private static func urlWithoutFragment(_ url: URL) -> URL {
@@ -1581,16 +1741,8 @@ struct NativeReaderView: View {
     @State private var readerContentSize = CGSize(width: 1_200, height: 720)
     @State private var profileRepository = ProfileRepository.shared
 
-    private var gallerySheetWidth: CGFloat {
-        max(readerContentSize.width - 128, 720)
-    }
-
-    private var gallerySheetHeight: CGFloat {
-        max(readerContentSize.height - 48, 680)
-    }
-
     private var sepiaInverted: Bool {
-        userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
+        userConfig.usesDarkSepia(in: systemColorScheme)
     }
 
     private var readerBackgroundColor: Color {
@@ -1614,20 +1766,18 @@ struct NativeReaderView: View {
     }
 
     private var readerBackgroundHex: String {
-        nsColorHex(readerBackgroundColor)
+        // Resolve dynamic system colors against the Reader's own appearance,
+        // not whatever drawing appearance is current while SwiftUI updates.
+        let appearance = NSAppearance(named: effectiveReaderColorScheme == .dark ? .darkAqua : .aqua)
+        var hex = ""
+        (appearance ?? NSApp.effectiveAppearance).performAsCurrentDrawingAppearance {
+            hex = nsColorHex(readerBackgroundColor)
+        }
+        return hex
     }
 
     private var readerPreferredColorScheme: ColorScheme? {
-        if userConfig.theme == .custom {
-            return userConfig.uiTheme.colorScheme
-        }
-        if userConfig.theme == .system {
-            return nil
-        }
-        if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {
-            return nil
-        }
-        return userConfig.theme.colorScheme
+        userConfig.preferredColorScheme ?? NativeSystemAppearance.shared.colorScheme
     }
 
     private var effectiveReaderColorScheme: ColorScheme {
@@ -1642,19 +1792,75 @@ struct NativeReaderView: View {
         effectiveReaderColorScheme == .dark ? nsColorHex(userConfig.sasayakiDarkBackgroundColor) : nsColorHex(userConfig.sasayakiBackgroundColor)
     }
 
+    private var showsPageCount: Bool {
+        userConfig.readerProgressCount == .pages && !userConfig.continuousMode
+    }
+
+    /// Layout inputs that change where pages break; nil when pages are not shown.
+    private func pageLayoutKey(readerSize: CGSize) -> String? {
+        guard showsPageCount, userConfig.readerShowProgress || userConfig.readerShowChapterProgress else { return nil }
+        return [
+            "pages-v1",
+            "\(userConfig.verticalWriting)",
+            "\(userConfig.readerTwoColumnHorizontalPages)",
+            "\(userConfig.paragraphMode)",
+            "\(userConfig.fontSize)",
+            userConfig.selectedFont,
+            "\(userConfig.readerFuriganaMode == .hidden)",
+            "\(userConfig.horizontalPadding)",
+            "\(userConfig.verticalPadding)",
+            "\(userConfig.avoidPageBreak)",
+            "\(userConfig.justifyText)",
+            "\(userConfig.blurImages)",
+            "\(userConfig.layoutAdvanced)",
+            "\(userConfig.lineHeight)",
+            "\(userConfig.characterSpacing)",
+            "\(userConfig.paragraphSpacing)",
+            "\(Int(readerSize.width))",
+            "\(Int(readerSize.height))",
+        ].joined(separator: "-")
+    }
+
     private var progressString: String {
-        var result: [String] = []
-        if userConfig.readerShowCharacters {
+        var lines: [String] = []
+        let pages = showsPageCount ? model.pageProgress : nil
+        if userConfig.readerShowProgress {
+            let line = progressLine(
+                current: model.currentCharacter,
+                total: model.bookInfo.characterCount,
+                pages: pages.map { ($0.page, $0.total) }
+            )
+            if !line.isEmpty {
+                lines.append(line)
+            }
+        }
+        if userConfig.readerShowChapterProgress {
+            let chapter = model.currentProgressChapterRange
+            let line = progressLine(
+                current: chapter.character(at: model.currentCharacter),
+                total: chapter.count,
+                pages: pages.map { ($0.chapterPage, $0.chapterTotal) }
+            )
+            if !line.isEmpty {
+                lines.append("(\(line))")
+            }
+        }
+        return lines.joined(separator: userConfig.readerShowProgressTop ? " " : "\n")
+    }
+
+    private func progressLine(current: Int, total: Int, pages: (current: Int, total: Int)?) -> String {
+        var parts: [String] = []
+        if showsPageCount {
+            parts.append(pages.map { String(localized: "\($0.current) of \($0.total)") } ?? "…")
+        } else if userConfig.readerProgressCount != .off {
             let language = profileRepository.activeProfile.language
-            result.append("\(language.displayCount(forRawCharacters: model.currentCharacter)) / \(language.displayCount(forRawCharacters: model.bookInfo.characterCount))")
+            parts.append("\(language.displayCount(forRawCharacters: current)) / \(language.displayCount(forRawCharacters: total))")
         }
         if userConfig.readerShowPercentage {
-            let percent = model.bookInfo.characterCount > 0
-                ? (Double(model.currentCharacter) / Double(model.bookInfo.characterCount) * 100)
-                : 0
-            result.append("\(String(format: "%.2f%%", percent))")
+            let percent = total > 0 ? Double(current) / Double(total) * 100 : 0
+            parts.append(String(format: "%.2f%%", percent))
         }
-        return result.joined(separator: " ")
+        return parts.joined(separator: " ")
     }
 
     private var statisticsString: String {
@@ -1662,7 +1868,7 @@ struct NativeReaderView: View {
         let contentLanguage = profileRepository.activeProfile.language
         var result: [String] = []
         if userConfig.readerShowReadingSpeed {
-            let speed = contentLanguage.displayCount(forRawCharacters: model.sessionStatistics.lastReadingSpeed)
+            let speed = contentLanguage.displayCount(forRawCharacters: model.sessionStatistics.readingSpeed)
             result.append("\(speed.formatted(.number.grouping(.never))) / h")
         }
         if userConfig.readerShowReadingTime {
@@ -1796,9 +2002,10 @@ struct NativeReaderView: View {
                 "\(userConfig.continuousMode)",
                 "\(userConfig.verticalWriting)",
                 "\(userConfig.readerTwoColumnHorizontalPages)",
+                "\(userConfig.paragraphMode)",
                 "\(userConfig.fontSize)",
                 userConfig.selectedFont,
-                "\(userConfig.readerHideFurigana)",
+                userConfig.readerFuriganaMode.rawValue,
                 "\(userConfig.horizontalPadding)",
                 "\(userConfig.verticalPadding)",
                 "\(userConfig.avoidPageBreak)",
@@ -1835,6 +2042,11 @@ struct NativeReaderView: View {
                         highlightsJSON: model.chapterHighlightsJSON(),
                         fragment: model.pendingFragment,
                         pageNavigation: pageNavigation,
+                        pageLayoutKey: pageLayoutKey(readerSize: readerSize),
+                        spineURLs: model.spineURLs,
+                        pageCacheDirectory: model.rootURL,
+                        onPagesChanged: model.updatePages,
+                        onPageChanged: model.updateCurrentPage,
                         onNavigationHandled: { navigationID in
                             if pageNavigation?.id == navigationID {
                                 pageNavigation = nil
@@ -1932,6 +2144,23 @@ struct NativeReaderView: View {
             }
         }
         .background(readerBackgroundColor.ignoresSafeArea())
+        .overlay {
+            // Clicking the page closes an open side panel; it sits below the
+            // bottom-right buttons so they keep toggling panels.
+            if isSidePanelOpen {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        activeSheet = nil
+                    }
+            }
+        }
+        .overlay {
+            if displayMode == .novel {
+                nativeReaderEdgeEffects
+            }
+        }
         .overlay(alignment: .top) {
             if displayMode == .novel {
                 nativeTopInfoOverlay
@@ -1984,6 +2213,20 @@ struct NativeReaderView: View {
         .task {
             await model.syncOnOpenIfNeeded()
         }
+        .sheet(item: Binding(
+            get: { model.fushiConflict },
+            set: { model.fushiConflict = $0 }
+        )) { conflict in
+            FushiConflictResolutionView(
+                conflicts: [conflict],
+                onResolved: { _, choice in
+                    model.applyResolvedFushiProgress(choice)
+                },
+                onDismiss: {
+                    model.fushiConflict = nil
+                }
+            )
+        }
         .onDisappear {
             readerPersistenceLogger.notice(
                 "reader.lifecycle.onDisappear book=\(model.book.folder, privacy: .public)"
@@ -2034,18 +2277,9 @@ struct NativeReaderView: View {
             )
             model.prepareForReaderLifecycleClose()
         }
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-            case .appearance:
-                NativeReaderSheetPanel("Appearance", onClose: {
-                    activeSheet = nil
-                }) {
-                    NativeSettingsDetailView(section: .appearance, userConfig: userConfig)
-                }
-                .frame(minWidth: 640, minHeight: 680)
-                .preferredColorScheme(readerPreferredColorScheme)
-            case .goTo:
-                if let document = model.document {
+        .overlay(alignment: .leading) {
+            if activeSheet == .goTo, displayMode == .novel, let document = model.document {
+                NativeReaderSidePanel(edge: .leading, onClose: { activeSheet = nil }) {
                     ReaderGoToView(
                         displayTitle: model.book.displayTitle,
                         document: document,
@@ -2077,9 +2311,52 @@ struct NativeReaderView: View {
                             activeSheet = nil
                         }
                     )
-                    .frame(minWidth: 580, minHeight: 700)
                 }
-            case .gallery:
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+        }
+        .overlay(alignment: .trailing) {
+            if displayMode == .novel, activeSheet == .appearance || activeSheet == .statistics || activeSheet == .sasayaki {
+                NativeReaderSidePanel(edge: .trailing, onClose: { activeSheet = nil }) {
+                    if activeSheet == .appearance {
+                        VStack(spacing: 0) {
+                            NativeReaderInspectorHeader(title: "Appearance", onClose: {
+                                activeSheet = nil
+                            })
+                            NativeSettingsDetailView(section: .appearance, userConfig: userConfig)
+                                .environment(\.nativeSettingsPresentation, .inspector)
+                        }
+                    } else if activeSheet == .sasayaki {
+                        if let player = model.sasayakiPlayer {
+                            SasayakiSheet(
+                                player: player,
+                                bookTitle: model.title,
+                                bookCoverURL: model.coverURL,
+                                onImportAudio: model.importSasayakiAudio,
+                                onDismiss: {
+                                    activeSheet = nil
+                                }
+                            )
+                        }
+                    } else {
+                        NativeReaderStatisticsSheet(
+                            model: model,
+                            contentLanguage: profileRepository.activeProfile.language,
+                            onClose: {
+                                activeSheet = nil
+                            }
+                        )
+                    }
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .animation(.smooth(duration: 0.22), value: activeSheet)
+        .modifier(NativeReaderEscapeDismissal(isActive: activeSheet != nil) {
+            activeSheet = nil
+        })
+        .overlay {
+            if activeSheet == .gallery {
                 GalleryView(
                     images: model.galleryImages,
                     isLoading: model.isGalleryIndexing,
@@ -2088,33 +2365,23 @@ struct NativeReaderView: View {
                         activeSheet = nil
                     }
                 )
-                .frame(width: gallerySheetWidth, height: gallerySheetHeight)
-                .preferredColorScheme(readerPreferredColorScheme)
-            case .statistics:
-                NativeReaderStatisticsSheet(
-                    model: model,
-                    contentLanguage: profileRepository.activeProfile.language,
-                    onClose: {
-                        activeSheet = nil
-                    }
-                )
-                .frame(minWidth: 520, minHeight: 560)
-            case .sasayaki:
-                if let player = model.sasayakiPlayer {
-                    SasayakiSheet(
-                        player: player,
-                        bookTitle: model.title,
-                        bookCoverURL: model.coverURL,
-                        onImportAudio: model.importSasayakiAudio,
-                        onDismiss: {
-                            activeSheet = nil
-                        }
-                    )
-                    .frame(minWidth: 520, minHeight: 620)
-                }
+                .ignoresSafeArea()
+                .transition(.opacity)
+                .zIndex(200)
             }
         }
         .preferredColorScheme(readerPreferredColorScheme)
+    }
+
+    private var isSidePanelOpen: Bool {
+        switch activeSheet {
+        case .goTo, .appearance, .statistics, .sasayaki: displayMode == .novel
+        case .gallery, nil: false
+        }
+    }
+
+    private func toggleSidePanel(_ sheet: NativeReaderSheet) {
+        activeSheet = activeSheet == sheet ? nil : sheet
     }
 
     private func updateReaderContentCoverage() {
@@ -2183,6 +2450,49 @@ struct NativeReaderView: View {
         }
     }
 
+    /// Mirrors upstream's iOS 26 top/bottom scroll edge effects under the
+    /// reader bars: shown with the bars, hidden in focus mode and while an
+    /// image is open. Drawn over the web view only, so layout never changes.
+    @ViewBuilder
+    private var nativeReaderEdgeEffects: some View {
+        if !focusMode && model.imageURL == nil {
+            VStack(spacing: 0) {
+                LinearGradient(
+                    stops: [
+                        .init(color: readerBackgroundColor, location: 0),
+                        .init(color: readerBackgroundColor.opacity(0.92), location: 0.55),
+                        .init(color: readerBackgroundColor.opacity(0), location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 76)
+                Spacer(minLength: 0)
+                LinearGradient(
+                    stops: [
+                        .init(color: readerBackgroundColor.opacity(0), location: 0),
+                        .init(color: readerBackgroundColor.opacity(0.92), location: 0.45),
+                        .init(color: readerBackgroundColor, location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 76)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
+    private var readerInfoPrimaryStyle: AnyShapeStyle {
+        userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.primary)
+    }
+
+    private var readerInfoSecondaryStyle: AnyShapeStyle {
+        userConfig.theme == .custom ? AnyShapeStyle(userConfig.customInfoColor) : AnyShapeStyle(.secondary)
+    }
+
     @ViewBuilder
     private var nativeTopInfoOverlay: some View {
         if !focusMode {
@@ -2193,22 +2503,20 @@ struct NativeReaderView: View {
                 VStack(alignment: .center, spacing: 2) {
                     if showTitle {
                         Text(model.title)
-                            .font(.callout.weight(.semibold))
+                            .font(.headline)
+                            .foregroundStyle(readerInfoPrimaryStyle)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
                     if showProgress {
                         Text(progressString)
-                            .font(.caption.weight(.medium))
-                            .monospacedDigit()
+                            .font(.system(size: 12).monospacedDigit())
+                            .foregroundStyle(readerInfoSecondaryStyle)
                     }
                 }
-                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .nativeReaderGlassCapsuleSurface()
-                .padding(.top, 8)
+                .padding(.horizontal, 96)
+                .padding(.top, 10)
                 .allowsHitTesting(false)
             }
         }
@@ -2229,12 +2537,9 @@ struct NativeReaderView: View {
                         Text(progressString)
                     }
                 }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .nativeReaderGlassCapsuleSurface()
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundStyle(readerInfoSecondaryStyle)
+                .multilineTextAlignment(.center)
                 .allowsHitTesting(false)
             }
         }
@@ -2308,51 +2613,39 @@ struct NativeReaderView: View {
                             .help(Text("Open Lyrics Mode"))
                         }
 
-                        Menu {
-                            Button {
-                                activeSheet = .appearance
-                            } label: {
-                                Label("Appearance", systemImage: "paintpalette")
-                            }
-                            Button {
-                                activeSheet = .goTo
-                            } label: {
-                                Label("Go to", systemImage: "magnifyingglass")
-                            }
-                            Button {
-                                activeSheet = .gallery
-                            } label: {
-                                Label("Gallery", systemImage: "photo.on.rectangle")
-                            }
-                            if userConfig.enableStatistics {
-                                Button {
-                                    activeSheet = .statistics
-                                } label: {
-                                    Label("Statistics", systemImage: "chart.xyaxis.line")
-                                }
-                            }
-                            if userConfig.enableSasayaki && model.sasayakiPlayer != nil {
-                                Button {
-                                    activeSheet = .sasayaki
-                                } label: {
-                                    Label("Sasayaki", systemImage: "waveform")
-                                }
-                            }
-                            if canShowLyricsMode {
-                                Button {
-                                    enterLyricsMode()
-                                } label: {
-                                    Label("Lyrics Mode", systemImage: "music.note.list")
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 16, weight: .semibold))
-                                .frame(width: 34, height: 34)
+                        NativeReaderGlassIconButton(systemName: "list.bullet", fontSize: 16) {
+                            toggleSidePanel(.goTo)
                         }
-                        .menuStyle(.button)
-                        .buttonStyle(.plain)
-                        .nativeReaderGlassCapsuleControl()
+                        .help(Text("Go to"))
+                        .accessibilityLabel(Text("Go to"))
+
+                        NativeReaderGlassIconButton(systemName: "paintpalette", fontSize: 16) {
+                            toggleSidePanel(.appearance)
+                        }
+                        .help(Text("Appearance"))
+                        .accessibilityLabel(Text("Appearance"))
+
+                        if userConfig.enableStatistics {
+                            NativeReaderGlassIconButton(systemName: "chart.bar.xaxis", fontSize: 16) {
+                                toggleSidePanel(.statistics)
+                            }
+                            .help(Text("Statistics"))
+                            .accessibilityLabel(Text("Statistics"))
+                        }
+
+                        NativeReaderGlassIconButton(systemName: "photo.on.rectangle", fontSize: 16) {
+                            activeSheet = .gallery
+                        }
+                        .help(Text("Gallery"))
+                        .accessibilityLabel(Text("Gallery"))
+
+                        if userConfig.enableSasayaki && model.sasayakiPlayer != nil {
+                            NativeReaderGlassIconButton(systemName: "headphones", fontSize: 16) {
+                                activeSheet = .sasayaki
+                            }
+                            .help(Text("Sasayaki"))
+                            .accessibilityLabel(Text("Sasayaki"))
+                        }
                     }
                 }
             }
@@ -2520,7 +2813,7 @@ private struct ReaderLyricsModeView: View {
     let showStatisticsMetrics: Bool
     let showStatisticsButton: Bool
     let isStatisticsTracking: Bool
-    let sessionStatistics: Statistics
+    let sessionStatistics: ReadingTotal
     var onToggleStatisticsTracking: () -> Void
     var onExit: () -> Void
     var onCueAdvanced: (SasayakiMatch?, SasayakiMatch) -> Void
@@ -2537,13 +2830,28 @@ private struct ReaderLyricsModeView: View {
     @State private var isVerticalLyricsMode = false
     @State private var isLyricsMaskEnabled = false
     @State private var hoveredLyricsCueID: String?
+    /// Apple Music style follow state: scrolling the full cue list by hand
+    /// detaches it from playback until the user returns or the delay elapses.
+    @State private var isFollowingPlayback = true
+    @State private var followResumeTask: Task<Void, Never>?
+    @State private var lyricsScrollRequest = ReaderLyricsScrollRequest()
+    @State private var animatesNextFollowScroll = false
+    @State private var scrubbingTime: Double?
+    @State private var isHoveringScrubber = false
 
-    private let focusedLineScale: CGFloat = 1.0
-    private let contextLineOpacity: Double = 0.52
     private let lyricsScrollAnchor = UnitPoint(x: 0.5, y: ReaderLyricsVisualSpec.selectedLineAnchorY)
+    private let verticalLyricsScrollAnchor = UnitPoint(x: 0.5, y: 0.5)
 
     private var activeLyricsCue: SasayakiMatch? {
         player.currentCue ?? heldLyricsCue
+    }
+
+    private var lyricsCues: [SasayakiMatch] {
+        player.matchData?.matches ?? []
+    }
+
+    private var activeLyricsIndex: Int? {
+        activeLyricsCue.flatMap(lyricsCueIndex(of:))
     }
 
     var body: some View {
@@ -2583,6 +2891,10 @@ private struct ReaderLyricsModeView: View {
             updateHeldLyricsCueForPlaybackPosition()
             handleCurrentCueChange(player.currentCue)
         }
+        .onDisappear {
+            followResumeTask?.cancel()
+            followResumeTask = nil
+        }
         .onChange(of: coverURL) { _, _ in
             loadCoverImage()
         }
@@ -2593,6 +2905,11 @@ private struct ReaderLyricsModeView: View {
         .onChange(of: player.currentTime) { _, _ in
             updateHeldLyricsCueForPlaybackPosition()
         }
+        .onChange(of: player.isPlaying) { _, isPlaying in
+            if isPlaying, !isFollowingPlayback {
+                scheduleFollowResume()
+            }
+        }
     }
 
     @ViewBuilder
@@ -2600,18 +2917,34 @@ private struct ReaderLyricsModeView: View {
         ZStack {
             Color.black
             if let image = coverImage {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 64)
-                    .saturation(1.45)
-                    .opacity(0.52)
+                GeometryReader { proxy in
+                    ZStack {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: proxy.size.width * 1.25, height: proxy.size.height * 1.25)
+                            .blur(radius: 72)
+                            .saturation(1.6)
+                            .opacity(0.6)
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: proxy.size.width * 0.9, height: proxy.size.height * 0.9)
+                            .rotationEffect(.degrees(180))
+                            .offset(x: proxy.size.width * 0.24, y: proxy.size.height * 0.2)
+                            .blur(radius: 96)
+                            .saturation(1.5)
+                            .opacity(0.38)
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                }
+                .drawingGroup()
             }
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.16),
-                    Color(red: 0.05, green: 0.08, blue: 0.08).opacity(0.74),
-                    Color.black.opacity(0.88)
+                    Color.black.opacity(0.2),
+                    Color.black.opacity(0.46),
+                    Color.black.opacity(0.74)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -2652,6 +2985,9 @@ private struct ReaderLyricsModeView: View {
                     availableHeight: lyricsHeight
                 )
                     .frame(width: lyricsWidth, height: lyricsHeight, alignment: .center)
+                    .overlay(alignment: .bottom) {
+                        followPlaybackButton
+                    }
             }
             .frame(width: availableWidth, height: availableHeight, alignment: .center)
         }
@@ -2675,232 +3011,157 @@ private struct ReaderLyricsModeView: View {
         }
     }
 
+    /// Every matched cue stays in one lazily rendered list, so the reader can
+    /// scroll back and forth through the whole book like synced song lyrics.
     private func horizontalLyricsStack(
         metrics: ReaderLyricsLayoutMetrics,
         availableWidth: CGFloat,
         availableHeight: CGFloat
     ) -> some View {
-        let radius = horizontalLyricsContextRadius(metrics: metrics, availableWidth: availableWidth, availableHeight: availableHeight)
-        let cues = visibleLyricsCueWindow(radius: radius, activeCue: activeLyricsCue)
+        let cues = lyricsCues
+        let activeIndex = activeLyricsIndex
         return ScrollViewReader { proxy in
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: metrics.lineSpacing) {
-                    if cues.isEmpty {
-                        Text("No lyrics match")
-                            .font(.system(size: metrics.emptyStateFontSize, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.64))
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    } else {
-                        ForEach(cues) { cue in
-                            lyricsLine(cue, metrics: metrics, availableWidth: availableWidth)
-                                .id(cue.id)
-                        }
+                LazyVStack(alignment: .leading, spacing: ReaderLyricsVisualSpec.listRowSpacing) {
+                    ForEach(cues.indices, id: \.self) { index in
+                        lyricsLine(
+                            cues[index],
+                            index: index,
+                            activeIndex: activeIndex,
+                            metrics: metrics,
+                            availableWidth: availableWidth
+                        )
+                            .id(index)
                     }
                 }
-                .overlay(alignment: .topLeading) {
-                    if !cues.isEmpty {
-                        horizontalLyricsMaskStack(cues: cues, metrics: metrics)
-                    }
-                }
-                .padding(.vertical, availableHeight / 2)
+                .padding(.top, availableHeight * ReaderLyricsVisualSpec.selectedLineAnchorY)
+                .padding(.bottom, availableHeight * (1 - ReaderLyricsVisualSpec.selectedLineAnchorY))
             }
-            .scrollIndicators(.hidden)
-            .onAppear { proxy.scrollTo(activeLyricsCue?.id, anchor: .center) }
-            .onChange(of: activeLyricsCue?.id) { _, id in
-                withAnimation(ReaderLyricsVisualSpec.lineChangeAnimation) {
-                    proxy.scrollTo(id, anchor: .center)
+            .scrollIndicators(.never)
+            .mask(lyricsEdgeFade(axis: .vertical))
+            .overlay {
+                if cues.isEmpty {
+                    emptyLyricsState(metrics: metrics)
                 }
+            }
+            .onScrollPhaseChange { _, phase in
+                handleLyricsScrollPhase(phase)
+            }
+            .onAppear { scrollLyrics(with: proxy, animated: false) }
+            .onChange(of: lyricsScrollRequest) { _, request in
+                scrollLyrics(with: proxy, animated: request.animated)
+            }
+            .onChange(of: activeIndex) { previousIndex, index in
+                followActiveCue(from: previousIndex, to: index)
             }
             .onChange(of: availableWidth) { _, _ in
-                proxy.scrollTo(activeLyricsCue?.id, anchor: .center)
+                scrollLyrics(with: proxy, animated: false)
             }
             .onChange(of: availableHeight) { _, _ in
-                proxy.scrollTo(activeLyricsCue?.id, anchor: .center)
+                scrollLyrics(with: proxy, animated: false)
             }
         }
     }
 
+    /// Vertical writing keeps the same full cue list, laid out as columns that
+    /// read right to left and scroll horizontally.
     private func verticalLyricsStack(
         metrics: ReaderLyricsLayoutMetrics,
         availableWidth: CGFloat,
         availableHeight: CGFloat
     ) -> some View {
-        let radius = verticalLyricsContextRadius(
-            metrics: metrics,
-            availableWidth: availableWidth,
-            availableHeight: availableHeight
-        )
-        let cues = visibleLyricsCueWindow(radius: radius, activeCue: activeLyricsCue)
-        return HStack(alignment: .center, spacing: verticalLyricsColumnSpacing(metrics: metrics)) {
-            if cues.isEmpty {
-                Text("No lyrics match")
-                    .font(.system(size: metrics.emptyStateFontSize, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.64))
-                    .frame(maxWidth: .infinity, alignment: .center)
-            } else {
-                ForEach(cues.reversed()) { cue in
-                    verticalLyricsLine(
-                        cue,
-                        metrics: metrics,
-                        availableWidth: availableWidth,
-                        availableHeight: availableHeight
-                    )
-                        .id(cue.id)
+        let cues = lyricsCues
+        let activeIndex = activeLyricsIndex
+        let columnHeight = max(availableHeight - ReaderLyricsVisualSpec.listRowVerticalPadding * 2, 1)
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .center, spacing: verticalLyricsColumnSpacing(metrics: metrics)) {
+                    ForEach(cues.indices.reversed(), id: \.self) { index in
+                        verticalLyricsLine(
+                            cues[index],
+                            index: index,
+                            activeIndex: activeIndex,
+                            metrics: metrics,
+                            availableHeight: columnHeight
+                        )
+                            .id(index)
+                    }
+                }
+                .padding(.horizontal, availableWidth / 2)
+                .frame(height: availableHeight)
+            }
+            .scrollIndicators(.never)
+            .mask(lyricsEdgeFade(axis: .horizontal))
+            .overlay {
+                if cues.isEmpty {
+                    emptyLyricsState(metrics: metrics)
                 }
             }
-        }
-        .overlay(alignment: .center) {
-            if !cues.isEmpty {
-                verticalLyricsMaskStack(
-                    cues: cues,
-                    metrics: metrics,
-                    availableWidth: availableWidth,
-                    availableHeight: availableHeight
-                )
+            .onScrollPhaseChange { _, phase in
+                handleLyricsScrollPhase(phase)
+            }
+            .onAppear { scrollLyrics(with: proxy, animated: false) }
+            .onChange(of: lyricsScrollRequest) { _, request in
+                scrollLyrics(with: proxy, animated: request.animated)
+            }
+            .onChange(of: activeIndex) { previousIndex, index in
+                followActiveCue(from: previousIndex, to: index)
+            }
+            .onChange(of: availableWidth) { _, _ in
+                scrollLyrics(with: proxy, animated: false)
+            }
+            .onChange(of: availableHeight) { _, _ in
+                scrollLyrics(with: proxy, animated: false)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .animation(ReaderLyricsVisualSpec.lineChangeAnimation, value: activeLyricsCue?.id)
+    }
+
+    /// Lines fade out toward the list edges instead of being cut off.
+    private func lyricsEdgeFade(axis: Axis) -> some View {
+        let fade = ReaderLyricsVisualSpec.listEdgeFadeFraction
+        return LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .black, location: fade),
+                .init(color: .black, location: 1 - fade),
+                .init(color: .clear, location: 1)
+            ],
+            startPoint: axis == .vertical ? .top : .leading,
+            endPoint: axis == .vertical ? .bottom : .trailing
+        )
+    }
+
+    private func emptyLyricsState(metrics: ReaderLyricsLayoutMetrics) -> some View {
+        Text("No lyrics match")
+            .font(.system(size: metrics.emptyStateFontSize, weight: .bold))
+            .foregroundStyle(.white.opacity(0.64))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private func verticalLyricsColumnSpacing(metrics: ReaderLyricsLayoutMetrics) -> CGFloat {
-        min(max(metrics.lineSpacing * 0.72, 14), 24)
-    }
-
-    private func horizontalLyricsContextRadius(
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat,
-        availableHeight: CGFloat
-    ) -> Int {
-        guard player.matchData?.matches.isEmpty == false else { return 0 }
-        var radius = 0
-        var previousCount = visibleLyricsCueWindow(radius: radius, activeCue: activeLyricsCue).count
-        while true {
-            let nextRadius = radius + 1
-            let nextCues = visibleLyricsCueWindow(radius: nextRadius, activeCue: activeLyricsCue)
-            guard nextCues.count > previousCount else { break }
-            guard horizontalLyricsRowsHeight(cues: nextCues, metrics: metrics, availableWidth: availableWidth) <= availableHeight else { break }
-            radius = nextRadius
-            previousCount = nextCues.count
-        }
-        return radius
-    }
-
-    private func horizontalLyricsRowsHeight(
-        cues: [SasayakiMatch],
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat
-    ) -> CGFloat {
-        let rowHeights = cues.reduce(CGFloat.zero) { total, cue in
-            total + horizontalLyricsRowHeight(cue, metrics: metrics, availableWidth: availableWidth)
-        }
-        return rowHeights + CGFloat(max(cues.count - 1, 0)) * metrics.lineSpacing
-    }
-
-    private func verticalLyricsContextRadius(
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat,
-        availableHeight: CGFloat
-    ) -> Int {
-        guard player.matchData?.matches.isEmpty == false else { return 0 }
-        var radius = 0
-        var previousCount = visibleLyricsCueWindow(radius: radius, activeCue: activeLyricsCue).count
-        while true {
-            let nextRadius = radius + 1
-            let nextCues = visibleLyricsCueWindow(radius: nextRadius, activeCue: activeLyricsCue)
-            guard nextCues.count > previousCount else { break }
-            guard verticalLyricsColumnsWidth(
-                cues: nextCues,
-                metrics: metrics,
-                availableWidth: availableWidth,
-                availableHeight: availableHeight
-            ) <= availableWidth else { break }
-            radius = nextRadius
-            previousCount = nextCues.count
-        }
-        return radius
-    }
-
-    private func verticalLyricsColumnsWidth(
-        cues: [SasayakiMatch],
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat,
-        availableHeight: CGFloat
-    ) -> CGFloat {
-        let columnWidths = cues.reduce(CGFloat.zero) { total, cue in
-            total + verticalLyricsLineWidth(
-                for: cue,
-                metrics: metrics,
-                availableWidth: availableWidth,
-                availableHeight: availableHeight
-            )
-        }
-        return columnWidths + CGFloat(max(cues.count - 1, 0)) * verticalLyricsColumnSpacing(metrics: metrics)
+        min(max(metrics.lineSpacing * 0.4, 6), 12)
     }
 
     private func verticalLyricsFontSize(
         for cue: SasayakiMatch,
         metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat? = nil,
         availableHeight: CGFloat
     ) -> CGFloat {
-        let isFocused = cue.id == activeLyricsCue?.id
-        let baseFontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize
-        return ReaderLyricsVerticalTextLayout.fittedFontSize(
+        ReaderLyricsVerticalTextLayout.fittedFontSize(
             text: cue.text,
-            baseFontSize: baseFontSize,
+            baseFontSize: metrics.lyricsListFontSize,
             availableHeight: availableHeight,
-            availableWidth: availableWidth,
-            minimumFontSize: isFocused
-                ? ReaderLyricsVisualSpec.minimumFocusedFittedFontSize
-                : ReaderLyricsVisualSpec.minimumContextFittedFontSize
-        )
-    }
-
-    private func verticalLyricsColumnWidth(
-        for cue: SasayakiMatch,
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat? = nil,
-        availableHeight: CGFloat
-    ) -> CGFloat {
-        ReaderLyricsVerticalTextLayout.columnWidth(
-            fontSize: verticalLyricsFontSize(
-                for: cue,
-                metrics: metrics,
-                availableWidth: availableWidth,
-                availableHeight: availableHeight
-            )
-        )
-    }
-
-    private func verticalLyricsInnerColumnSpacing(
-        for cue: SasayakiMatch,
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat? = nil,
-        availableHeight: CGFloat
-    ) -> CGFloat {
-        ReaderLyricsVerticalTextLayout.columnSpacing(
-            fontSize: verticalLyricsFontSize(
-                for: cue,
-                metrics: metrics,
-                availableWidth: availableWidth,
-                availableHeight: availableHeight
-            )
+            availableWidth: nil,
+            minimumFontSize: ReaderLyricsVisualSpec.minimumContextFittedFontSize
         )
     }
 
     private func verticalLyricsLineWidth(
         for cue: SasayakiMatch,
         metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat? = nil,
         availableHeight: CGFloat
     ) -> CGFloat {
-        let fontSize = verticalLyricsFontSize(
-            for: cue,
-            metrics: metrics,
-            availableWidth: availableWidth,
-            availableHeight: availableHeight
-        )
+        let fontSize = verticalLyricsFontSize(for: cue, metrics: metrics, availableHeight: availableHeight)
         return max(
             ReaderLyricsVerticalTextLayout.contentWidth(
                 glyphCount: ReaderLyricsVerticalTextLayout.glyphs(from: cue.text).count,
@@ -2915,113 +3176,117 @@ private struct ReaderLyricsModeView: View {
 
     private func verticalLyricsLine(
         _ cue: SasayakiMatch,
+        index: Int,
+        activeIndex: Int?,
         metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat,
         availableHeight: CGFloat
     ) -> some View {
         let isFocused = cue.id == activeLyricsCue?.id
-        let fontSize = verticalLyricsFontSize(
-            for: cue,
-            metrics: metrics,
-            availableWidth: availableWidth,
-            availableHeight: availableHeight
-        )
+        let isHovered = hoveredLyricsCueID == cue.id
+        let fontSize = verticalLyricsFontSize(for: cue, metrics: metrics, availableHeight: availableHeight)
+        let lineWidth = verticalLyricsLineWidth(for: cue, metrics: metrics, availableHeight: availableHeight)
         let isMasked = isLyricsMaskVisible(for: cue)
-        return GeometryReader { _ in
-            ReaderLyricsVerticalSelectableTextView(
-                text: cue.text,
-                scanLength: scanLength,
-                fontSize: fontSize,
-                weight: .bold,
-                textColor: .white.opacity(isFocused ? 0.98 : 0.62),
-                lookupHighlightColor: .white.opacity(0.18),
-                lookupHighlightTextColor: .white,
-                hoverLookupDelayMs: hoverLookupDelayMs,
-                isLookupPopupVisible: isLookupPopupVisible
-            ) { text, offset, selectionRect in
-                return onSelection(cue, text, offset, selectionRect, false)
-            }
-            .opacity(isMasked ? 0 : 1)
+        return ReaderLyricsVerticalSelectableTextView(
+            text: cue.text,
+            scanLength: scanLength,
+            fontSize: fontSize,
+            weight: .bold,
+            textColor: .white.opacity(0.98),
+            lookupHighlightColor: .white.opacity(0.18),
+            lookupHighlightTextColor: .white,
+            hoverLookupDelayMs: hoverLookupDelayMs,
+            isLookupPopupVisible: isLookupPopupVisible
+        ) { text, offset, selectionRect in
+            return onSelection(cue, text, offset, selectionRect, false)
         }
-        .frame(
-            width: verticalLyricsLineWidth(
-                for: cue,
-                metrics: metrics,
-                availableWidth: availableWidth,
-                availableHeight: availableHeight
-            ),
-            alignment: .center
-        )
-        .frame(maxHeight: .infinity, alignment: .center)
-        .shadow(
-            color: .white.opacity(isFocused ? 0.18 : 0),
-            radius: isFocused ? metrics.focusedGlowRadius : 0
-        )
-        .opacity(isFocused ? 1 : contextLineOpacity)
+        .frame(width: lineWidth, height: availableHeight)
+        .opacity(isMasked ? 0 : 1)
+        .overlay {
+            if isMasked {
+                maskedVerticalLyricsText(cue, fontSize: fontSize, isFocused: isFocused, availableHeight: availableHeight)
+            }
+        }
+        .padding(.horizontal, ReaderLyricsVisualSpec.listRowVerticalPadding)
+        .padding(.vertical, ReaderLyricsVisualSpec.listRowVerticalPadding)
+        .background {
+            lyricsLineHoverBackground(isHighlighted: isHovered && !isFocused)
+            if !isFocused {
+                contextLyricsLineTapTarget(for: cue)
+            }
+        }
+        .scaleEffect(isFocused ? 1 : ReaderLyricsVisualSpec.listDeselectedLineScale, anchor: .top)
+        .opacity(lyricsLineOpacity(index: index, activeIndex: activeIndex, isFocused: isFocused, isHovered: isHovered))
         .contentShape(Rectangle())
         .onHover { hovering in
             updateLyricsMaskHover(hovering, cue: cue)
         }
-        .animation(.smooth(duration: 0.12), value: isLyricsMaskVisible(for: cue))
+        .animation(.smooth(duration: 0.12), value: isMasked)
+        .animation(.smooth(duration: 0.18), value: isHovered)
+        .animation(.smooth(duration: 0.3), value: isFollowingPlayback)
         .animation(ReaderLyricsVisualSpec.highlightAnimation(highlighted: isFocused), value: isFocused)
     }
 
-    @ViewBuilder
     private func lyricsLine(
         _ cue: SasayakiMatch,
+        index: Int,
+        activeIndex: Int?,
         metrics: ReaderLyricsLayoutMetrics,
         availableWidth: CGFloat
     ) -> some View {
         let isFocused = cue.id == activeLyricsCue?.id
+        let isHovered = hoveredLyricsCueID == cue.id
         let isRightToLeft = ReaderLyricsTextDirection.isRightToLeft(cue.text)
-        let line = GeometryReader { _ in
-            let fontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize
-            let isMasked = isLyricsMaskVisible(for: cue)
-            ReaderLyricsSelectableTextView(
-                text: cue.text,
-                scanLength: scanLength,
-                fontSize: fontSize,
-                layoutWidth: availableWidth,
-                weight: .bold,
-                textColor: .white.opacity(isFocused ? 0.98 : 0.62),
-                upcomingTextColor: .white.opacity(isFocused ? 0.58 : 0.62),
-                progressFraction: isFocused ? lineProgress(for: cue) : 1,
-                progressRatePerSecond: isFocused ? progressRate(for: cue) : 0,
-                isProgressAnimating: isFocused && player.isPlaying && cue.id == player.currentCue?.id,
-                lookupHighlightColor: .white.opacity(0.18),
-                lookupHighlightTextColor: .white,
-                hoverLookupDelayMs: hoverLookupDelayMs,
-                isLookupPopupVisible: isLookupPopupVisible
-            ) { text, offset, selectionRect in
-                return onSelection(cue, text, offset, selectionRect, false)
-            }
-            .opacity(isMasked ? 0 : 1)
+        let fontSize = metrics.lyricsListFontSize
+        let textWidth = horizontalLyricsTextWidth(availableWidth: availableWidth)
+        let isMasked = isLyricsMaskVisible(for: cue)
+        return ReaderLyricsSelectableTextView(
+            text: cue.text,
+            scanLength: scanLength,
+            fontSize: fontSize,
+            layoutWidth: textWidth,
+            weight: .bold,
+            textColor: .white.opacity(0.98),
+            upcomingTextColor: .white.opacity(isFocused ? 0.4 : 0.98),
+            // A paused current line stays fully lit; the sweep only runs during playback.
+            progressFraction: isFocused && player.isPlaying ? lineProgress(for: cue) : 1,
+            progressRatePerSecond: isFocused ? progressRate(for: cue) : 0,
+            isProgressAnimating: isFocused && player.isPlaying && cue.id == player.currentCue?.id,
+            lookupHighlightColor: .white.opacity(0.18),
+            lookupHighlightTextColor: .white,
+            hoverLookupDelayMs: hoverLookupDelayMs,
+            isLookupPopupVisible: isLookupPopupVisible
+        ) { text, offset, selectionRect in
+            return onSelection(cue, text, offset, selectionRect, false)
         }
-        .frame(height: horizontalLyricsRowHeight(cue, metrics: metrics, availableWidth: availableWidth))
-        .shadow(
-            color: .white.opacity(isFocused ? 0.18 : 0),
-            radius: isFocused ? metrics.focusedGlowRadius : 0
-        )
+        .frame(width: textWidth, height: horizontalLyricsRowHeight(cue, metrics: metrics, availableWidth: availableWidth))
+        .opacity(isMasked ? 0 : 1)
+        .overlay {
+            if isMasked {
+                maskedHorizontalLyricsText(cue, fontSize: fontSize, isFocused: isFocused, isRightToLeft: isRightToLeft)
+            }
+        }
+        .padding(.horizontal, ReaderLyricsVisualSpec.listRowHorizontalPadding)
+        .padding(.vertical, ReaderLyricsVisualSpec.listRowVerticalPadding)
+        .frame(width: availableWidth, alignment: isRightToLeft ? .trailing : .leading)
+        .background {
+            lyricsLineHoverBackground(isHighlighted: isHovered && !isFocused)
+            if !isFocused {
+                contextLyricsLineTapTarget(for: cue)
+            }
+        }
         .scaleEffect(
-            isFocused ? focusedLineScale : ReaderLyricsVisualSpec.deselectedLineScale,
+            isFocused ? 1 : ReaderLyricsVisualSpec.listDeselectedLineScale,
             anchor: isRightToLeft ? .trailing : .leading
         )
-        .opacity(isFocused ? 1 : contextLineOpacity)
+        .opacity(lyricsLineOpacity(index: index, activeIndex: activeIndex, isFocused: isFocused, isHovered: isHovered))
         .contentShape(Rectangle())
         .onHover { hovering in
             updateLyricsMaskHover(hovering, cue: cue)
         }
-        .animation(.smooth(duration: 0.12), value: isLyricsMaskVisible(for: cue))
+        .animation(.smooth(duration: 0.12), value: isMasked)
+        .animation(.smooth(duration: 0.18), value: isHovered)
+        .animation(.smooth(duration: 0.3), value: isFollowingPlayback)
         .animation(ReaderLyricsVisualSpec.highlightAnimation(highlighted: isFocused), value: isFocused)
-
-        if isFocused {
-            line
-        } else {
-            ZStack {
-                contextLyricsLineTapTarget(for: cue)
-                line
-            }
-        }
     }
 
     private func contextLyricsLineTapTarget(for cue: SasayakiMatch) -> some View {
@@ -3031,7 +3296,35 @@ private struct ReaderLyricsModeView: View {
                 pendingManualCueID = cue.id
                 onManualSeek(cue)
                 player.seekToCue(cue, startPlayback: true)
+                followResumeTask?.cancel()
+                followResumeTask = nil
+                animatesNextFollowScroll = true
+                isFollowingPlayback = true
             }
+    }
+
+    private func lyricsLineHoverBackground(isHighlighted: Bool) -> some View {
+        RoundedRectangle(cornerRadius: ReaderLyricsVisualSpec.listRowHoverCornerRadius, style: .continuous)
+            .fill(.white.opacity(isHighlighted ? 0.08 : 0))
+    }
+
+    private func lyricsLineOpacity(index: Int, activeIndex: Int?, isFocused: Bool, isHovered: Bool) -> Double {
+        if isFocused {
+            return 1
+        }
+        let restingOpacity: Double
+        if isFollowingPlayback, let activeIndex {
+            let opacities = ReaderLyricsVisualSpec.contextLineOpacities
+            let distance = min(max(abs(index - activeIndex), 1), opacities.count)
+            restingOpacity = opacities[distance - 1]
+        } else {
+            restingOpacity = ReaderLyricsVisualSpec.browsingLineOpacity
+        }
+        return isHovered ? max(restingOpacity, ReaderLyricsVisualSpec.hoveredLineOpacity) : restingOpacity
+    }
+
+    private func horizontalLyricsTextWidth(availableWidth: CGFloat) -> CGFloat {
+        max(availableWidth - ReaderLyricsVisualSpec.listRowHorizontalPadding * 2, 1)
     }
 
     private func horizontalLyricsRowHeight(
@@ -3039,9 +3332,30 @@ private struct ReaderLyricsModeView: View {
         metrics: ReaderLyricsLayoutMetrics,
         availableWidth: CGFloat
     ) -> CGFloat {
-        let fontSize = cue.id == activeLyricsCue?.id ? metrics.focusedFontSize : metrics.contextFontSize
-        return ReaderLyricsHorizontalTextLayout.measuredHeight(text: cue.text, fontSize: fontSize,
-                                                               weight: .bold, width: availableWidth)
+        ReaderLyricsHorizontalTextLayout.measuredHeight(text: cue.text, fontSize: metrics.lyricsListFontSize,
+                                                       weight: .bold,
+                                                       width: horizontalLyricsTextWidth(availableWidth: availableWidth))
+    }
+
+    @ViewBuilder
+    private var followPlaybackButton: some View {
+        if !isFollowingPlayback, activeLyricsIndex != nil {
+            Button {
+                resumeFollowingPlayback()
+            } label: {
+                Label("Back to Current Line", systemImage: "text.line.first.and.arrowtriangle.forward")
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.92))
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .environment(\.colorScheme, .dark)
+            .padding(.bottom, 18)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     private func playerPanel(
@@ -3053,55 +3367,107 @@ private struct ReaderLyricsModeView: View {
         let metadataHeight = playerMetadataHeight(availableHeight: availableHeight)
         return VStack(alignment: .leading, spacing: panelSpacing) {
             lyricsArtwork(metrics: metrics, availableHeight: availableHeight, panelWidth: panelWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
 
             lyricsPlayerMetadata
                 .frame(height: metadataHeight, alignment: .bottomLeading)
                 .clipped()
 
-            ProgressView(value: progressValue)
-                .tint(.white.opacity(0.72))
-                .progressViewStyle(.linear)
-                .controlSize(.small)
-                .frame(height: 8)
-                .frame(maxWidth: .infinity)
+            lyricsScrubber
+                .frame(height: ReaderLyricsVisualSpec.scrubberHeight)
 
             HStack(spacing: playerControlSpacing(metrics: metrics, availableWidth: panelWidth)) {
-                LyricsPlayerIconButton(systemName: "backward.end.fill", diameter: 48, fontSize: 30) {
+                LyricsPlayerIconButton(systemName: "backward.end.fill", diameter: 48, fontSize: 28) {
                     suppressNextCueAdvance = true
                     onManualBaselineReset()
                     player.prevCue()
                 }
+                .help(Text("Previous Cue"))
                 LyricsPlayerIconButton(
                     systemName: player.isPlaying ? "pause.fill" : "play.fill",
                     diameter: 64,
-                    fontSize: player.isPlaying ? 44 : 40
+                    fontSize: player.isPlaying ? 42 : 38
                 ) {
                     player.togglePlayback()
                 }
-                LyricsPlayerIconButton(systemName: "forward.end.fill", diameter: 48, fontSize: 30) {
+                .contentTransition(.symbolEffect(.replace))
+                LyricsPlayerIconButton(systemName: "forward.end.fill", diameter: 48, fontSize: 28) {
                     suppressNextCueAdvance = true
                     onManualBaselineReset()
                     player.nextCue()
                 }
+                .help(Text("Next Cue"))
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
 
-                Spacer(minLength: 2)
-                HStack(spacing: 10) {
-                    lyricsMaskButton
-                    verticalLyricsModeButton
+            HStack(spacing: 10) {
+                lyricsMaskButton
+                verticalLyricsModeButton
 
-                    if showStatisticsButton {
-                        LyricsPlayerIconButton(
-                            systemName: isStatisticsTracking ? "timer" : "chart.xyaxis.line",
-                            diameter: 34,
-                            fontSize: 19
-                        ) {
-                            onToggleStatisticsTracking()
-                        }
-                        .help(Text("Statistics"))
+                if showStatisticsButton {
+                    LyricsPlayerIconButton(
+                        systemName: isStatisticsTracking ? "timer" : "chart.xyaxis.line",
+                        diameter: 34,
+                        fontSize: 19
+                    ) {
+                        onToggleStatisticsTracking()
                     }
+                    .help(Text("Statistics"))
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+    }
+
+    private var lyricsScrubber: some View {
+        let duration = max(player.duration, 0)
+        let displayedTime = min(max(scrubbingTime ?? player.currentTime, 0), max(duration, 0))
+        let fraction = duration > 0 ? min(max(displayedTime / duration, 0), 1) : 0
+        let isActive = isHoveringScrubber || scrubbingTime != nil
+        return VStack(spacing: 5) {
+            GeometryReader { proxy in
+                let trackWidth = max(proxy.size.width, 1)
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.white.opacity(0.2))
+                    Capsule()
+                        .fill(.white.opacity(isActive ? 0.94 : 0.72))
+                        .frame(width: trackWidth * fraction)
+                }
+                .frame(height: isActive ? 9 : 5)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            guard duration > 0 else { return }
+                            scrubbingTime = min(max(value.location.x / trackWidth, 0), 1) * duration
+                        }
+                        .onEnded { value in
+                            scrubbingTime = nil
+                            guard duration > 0 else { return }
+                            seekLyricsPlayback(to: min(max(value.location.x / trackWidth, 0), 1) * duration)
+                        }
+                )
+            }
+            .frame(height: 14)
+            .onHover { hovering in
+                isHoveringScrubber = hovering
+            }
+            .animation(.smooth(duration: 0.16), value: isActive)
+
+            HStack {
+                Text(verbatim: lyricsTimeText(displayedTime))
+                Spacer(minLength: 8)
+                Text(verbatim: "-" + lyricsTimeText(max(duration - displayedTime, 0)))
+            }
+            .font(.caption2.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(.white.opacity(0.52))
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Playback Position"))
+        .accessibilityValue(Text(verbatim: lyricsTimeText(displayedTime)))
     }
 
     private var lyricsMaskButton: some View {
@@ -3124,12 +3490,20 @@ private struct ReaderLyricsModeView: View {
             diameter: 34,
             fontSize: 19
         ) {
-            withAnimation(ReaderLyricsVisualSpec.lineChangeAnimation) {
-                isVerticalLyricsMode.toggle()
-            }
+            toggleVerticalLyricsMode()
         }
         .help(Text("Vertical Lyrics Mode"))
         .accessibilityLabel(Text("Vertical Lyrics Mode"))
+    }
+
+    /// The other orientation is a fresh list, so it always opens on the current line.
+    private func toggleVerticalLyricsMode() {
+        followResumeTask?.cancel()
+        followResumeTask = nil
+        isFollowingPlayback = true
+        withAnimation(ReaderLyricsVisualSpec.lineChangeAnimation) {
+            isVerticalLyricsMode.toggle()
+        }
     }
 
     @ViewBuilder
@@ -3139,37 +3513,41 @@ private struct ReaderLyricsModeView: View {
         panelWidth: CGFloat
     ) -> some View {
         let size = artworkSize(metrics: metrics, availableHeight: availableHeight, panelWidth: panelWidth)
-        if let image = coverImage {
-            ZStack {
-                Color.clear
-                    .frame(width: size, height: size)
+        Group {
+            if let image = coverImage {
+                ZStack {
+                    Color.clear
+                        .frame(width: size, height: size)
 
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: size, height: size, alignment: .center)
-            }
-                .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .shadow(color: .black.opacity(0.32), radius: 18, y: 10)
-        } else {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.white.opacity(0.12))
-                .aspectRatio(1, contentMode: .fill)
-                .frame(width: size, height: size)
-                .overlay {
-                    Image(systemName: "book.closed")
-                        .font(.system(size: size * 0.18, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.48))
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: size, height: size, alignment: .center)
                 }
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.white.opacity(0.12))
+                    .aspectRatio(1, contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .overlay {
+                        Image(systemName: "book.closed")
+                            .font(.system(size: size * 0.18, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.48))
+                    }
+            }
         }
+        .shadow(color: .black.opacity(player.isPlaying ? 0.38 : 0.22), radius: player.isPlaying ? 26 : 14, y: player.isPlaying ? 14 : 8)
+        .scaleEffect(player.isPlaying ? 1 : ReaderLyricsVisualSpec.pausedArtworkScale)
+        .animation(.spring(response: 0.5, dampingFraction: 0.78), value: player.isPlaying)
     }
 
     private var lyricsPlayerMetadata: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.92))
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.white.opacity(0.94))
                 .lineLimit(1)
                 .truncationMode(.middle)
 
@@ -3178,6 +3556,7 @@ private struct ReaderLyricsModeView: View {
                 .foregroundStyle(.white.opacity(0.56))
                 .lineLimit(1)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var lyricsMetricRow: some View {
@@ -3223,9 +3602,10 @@ private struct ReaderLyricsModeView: View {
         panelWidth: CGFloat
     ) -> CGFloat {
         let reservedHeight = playerMetadataHeight(availableHeight: availableHeight)
-            + 8
+            + ReaderLyricsVisualSpec.scrubberHeight
             + 64
-            + playerPanelSpacing(metrics: metrics, availableHeight: availableHeight) * 3
+            + 34
+            + playerPanelSpacing(metrics: metrics, availableHeight: availableHeight) * 4
         return min(panelWidth, max(availableHeight - reservedHeight, 96))
     }
 
@@ -3241,11 +3621,11 @@ private struct ReaderLyricsModeView: View {
     }
 
     private func playerMetadataHeight(availableHeight: CGFloat) -> CGFloat {
-        min(max(availableHeight * 0.12, 58), 86)
+        min(max(availableHeight * 0.1, 50), 72)
     }
 
     private func playerControlSpacing(metrics: ReaderLyricsLayoutMetrics, availableWidth: CGFloat) -> CGFloat {
-        min(max(availableWidth * 0.04, 12), 24)
+        min(max(availableWidth * 0.08, 16), 36)
     }
 
     private func lyricsColumnWidth(
@@ -3276,6 +3656,79 @@ private struct ReaderLyricsModeView: View {
         let previous = lastReportedCue
         lastReportedCue = cue
         onCueAdvanced(previous, cue)
+    }
+
+    private func seekLyricsPlayback(to time: Double) {
+        suppressNextCueAdvance = true
+        onManualBaselineReset()
+        player.seekRelative(time - player.currentTime)
+        followResumeTask?.cancel()
+        followResumeTask = nil
+        isFollowingPlayback = true
+    }
+
+    private func handleLyricsScrollPhase(_ phase: ScrollPhase) {
+        switch phase {
+        case .tracking, .interacting, .decelerating:
+            followResumeTask?.cancel()
+            followResumeTask = nil
+            guard isFollowingPlayback else { return }
+            isFollowingPlayback = false
+        case .idle:
+            guard !isFollowingPlayback else { return }
+            scheduleFollowResume()
+        default:
+            break
+        }
+    }
+
+    private func scheduleFollowResume() {
+        followResumeTask?.cancel()
+        followResumeTask = nil
+        guard player.isPlaying else { return }
+        followResumeTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(ReaderLyricsVisualSpec.manualScrollFollowResumeDelay))
+            guard !Task.isCancelled, player.isPlaying else { return }
+            resumeFollowingPlayback()
+        }
+    }
+
+    private func resumeFollowingPlayback() {
+        followResumeTask?.cancel()
+        followResumeTask = nil
+        withAnimation(.smooth(duration: 0.24)) {
+            isFollowingPlayback = true
+        }
+        requestLyricsScroll(animated: true)
+    }
+
+    private func followActiveCue(from previousIndex: Int?, to index: Int?) {
+        let isNearbyAdvance = previousIndex.flatMap { previous in
+            index.map { abs($0 - previous) <= ReaderLyricsVisualSpec.maxAnimatedFollowDistance }
+        } ?? false
+        let animated = animatesNextFollowScroll || isNearbyAdvance
+        animatesNextFollowScroll = false
+        requestLyricsScroll(animated: animated)
+    }
+
+    private func requestLyricsScroll(animated: Bool) {
+        guard isFollowingPlayback else { return }
+        lyricsScrollRequest = ReaderLyricsScrollRequest(
+            generation: lyricsScrollRequest.generation &+ 1,
+            animated: animated
+        )
+    }
+
+    private func scrollLyrics(with proxy: ScrollViewProxy, animated: Bool) {
+        guard isFollowingPlayback, let index = activeLyricsIndex else { return }
+        let anchor = isVerticalLyricsMode ? verticalLyricsScrollAnchor : lyricsScrollAnchor
+        if animated {
+            withAnimation(ReaderLyricsVisualSpec.lineChangeAnimation) {
+                proxy.scrollTo(index, anchor: anchor)
+            }
+        } else {
+            proxy.scrollTo(index, anchor: anchor)
+        }
     }
 
     private func updateHeldLyricsCue(_ cue: SasayakiMatch?) {
@@ -3310,6 +3763,30 @@ private struct ReaderLyricsModeView: View {
         return previousCue
     }
 
+    /// Cues are ordered by start time, so a binary search finds the row without
+    /// scanning the whole book on every playback tick.
+    private func lyricsCueIndex(of cue: SasayakiMatch) -> Int? {
+        let matches = lyricsCues
+        var low = matches.startIndex
+        var high = matches.endIndex
+        while low < high {
+            let mid = (low + high) / 2
+            if matches[mid].startTime < cue.startTime {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+        var index = low
+        while index < matches.endIndex, matches[index].startTime == cue.startTime {
+            if matches[index].id == cue.id {
+                return index
+            }
+            index += 1
+        }
+        return matches.firstIndex(where: { $0.id == cue.id })
+    }
+
     private func isLyricsMaskVisible(for cue: SasayakiMatch) -> Bool {
         guard isLyricsMaskEnabled, player.isPlaying, !isLookupPopupVisible else { return false }
         return hoveredLyricsCueID != cue.id
@@ -3323,138 +3800,54 @@ private struct ReaderLyricsModeView: View {
         }
     }
 
-    private func horizontalLyricsMaskStack(
-        cues: [SasayakiMatch],
-        metrics: ReaderLyricsLayoutMetrics
-    ) -> some View {
-        GeometryReader { geometry in
-            ReaderLyricsMaskedTextOverlay {
-                VStack(alignment: .leading, spacing: metrics.lineSpacing) {
-                    ForEach(cues) { cue in
-                        horizontalLyricsMaskLine(
-                            cue,
-                            metrics: metrics,
-                            availableWidth: geometry.size.width
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    private func horizontalLyricsMaskLine(
+    private func maskedHorizontalLyricsText(
         _ cue: SasayakiMatch,
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat
-    ) -> some View {
-        let isFocused = cue.id == activeLyricsCue?.id
-        let isRightToLeft = ReaderLyricsTextDirection.isRightToLeft(cue.text)
-        let fontSize = isFocused ? metrics.focusedFontSize : metrics.contextFontSize
-        let rowHeight = horizontalLyricsRowHeight(cue, metrics: metrics, availableWidth: availableWidth)
-        let rowOpacity: Double = isFocused ? 1 : contextLineOpacity
-        return Text(cue.text)
-            .font(.system(size: min(max(fontSize, 12), 72), weight: .bold))
-            .foregroundStyle(.white.opacity(maskedLyricsOpacity(isFocused: isFocused)))
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity,
-                alignment: isRightToLeft ? .trailing : .leading
-            )
-            .frame(height: rowHeight)
-            .shadow(
-                color: .white.opacity(isFocused ? 0.18 : 0),
-                radius: isFocused ? metrics.focusedGlowRadius : 0
-            )
-            .scaleEffect(
-                isFocused ? focusedLineScale : ReaderLyricsVisualSpec.deselectedLineScale,
-                anchor: isRightToLeft ? .trailing : .leading
-            )
-            .opacity(isLyricsMaskVisible(for: cue) ? rowOpacity : 0)
-    }
-
-    private func verticalLyricsMaskStack(
-        cues: [SasayakiMatch],
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat,
-        availableHeight: CGFloat
+        fontSize: CGFloat,
+        isFocused: Bool,
+        isRightToLeft: Bool
     ) -> some View {
         ReaderLyricsMaskedTextOverlay {
-            HStack(alignment: .center, spacing: verticalLyricsColumnSpacing(metrics: metrics)) {
-                ForEach(cues.reversed()) { cue in
-                    verticalLyricsMaskColumn(
-                        cue,
-                        metrics: metrics,
-                        availableWidth: availableWidth,
-                        availableHeight: availableHeight
-                    )
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            Text(cue.text)
+                .font(.system(size: min(max(fontSize, 12), 72), weight: .bold))
+                .foregroundStyle(.white.opacity(maskedLyricsOpacity(isFocused: isFocused)))
+                .multilineTextAlignment(isRightToLeft ? .trailing : .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: isRightToLeft ? .topTrailing : .topLeading
+                )
         }
-        .allowsHitTesting(false)
     }
 
-    private func verticalLyricsMaskColumn(
+    private func maskedVerticalLyricsText(
         _ cue: SasayakiMatch,
-        metrics: ReaderLyricsLayoutMetrics,
-        availableWidth: CGFloat,
+        fontSize: CGFloat,
+        isFocused: Bool,
         availableHeight: CGFloat
     ) -> some View {
-        let isFocused = cue.id == activeLyricsCue?.id
-        let fontSize = verticalLyricsFontSize(
-            for: cue,
-            metrics: metrics,
-            availableWidth: availableWidth,
-            availableHeight: availableHeight
-        )
-        let columnWidth = verticalLyricsColumnWidth(
-            for: cue,
-            metrics: metrics,
-            availableWidth: availableWidth,
-            availableHeight: availableHeight
-        )
-        let columnSpacing = verticalLyricsInnerColumnSpacing(
-            for: cue,
-            metrics: metrics,
-            availableWidth: availableWidth,
-            availableHeight: availableHeight
-        )
+        let columnWidth = ReaderLyricsVerticalTextLayout.columnWidth(fontSize: fontSize)
+        let columnSpacing = ReaderLyricsVerticalTextLayout.columnSpacing(fontSize: fontSize)
+        let rowHeight = ReaderLyricsVerticalTextLayout.rowHeight(fontSize: fontSize)
         let columns = ReaderLyricsVerticalTextLayout.columns(
             from: cue.text,
             fontSize: fontSize,
             availableHeight: availableHeight
         )
-        let columnOpacity: Double = isFocused ? 1 : contextLineOpacity
-        return HStack(alignment: .center, spacing: columnSpacing) {
-            ForEach(Array(columns.enumerated().reversed()), id: \.offset) { _, column in
-                VStack(spacing: max(fontSize * 0.08, 2)) {
-                    ForEach(Array(column.enumerated()), id: \.offset) { _, glyph in
-                        Text(glyph.text)
+        return ReaderLyricsMaskedTextOverlay {
+            HStack(alignment: .center, spacing: columnSpacing) {
+                ForEach(Array(columns.enumerated().reversed()), id: \.offset) { _, column in
+                    VStack(spacing: 0) {
+                        ForEach(Array(column.enumerated()), id: \.offset) { _, glyph in
+                            Text(glyph.text)
+                                .frame(width: columnWidth, height: rowHeight)
+                        }
                     }
                 }
-                .frame(width: columnWidth, alignment: .center)
             }
+            .font(.system(size: min(max(fontSize, 12), 72), weight: .bold))
+            .foregroundStyle(.white.opacity(maskedLyricsOpacity(isFocused: isFocused)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
-        .font(.system(size: min(max(fontSize, 12), 72), weight: .bold))
-        .foregroundStyle(.white.opacity(maskedLyricsOpacity(isFocused: isFocused)))
-        .frame(
-            width: verticalLyricsLineWidth(
-                for: cue,
-                metrics: metrics,
-                availableWidth: availableWidth,
-                availableHeight: availableHeight
-            ),
-            alignment: .center
-        )
-        .frame(maxHeight: .infinity, alignment: .center)
-        .shadow(
-            color: .white.opacity(isFocused ? 0.18 : 0),
-            radius: isFocused ? metrics.focusedGlowRadius : 0
-        )
-        .opacity(isLyricsMaskVisible(for: cue) ? columnOpacity : 0)
     }
 
     private func maskedLyricsOpacity(isFocused: Bool) -> CGFloat {
@@ -3463,49 +3856,23 @@ private struct ReaderLyricsModeView: View {
             : ReaderLyricsVisualSpec.lyricsMaskContextOpacity
     }
 
-    private func visibleLyricsCueWindow(radius: Int, activeCue: SasayakiMatch?) -> [SasayakiMatch] {
-        guard let matches = player.matchData?.matches, !matches.isEmpty else { return [] }
-        let activeIndex = activeCue
-            .flatMap { cue in matches.firstIndex(where: { $0.id == cue.id }) }
-            ?? cueIndex(near: player.currentTime - player.delay, in: matches)
-        let safeRadius = max(0, radius)
-        let lowerBound = max(matches.startIndex, activeIndex - safeRadius)
-        let upperBound = min(matches.endIndex, activeIndex + safeRadius + 1)
-        return Array(matches[lowerBound..<upperBound])
-    }
-
-    private func cueIndex(near time: Double, in matches: [SasayakiMatch]) -> Int {
-        var low = matches.startIndex
-        var high = matches.endIndex
-        while low < high {
-            let mid = (low + high) / 2
-            if matches[mid].startTime < time {
-                low = mid + 1
-            } else {
-                high = mid
-            }
-        }
-        if low == matches.startIndex {
-            return low
-        }
-        if low == matches.endIndex {
-            return matches.index(before: matches.endIndex)
-        }
-        let previous = matches.index(before: low)
-        return abs(matches[previous].startTime - time) <= abs(matches[low].startTime - time) ? previous : low
-    }
-
     private func loadCoverImage() {
         coverImage = coverURL.flatMap(NSImage.init(contentsOf:))
     }
 
-    private var progressValue: Double {
-        guard player.duration > 0 else { return 0 }
-        return min(max(player.currentTime / player.duration, 0), 1)
+    private func lyricsTimeText(_ seconds: Double) -> String {
+        let totalSeconds = max(Int(seconds.rounded(.down)), 0)
+        let hours = totalSeconds / 3600
+        let minutes = totalSeconds / 60 % 60
+        let remainingSeconds = totalSeconds % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 
     private var readingSpeedText: String {
-        "\(contentLanguage.displayCount(forRawCharacters: sessionStatistics.lastReadingSpeed).formatted(.number.grouping(.never))) / h"
+        "\(contentLanguage.displayCount(forRawCharacters: sessionStatistics.readingSpeed).formatted(.number.grouping(.never))) / h"
     }
 
     private var readingProgressText: String {
@@ -3531,6 +3898,13 @@ private struct ReaderLyricsModeView: View {
         let duration = max(cue.endTime - cue.startTime, 0.1)
         return max(Double(player.rate), 0) / duration
     }
+}
+
+/// A scroll request is a value so every follow action re-scrolls, even when
+/// the active cue has not changed since the user scrolled away.
+private struct ReaderLyricsScrollRequest: Equatable {
+    var generation = 0
+    var animated = false
 }
 
 private extension ReaderLyricsVisualSpec {
@@ -3617,6 +3991,33 @@ private struct NativeReaderStatisticsSheet: View {
     }
 }
 
+/// Desktop side panel for Reader tools: a full-height card floating over the
+/// page, so opening it never changes pagination.
+private struct NativeReaderSidePanel<Content: View>: View {
+    let edge: HorizontalEdge
+    let onClose: () -> Void
+    @ViewBuilder let content: () -> Content
+    @Environment(\.colorScheme) private var colorScheme
+
+    static var width: CGFloat { 440 }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        content()
+            .frame(width: Self.width)
+            .frame(maxHeight: .infinity)
+            .background(NativeGlassPageBackground())
+            .clipShape(shape)
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.1), lineWidth: 0.7)
+            }
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.16), radius: 24, x: 0, y: 8)
+            .padding(.vertical, 12)
+            .padding(edge == .leading ? .leading : .trailing, 12)
+            .onExitCommand(perform: onClose)
+    }
+}
+
 private struct NativeReaderGlassIconButton: View {
     let systemName: String
     var diameter: CGFloat = 34
@@ -3638,7 +4039,6 @@ private extension View {
     @ViewBuilder
     func nativeReaderGlassCircleControl() -> some View {
         self
-            .background(.ultraThinMaterial, in: Circle())
             .overlay {
                 Circle()
                     .strokeBorder(.quaternary.opacity(0.58), lineWidth: 0.7)
@@ -3649,18 +4049,6 @@ private extension View {
     @ViewBuilder
     func nativeReaderGlassCapsuleControl() -> some View {
         self
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(.quaternary.opacity(0.58), lineWidth: 0.7)
-            }
-            .nativeReaderGlassCapsule()
-    }
-
-    @ViewBuilder
-    func nativeReaderGlassCapsuleSurface() -> some View {
-        self
-            .background(.ultraThinMaterial, in: Capsule())
             .overlay {
                 Capsule()
                     .strokeBorder(.quaternary.opacity(0.58), lineWidth: 0.7)
@@ -3747,6 +4135,12 @@ final class NativeReaderWKWebView: HoshiShiftHoverWKWebView {
     }
 }
 
+/// Off-screen layout surface for page counting; never takes input.
+final class NativeReaderPageMeasureWebView: WKWebView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override var acceptsFirstResponder: Bool { false }
+}
+
 struct NativeReaderWebView: NSViewRepresentable {
     let chapterURL: URL
     let readAccessURL: URL
@@ -3765,6 +4159,13 @@ struct NativeReaderWebView: NSViewRepresentable {
     let highlightsJSON: String?
     let fragment: String?
     let pageNavigation: NativeReaderPageNavigation?
+    /// Non-nil when the progress display counts pages; identifies the layout the
+    /// page table is measured for.
+    let pageLayoutKey: String?
+    let spineURLs: [URL]
+    let pageCacheDirectory: URL?
+    var onPagesChanged: ([[Int]]) -> Void = { _ in }
+    var onPageChanged: (URL, Int) -> Void = { _, _ in }
     var onNavigationHandled: (UUID) -> Void
     var onPageTurn: () -> Void
     var onNextChapter: () -> Bool
@@ -3792,6 +4193,7 @@ struct NativeReaderWebView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "tapOutside")
         config.userContentController.add(context.coordinator, name: "progressChanged")
         config.userContentController.add(context.coordinator, name: "selectionState")
+        config.userContentController.add(context.coordinator, name: "pageChanged")
 
         let webView = NativeReaderWKWebView(frame: .zero, configuration: config)
         webView.shortcutManager = shortcutManager
@@ -3811,6 +4213,7 @@ struct NativeReaderWebView: NSViewRepresentable {
         context.coordinator.parent = self
         (webView as? NativeReaderWKWebView)?.shortcutManager = shortcutManager
         context.coordinator.syncTextColor()
+        context.coordinator.syncBackgroundColor()
         context.coordinator.syncSasayakiColors()
         if !bridge.pendingCommands.isEmpty {
             let commands = bridge.pendingCommands
@@ -3823,6 +4226,7 @@ struct NativeReaderWebView: NSViewRepresentable {
             (webView as? NativeReaderWKWebView)?.relinquishTextInputFocus()
             webView.loadFileURL(chapterURL, allowingReadAccessTo: readAccessURL)
         }
+        context.coordinator.updatePageMeasurement()
         if let navigation = pageNavigation,
            context.coordinator.lastNavigationRequestID != navigation.id {
             guard NativeReaderNavigationConsumptionRegistry.consume(navigation.id) else {
@@ -3845,6 +4249,8 @@ struct NativeReaderWebView: NSViewRepresentable {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "tapOutside")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "progressChanged")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "selectionState")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "pageChanged")
+        coordinator.stopMeasuringPages()
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
@@ -3856,6 +4262,12 @@ struct NativeReaderWebView: NSViewRepresentable {
         private var shouldSyncProgressAfterRestore = false
         private var hasSyncedTextColor = false
         private var lastTextColor: String?
+        private var lastBackgroundColor: String?
+        private var pagesWebView: NativeReaderPageMeasureWebView?
+        private var measuringLayoutKey: String?
+        private var measuredLayoutKey: String?
+        private var measuredSpinePageStarts: [[Int]] = []
+        private var spineMeasureTimeout: DispatchWorkItem?
 
         init(_ parent: NativeReaderWebView) {
             self.parent = parent
@@ -3895,6 +4307,16 @@ struct NativeReaderWebView: NSViewRepresentable {
             applyTextColor(parent.textColor)
         }
 
+        /// Keeps the page background in step with live theme and macOS
+        /// appearance changes; the load-time script only sets the first value.
+        fileprivate func syncBackgroundColor() {
+            guard lastBackgroundColor != parent.backgroundColor else { return }
+            lastBackgroundColor = parent.backgroundColor
+            webView?.evaluateJavaScript(
+                "document.documentElement.style.setProperty('--hoshi-reader-background-color', '\(parent.backgroundColor)');"
+            ) { _, _ in }
+        }
+
         private func applyTextColor(_ hex: String?) {
             hasSyncedTextColor = true
             lastTextColor = hex
@@ -3903,6 +4325,15 @@ struct NativeReaderWebView: NSViewRepresentable {
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             switch message.name {
+            case "spineMeasured":
+                guard message.webView === pagesWebView else { return }
+                let starts = (message.body as? [Any])?.compactMap { ($0 as? NSNumber)?.intValue } ?? []
+                finishMeasuringSpine(starts.isEmpty ? [0] : starts)
+            case "pageChanged":
+                guard message.webView === webView,
+                      let page = (message.body as? NSNumber)?.intValue,
+                      let url = message.webView?.url else { return }
+                parent.onPageChanged(url, page)
             case "selectionState":
                 guard let hasSelection = message.body as? Bool,
                       let webView = message.webView as? NativeReaderWKWebView else {
@@ -3928,6 +4359,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 parent.onSaveBookmark(progress)
             case "restoreCompleted":
                 message.webView?.alphaValue = 1
+                message.webView?.evaluateJavaScript(textAnimationScript) { _, _ in }
                 if shouldSyncProgressAfterRestore {
                     shouldSyncProgressAfterRestore = false
                     syncInternalJumpProgress()
@@ -3988,19 +4420,131 @@ struct NativeReaderWebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            injectReader(into: webView)
+            injectReader(into: webView, measuringPages: webView === pagesWebView)
         }
 
-        private func injectReader(into webView: WKWebView) {
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            if webView === pagesWebView { finishMeasuringSpine([0]) }
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            if webView === pagesWebView { finishMeasuringSpine([0]) }
+        }
+
+        // MARK: Page measurement
+
+        private struct PageCache: Codable {
+            let layoutKey: String
+            let pageStarts: [[Int]]
+        }
+
+        private static let pageCacheFileName = "reader_pages.json"
+
+        /// Lays out every spine item in a hidden web view with the visible Reader's
+        /// layout and records where each page starts. Results are cached per book for
+        /// the exact layout key, so the work only repeats after a layout change.
+        func updatePageMeasurement() {
+            guard let key = parent.pageLayoutKey, !parent.spineURLs.isEmpty else {
+                stopMeasuringPages()
+                measuredLayoutKey = nil
+                return
+            }
+            guard key != measuredLayoutKey, key != measuringLayoutKey else { return }
+            stopMeasuringPages()
+            measuredLayoutKey = nil
+            measuredSpinePageStarts = []
+
+            if let directory = parent.pageCacheDirectory,
+               let data = try? Data(contentsOf: directory.appendingPathComponent(Self.pageCacheFileName)),
+               let cache = try? JSONDecoder().decode(PageCache.self, from: data),
+               cache.layoutKey == key,
+               cache.pageStarts.count == parent.spineURLs.count {
+                measuredLayoutKey = key
+                publishPages(cache.pageStarts)
+                return
+            }
+
+            publishPages([])
+            guard let webView else { return }
+            let config = WKWebViewConfiguration()
+            config.userContentController.add(self, name: "spineMeasured")
+            let pagesWebView = NativeReaderPageMeasureWebView(
+                frame: CGRect(origin: .zero, size: parent.viewSize),
+                configuration: config
+            )
+            pagesWebView.alphaValue = 0
+            pagesWebView.setAccessibilityElement(false)
+            pagesWebView.navigationDelegate = self
+            pagesWebView.setValue(false, forKey: "drawsBackground")
+            webView.addSubview(pagesWebView, positioned: .below, relativeTo: nil)
+            self.pagesWebView = pagesWebView
+            measuringLayoutKey = key
+            loadNextSpineForMeasurement()
+        }
+
+        func stopMeasuringPages() {
+            spineMeasureTimeout?.cancel()
+            spineMeasureTimeout = nil
+            measuringLayoutKey = nil
+            guard let pagesWebView else { return }
+            pagesWebView.stopLoading()
+            pagesWebView.configuration.userContentController.removeScriptMessageHandler(forName: "spineMeasured")
+            pagesWebView.removeFromSuperview()
+            self.pagesWebView = nil
+        }
+
+        private func loadNextSpineForMeasurement() {
+            guard let pagesWebView else { return }
+            let spineIndex = measuredSpinePageStarts.count
+            guard parent.spineURLs.indices.contains(spineIndex) else { return }
+            spineMeasureTimeout?.cancel()
+            let timeout = DispatchWorkItem { [weak self] in
+                // A spine item that never finishes layout counts as a single page.
+                self?.finishMeasuringSpine([0])
+            }
+            spineMeasureTimeout = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: timeout)
+            pagesWebView.loadFileURL(parent.spineURLs[spineIndex], allowingReadAccessTo: parent.readAccessURL)
+        }
+
+        private func finishMeasuringSpine(_ starts: [Int]) {
+            guard pagesWebView != nil, let key = measuringLayoutKey else { return }
+            spineMeasureTimeout?.cancel()
+            spineMeasureTimeout = nil
+            measuredSpinePageStarts.append(starts)
+            guard measuredSpinePageStarts.count >= parent.spineURLs.count else {
+                loadNextSpineForMeasurement()
+                return
+            }
+            let pageStarts = measuredSpinePageStarts
+            stopMeasuringPages()
+            measuredLayoutKey = key
+            if let directory = parent.pageCacheDirectory,
+               let data = try? JSONEncoder().encode(PageCache(layoutKey: key, pageStarts: pageStarts)) {
+                try? data.write(to: directory.appendingPathComponent(Self.pageCacheFileName), options: .atomic)
+            }
+            publishPages(pageStarts)
+        }
+
+        private func publishPages(_ pageStarts: [[Int]]) {
+            // May run inside updateNSView; defer the model mutation.
+            DispatchQueue.main.async { [weak self] in
+                self?.parent.onPagesChanged(pageStarts)
+            }
+        }
+
+        private func injectReader(into webView: WKWebView, measuringPages: Bool = false) {
             let writingMode = parent.userConfig.verticalWriting ? "vertical-rl" : "horizontal-tb"
             let pageWidth = max(Int(parent.viewSize.width.rounded()), 1)
             let pageHeight = max(Int(parent.viewSize.height.rounded()), 1)
             let verticalPadding = Double(parent.userConfig.verticalPadding)
             let horizontalPadding = Double(parent.userConfig.horizontalPadding)
             let bottomOverlap = parent.userConfig.verticalWriting ? parent.userConfig.fontSize : 0
+            let paragraphMode = parent.userConfig.paragraphMode && !parent.userConfig.continuousMode
             let horizontalPageColumns = parent.userConfig.readerTwoColumnHorizontalPages
                 && !parent.userConfig.verticalWriting
-                && !parent.userConfig.continuousMode ? 2 : 1
+                && !parent.userConfig.continuousMode
+                && !paragraphMode ? 2 : 1
             let horizontalSpreadColumnGap = 32
             let horizontalSpreadPageSize = horizontalPageColumns > 1
                 ? max(1, Double(pageWidth) - (Double(pageWidth) * horizontalPadding / 100.0) + Double(horizontalSpreadColumnGap))
@@ -4010,6 +4554,7 @@ struct NativeReaderWebView: NSViewRepresentable {
             let readerScript = Self.bundleString(readerScriptName, extension: "js")
             let selectionScript = Self.bundleString("selection", extension: "js")
             let highlightsScript = Self.bundleString("highlights", extension: "js")
+            let paragraphScript = paragraphMode ? Self.bundleString("paragraph", extension: "js") : ""
             let textColorCss = Self.textColorScript(parent.textColor)
             let backgroundColorCss = """
             document.documentElement.style.setProperty('--hoshi-reader-background-color', '\(parent.backgroundColor)');
@@ -4018,9 +4563,12 @@ struct NativeReaderWebView: NSViewRepresentable {
             document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', '\(parent.sasayakiTextColor)');
             document.documentElement.style.setProperty('--hoshi-sasayaki-background-color', '\(parent.sasayakiBackgroundColor)');
             """
-            let highlightsSetupScript = parent.highlightsJSON.map { "window.hoshiHighlights.applyHighlights(\($0));" } ?? ""
-            let sasayakiSetupScript = parent.bridge.sasayakiCues.map { "window.hoshiReader.applySasayakiCues(\($0));" } ?? ""
+            let highlightsSetupScript = measuringPages ? "" : parent.highlightsJSON.map { "window.hoshiHighlights.applyHighlights(\($0));" } ?? ""
+            let sasayakiSetupScript = measuringPages ? "" : parent.bridge.sasayakiCues.map { "window.hoshiReader.applySasayakiCues(\($0));" } ?? ""
             let initialRestoreScript: String = {
+                if measuringPages {
+                    return "document.fonts.ready.then(() => window.webkit.messageHandlers.spineMeasured.postMessage(window.hoshiReader.calculatePageStarts()))"
+                }
                 if let fragment = parent.fragment {
                     shouldSyncProgressAfterRestore = true
                     return "window.hoshiReader.jumpToFragment(\(Self.javaScriptStringLiteral(fragment)))"
@@ -4163,6 +4711,21 @@ struct NativeReaderWebView: NSViewRepresentable {
                 }
                 """
             }()
+            let paragraphModeCss = paragraphMode ? """
+            body {
+                column-fill: auto !important;
+                -webkit-column-fill: auto !important;
+                font-kerning: none !important;
+            }
+            p.hoshi-paragraph {
+                margin-block-start: 0 !important;
+                break-before: column !important;
+                -webkit-column-break-before: always !important;
+            }
+            ::highlight(hoshi-animation) {
+                color: transparent !important;
+            }
+            """ : ""
             let gridCss = parent.userConfig.justifyText ? "" : """
                 text-align: start !important;
                 hanging-punctuation: allow-end !important;
@@ -4197,6 +4760,45 @@ struct NativeReaderWebView: NSViewRepresentable {
                 spacer.style.breakInside = 'avoid';
                 document.body.appendChild(spacer);
                 """
+            }()
+            // Toggle mode keeps the rt box so revealing furigana never reflows the page.
+            let hiddenFuriganaCss = parent.userConfig.verticalWriting
+            ? """
+            ruby.furigana-hidden > rt {
+                color: transparent !important;
+                background-image: linear-gradient(rgba(150, 150, 150, 0.75), rgba(150, 150, 150, 0.75)) !important;
+                background-size: 0.14em 100% !important;
+                background-position: left center !important;
+                background-repeat: no-repeat !important;
+            }
+            """
+            : """
+            ruby.furigana-hidden > rt {
+                color: transparent !important;
+                background-image: linear-gradient(rgba(150, 150, 150, 0.75), rgba(150, 150, 150, 0.75)) !important;
+                background-size: 100% 0.14em !important;
+                background-position: center bottom !important;
+                background-repeat: no-repeat !important;
+            }
+            """
+            let dimmedFuriganaCss = parent.userConfig.readerFuriganaMode == .dimmed ? """
+            ruby > rt, ruby > rp { opacity: 0.4 !important; }
+            """ : ""
+            let furiganaJs: String = {
+                switch parent.userConfig.readerFuriganaMode {
+                case .off, .dimmed:
+                    return ""
+                case .toggle:
+                    return """
+                    document.querySelectorAll('ruby').forEach(ruby => {
+                        if (ruby.querySelector('rt')) {
+                            ruby.classList.add('furigana-hidden');
+                        }
+                    });
+                    """
+                case .hidden:
+                    return "document.querySelectorAll('rt').forEach(rt => rt.remove());"
+                }
             }()
             let css = """
             \(fontFaceCss)
@@ -4270,9 +4872,16 @@ struct NativeReaderWebView: NSViewRepresentable {
                 background-color: var(--hoshi-sasayaki-background-color) !important;
             }
             ruby > rt, ruby > rp { -webkit-user-select: none; }
+            ruby.furigana-hidden > rp,
+            ruby.furigana-hidden > rt > * {
+                visibility: hidden !important;
+            }
+            \(dimmedFuriganaCss)
+            \(hiddenFuriganaCss)
             \(HighlightColor.css)
             \(pageBreakCss)
             \(paragraphSpacingCss)
+            \(paragraphModeCss)
             """
 
             let script = """
@@ -4297,6 +4906,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 window.hoshiSelection.language = '\(parent.contentLanguageID)';
                 \(readerScript)
                 \(highlightsScript)
+                \(paragraphScript)
                 const lookupScanLength = \(parent.userConfig.scanLength);
                 window.hoshiSelection.registerModifierTracking();
                 window.hoshiSelection.registerShiftHoverLookup(lookupScanLength, \(parent.userConfig.desktopLookupHoverDelayMs));
@@ -4326,9 +4936,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                         }
                     }, { passive: true });
                 }
-                if (\(parent.userConfig.readerHideFurigana ? "true" : "false")) {
-                    document.querySelectorAll('rt').forEach(rt => rt.remove());
-                }
+                \(furiganaJs)
 
                 // Wrap text directly under ruby nodes so selection/highlight ranges stay stable.
                 document.querySelectorAll('ruby').forEach(ruby => {
@@ -4400,6 +5008,11 @@ struct NativeReaderWebView: NSViewRepresentable {
                 });
                 document.addEventListener('click', event => {
                     if (event.target?.closest?.('a, button, input, textarea, select, [contenteditable="true"]')) { return; }
+                    if (window.hoshiParagraph?.finishTextAnimation()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
                     const browserSelection = window.getSelection();
                     if (browserSelection && !browserSelection.isCollapsed) { return; }
                     const selected = window.hoshiSelection.selectText(event.clientX, event.clientY, lookupScanLength);
@@ -4410,6 +5023,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 }, 2500);
                 Promise.all(imagePromises)
                     .then(() => new Promise(resolve => setTimeout(resolve, 50)))
+                    .then(() => \(paragraphMode ? "document.fonts.ready.then(() => window.hoshiParagraph.layoutParagraphs())" : "null"))
                     .then(() => {
                         window.hoshiReader.buildNodeOffsets?.();
                         \(sasayakiSetupScript)
@@ -4423,6 +5037,13 @@ struct NativeReaderWebView: NSViewRepresentable {
                     .finally(() => clearTimeout(restoreFallback));
             })();
             """
+
+            if measuringPages {
+                webView.evaluateJavaScript(script) { [weak self] _, error in
+                    if error != nil { self?.finishMeasuringSpine([0]) }
+                }
+                return
+            }
 
             webView.alphaValue = 0
             webView.evaluateJavaScript(script) { [weak self] _, error in
@@ -4451,7 +5072,16 @@ struct NativeReaderWebView: NSViewRepresentable {
             let jsDirection = direction == .forward ? "forward" : "backward"
             let script = parent.userConfig.continuousMode
                 ? Self.continuousNavigationScript(direction: direction, currentProgress: parent.progress)
-                : "window.hoshiReader.paginate('\(jsDirection)')"
+                : """
+                (function() {
+                    window.hoshiParagraph?.finishTextAnimation();
+                    var result = window.hoshiReader.paginate('\(jsDirection)');
+                    if (result === 'scrolled') {
+                        \(direction == .forward ? textAnimationScript : "")
+                    }
+                    return result;
+                })()
+                """
             webView.evaluateJavaScript(script) { [weak self] result, _ in
                 guard let self else { return }
                 if let outcome = result as? String, outcome == "limit" {
@@ -4479,6 +5109,15 @@ struct NativeReaderWebView: NSViewRepresentable {
                 }
                 self.syncProgress()
             }
+        }
+
+        /// Reveals the visible page text gradually in paragraph mode; reads the
+        /// live settings so speed changes apply without reloading the chapter.
+        private var textAnimationScript: String {
+            guard parent.userConfig.paragraphMode,
+                  !parent.userConfig.continuousMode,
+                  parent.userConfig.textAnimation else { return "" }
+            return "window.hoshiParagraph?.animateText(\(parent.userConfig.textSpeed));"
         }
 
         fileprivate func handleCommand(_ command: WebViewCommand) {

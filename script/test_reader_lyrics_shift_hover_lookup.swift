@@ -1,3 +1,4 @@
+// test-sources: Features/Reader/Lyrics/ReaderLyricsShiftHoverLookupState.swift
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

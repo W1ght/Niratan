@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Playback/PlaybackEngine.swift Features/Video/Playback/VideoTrack.swift Features/Video/Remote/RemoteVideoSource.swift Features/Video/Remote/RemoteVideoResolver.swift Features/Video/VideoPlaybackHistoryStore.swift Features/Video/VideoPlayerViewModel.swift Models/Subtitle.swift Features/Video/Remote/YouTubeURLParser.swift Features/Video/Remote/RemotePlaybackSession.swift Features/Video/Subtitles/SubtitleCueStore.swift Features/Video/VideoInspectorState.swift Features/Video/VideoPlaylist.swift
 import Foundation
 
 nonisolated enum VideoShaderPreset {

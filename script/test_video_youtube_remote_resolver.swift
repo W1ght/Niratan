@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Remote/RemoteVideoResolver.swift Features/Video/Remote/RemoteVideoSource.swift Features/Video/Remote/YouTubeKitRemoteVideoResolver.swift Features/Video/Remote/YouTubeMediaModels.swift Models/Subtitle.swift Features/Video/Remote/YouTubeURLParser.swift Features/Video/Remote/YouTubeStreamSelector.swift
 import Foundation
 
 private func expect<T: Equatable>(_ actual: T, _ expected: T, _ message: String) {

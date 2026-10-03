@@ -64,7 +64,7 @@ struct MangaLibraryView: View {
     @State private var isSelecting = false
     @State private var selectedItems = Set<MangaLibraryItem>()
     @State private var showBulkRemoveConfirmation = false
-    @State private var showShelfManagement = false
+    @AppStorage("mangaLibraryCoverWidth") private var coverWidth = Double(BookshelfLayout.v050CoverWidth)
 
     var body: some View {
         ZStack {
@@ -95,9 +95,6 @@ struct MangaLibraryView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The original manga files will not be deleted.")
-        }
-        .sheet(isPresented: $showShelfManagement) {
-            MangaShelfManagementView(viewModel: viewModel)
         }
         .toolbar {
             toolbarContent
@@ -219,24 +216,114 @@ struct MangaLibraryView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            let sections = viewModel.sections()
-            ScrollView {
-                ForEach(sections) { section in
-                    if !section.items.isEmpty {
-                        MangaShelfView(
-                            viewModel: viewModel,
-                            section: section,
-                            showTitle: true,
-                            isSelecting: isSelecting,
-                            selectedItems: $selectedItems,
-                            onOpen: openManga
-                        )
-                    }
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    shelfSidebar
+                        .frame(width: LibraryShelfLayout.sidebarWidth(for: proxy.size.width))
+
+                    shelfDetail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
-                .padding(.vertical, 14)
             }
-            .scrollIndicators(.hidden)
-            .scrollEdgeEffectStyle(.soft, for: .top)
+        }
+    }
+
+    private var shelfSidebar: some View {
+        LibraryShelfSidebar(
+            selection: shelfSelection,
+            smartRows: [
+                LibraryShelfSmartRow(
+                    selection: .all,
+                    title: "All Manga",
+                    systemImage: "books.vertical",
+                    count: viewModel.itemCount(for: .all)
+                ),
+                LibraryShelfSmartRow(
+                    selection: .reading,
+                    title: "Currently Reading",
+                    systemImage: "book",
+                    count: viewModel.itemCount(for: .reading)
+                ),
+                LibraryShelfSmartRow(
+                    selection: .unshelved,
+                    title: "Unshelved",
+                    systemImage: "tray",
+                    count: viewModel.itemCount(for: .unshelved)
+                ),
+            ],
+            shelves: viewModel.catalog.shelves.map { shelf in
+                LibraryShelfEntry(
+                    id: shelf.id.uuidString,
+                    name: shelf.name,
+                    count: viewModel.itemCount(for: .shelf(shelf.id.uuidString))
+                )
+            },
+            onCreate: { name in
+                viewModel.createShelf(name: name)
+            },
+            onRename: { key, newName in
+                guard let shelfID = UUID(uuidString: key) else { return nil }
+                return viewModel.renameShelf(id: shelfID, to: newName)
+            },
+            onDelete: { key in
+                guard let shelfID = UUID(uuidString: key) else { return }
+                viewModel.deleteShelf(id: shelfID)
+            },
+            onMove: viewModel.moveShelves
+        )
+    }
+
+    private var shelfSelection: Binding<LibraryShelfSelection> {
+        Binding {
+            viewModel.resolvedShelfSelection
+        } set: { selection in
+            viewModel.shelfSelection = selection
+        }
+    }
+
+    private var shelfDetail: some View {
+        let selection = viewModel.resolvedShelfSelection
+        let section = viewModel.section(for: selection)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                LibraryShelfDetailHeader(
+                    title: shelfTitle(for: selection),
+                    count: section.items.count
+                )
+
+                if section.items.isEmpty {
+                    LibraryShelfEmptyView(selection: selection)
+                } else {
+                    MangaShelfView(
+                        viewModel: viewModel,
+                        section: section,
+                        showTitle: false,
+                        allowsCollapse: false,
+                        isSelecting: isSelecting,
+                        selectedItems: $selectedItems,
+                        onOpen: openManga
+                    )
+                    .id(section.id)
+                    .environment(\.shelfCoverWidth, BookshelfLayout.clampedCoverWidth(coverWidth))
+                }
+            }
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+    }
+
+    private func shelfTitle(for selection: LibraryShelfSelection) -> Text {
+        switch selection {
+        case .all, .googleDrive:
+            Text("All Manga")
+        case .reading:
+            Text("Currently Reading")
+        case .unshelved:
+            Text("Unshelved")
+        case .shelf(let key):
+            Text(verbatim: viewModel.catalog.shelves.first { $0.id.uuidString == key }?.name ?? "")
         }
     }
 
@@ -314,7 +401,7 @@ struct MangaLibraryView: View {
                 .disabled(selectedItems.isEmpty)
             }
         } else if showsLocalLibraryActions {
-            ToolbarItemGroup(placement: .navigation) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Menu {
                     @Bindable var viewModel = viewModel
                     Picker("Sort", selection: $viewModel.sortOption) {
@@ -326,6 +413,7 @@ struct MangaLibraryView: View {
                             .tag(option)
                         }
                     }
+                    .pickerStyle(.inline)
                 } label: {
                     Label("Sort", systemImage: "arrow.up.arrow.down")
                 }
@@ -340,15 +428,8 @@ struct MangaLibraryView: View {
                 }
                 .disabled(viewModel.visibleItems.isEmpty)
                 .help("Select Manga")
-            }
 
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    showShelfManagement = true
-                } label: {
-                    Label("Manage Manga Shelves", systemImage: "folder.badge.gearshape")
-                }
-                .help("Manage Manga Shelves")
+                LibraryCoverSizeButton(width: $coverWidth)
 
                 Button {
                     presentMangaImporter()
@@ -427,6 +508,7 @@ struct MangaLibraryView: View {
 }
 
 private struct MangaShelfView: View {
+    @Environment(\.shelfCoverWidth) private var coverWidth
     let viewModel: MangaLibraryViewModel
     let section: MangaShelfSection
     let showTitle: Bool
@@ -447,6 +529,7 @@ private struct MangaShelfView: View {
         viewModel: MangaLibraryViewModel,
         section: MangaShelfSection,
         showTitle: Bool,
+        allowsCollapse: Bool = true,
         isSelecting: Bool,
         selectedItems: Binding<Set<MangaLibraryItem>>,
         onOpen: @escaping (MangaLibraryItem) -> Void
@@ -457,14 +540,14 @@ private struct MangaShelfView: View {
         self.isSelecting = isSelecting
         self._selectedItems = selectedItems
         self.onOpen = onOpen
-        self._isCollapsed = State(initialValue: !section.isReading)
+        self._isCollapsed = State(initialValue: allowsCollapse && !section.isReading)
     }
 
     private var columns: [GridItem] {
         [GridItem(
             .adaptive(
-                minimum: BookshelfLayout.v050CoverWidth,
-                maximum: BookshelfLayout.v050CoverWidth
+                minimum: coverWidth,
+                maximum: coverWidth
             ),
             spacing: BookshelfLayout.columnSpacing
         )]
@@ -506,22 +589,22 @@ private struct MangaShelfView: View {
                         let cell = MangaLibraryItemCell(
                             item: item,
                             viewModel: viewModel,
-                            currentShelfID: section.shelf?.id,
-                            hideMove: section.isReading,
+                            currentShelfID: viewModel.shelfID(containing: item.id),
+                            hideMove: false,
                             onOpen: { onOpen(item) },
                             isSelecting: isSelecting,
                             selectedItems: $selectedItems,
-                            dragCoordinateSpaceName: section.isReading ? nil : coordinateSpaceName,
-                            onDragChanged: section.isReading ? nil : { location in
+                            dragCoordinateSpaceName: section.allowsReordering ? coordinateSpaceName : nil,
+                            onDragChanged: section.allowsReordering ? { location in
                                 reorderItem(item.id, draggedTo: location)
-                            },
-                            onDragEnded: section.isReading ? nil : { location in
+                            } : nil,
+                            onDragEnded: section.allowsReordering ? { location in
                                 reorderItem(item.id, draggedTo: location)
                                 endDrag()
-                            }
+                            } : nil
                         )
 
-                        if section.isReading {
+                        if !section.allowsReordering {
                             cell
                         } else {
                             cell
@@ -581,7 +664,7 @@ private struct MangaShelfView: View {
     }
 
     private func reorderItem(_ sourceID: String, draggedTo location: CGPoint) {
-        guard !section.isReading else { return }
+        guard section.allowsReordering else { return }
         beginDragIfNeeded(sourceID)
         guard let targetID = itemFrames.first(where: { id, frame in
             id != sourceID && frame.insetBy(dx: -8, dy: -8).contains(location)
@@ -795,35 +878,6 @@ private struct MangaCoverImage: View {
         }
         .aspectRatio(0.709, contentMode: .fit)
         .clipped()
-    }
-}
-
-private struct MangaShelfManagementView: View {
-    @Environment(\.dismiss) private var dismiss
-    let viewModel: MangaLibraryViewModel
-
-    var body: some View {
-        @Bindable var viewModel = viewModel
-        NativeReaderSheetPanel("Manage Manga Shelves", onClose: {
-            dismiss()
-        }) {
-            ShelfManagementForm(
-                showReading: $viewModel.showReading,
-                shelves: viewModel.catalog.shelves.map {
-                    ShelfManagementEntry(id: $0.id.uuidString, name: $0.name)
-                },
-                onCreate: viewModel.createShelf,
-                onDelete: { id in
-                    guard let shelfID = UUID(uuidString: id) else { return }
-                    viewModel.deleteShelf(id: shelfID)
-                },
-                onMove: viewModel.moveShelves
-            )
-        }
-        .frame(
-            width: ShelfManagementLayout.panelWidth,
-            height: ShelfManagementLayout.panelHeight
-        )
     }
 }
 

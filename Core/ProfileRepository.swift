@@ -225,9 +225,11 @@ final class ProfileRepository {
                 config.termDictionaries.removeAll { $0.fileName == fileName }
                 config.frequencyDictionaries.removeAll { $0.fileName == fileName }
                 config.pitchDictionaries.removeAll { $0.fileName == fileName }
+                config.kanjiDictionaries?.removeAll { $0.fileName == fileName }
                 for index in config.termDictionaries.indices { config.termDictionaries[index].order = index }
                 for index in config.frequencyDictionaries.indices { config.frequencyDictionaries[index].order = index }
                 for index in config.pitchDictionaries.indices { config.pitchDictionaries[index].order = index }
+                for index in config.kanjiDictionaries?.indices ?? 0..<0 { config.kanjiDictionaries?[index].order = index }
                 if let updated = try? encoder.encode(config) {
                     try? updated.write(to: configURL, options: .atomic)
                     if profile.id == self.index.defaultProfileId {

@@ -1,3 +1,4 @@
+// test-sources: Models/Statistics.swift
 import Foundation
 
 @main

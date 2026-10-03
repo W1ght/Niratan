@@ -197,7 +197,7 @@ nonisolated enum MangaReaderLayout: String, CaseIterable, Identifiable, Sendable
     }
 }
 
-nonisolated enum MangaReadingDirection: String, CaseIterable, Identifiable, Sendable {
+nonisolated enum MangaReadingDirection: String, Codable, CaseIterable, Identifiable, Sendable {
     case rightToLeft
     case leftToRight
 
@@ -352,13 +352,15 @@ nonisolated enum MangaWheelZoomResolver {
         currentScale: Double,
         deltaX: Double,
         deltaY: Double,
-        hasPreciseScrollingDeltas: Bool
+        hasPreciseScrollingDeltas: Bool,
+        minimumScale: Double = Double(MangaReaderPreferences.minimumZoomPercentage) / 100,
+        maximumScale: Double = Double(MangaReaderPreferences.maximumZoomPercentage) / 100,
+        sensitivityMultiplier: Double = 1
     ) -> Double? {
         let delta = abs(deltaY) >= abs(deltaX) ? deltaY : deltaX
         guard delta != 0 else { return nil }
-        let sensitivity = hasPreciseScrollingDeltas ? 0.012 : 0.12
-        let minimumScale = Double(MangaReaderPreferences.minimumZoomPercentage) / 100
-        let maximumScale = Double(MangaReaderPreferences.maximumZoomPercentage) / 100
+        let sensitivity = (hasPreciseScrollingDeltas ? 0.012 : 0.12)
+            * max(0.25, sensitivityMultiplier)
         return min(
             maximumScale,
             max(
@@ -487,11 +489,20 @@ nonisolated enum MangaOCRLanguage: String, Codable, Sendable {
 }
 
 nonisolated struct MangaOCRCacheKey: Hashable, Sendable {
+    static let googleLensEngineID = "google-lens"
+    static let googleLensEngineSignature = "google-lens-v2"
+
     let itemID: String
     let pageIndex: Int
     let pagePath: String
     let modifiedAt: Date?
     let language: MangaOCRLanguage
+    /// Each engine keeps its own cache directory, so switching engines never
+    /// discards another engine's completed pages.
+    var engineID: String = Self.googleLensEngineID
+    /// A changed signature (engine revision or model fingerprint) invalidates
+    /// only that engine's pages.
+    var engineSignature: String = Self.googleLensEngineSignature
 }
 
 nonisolated enum MangaMediaTypes {

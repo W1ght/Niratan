@@ -197,7 +197,7 @@ final class MpvPlayerEngine: PlaybackEngine {
     func load(source: VideoPlaybackSource) throws {
         guard let client else {
             throw MpvPlayerEngineError.initializationFailed(
-                initializationError ?? "Unable to initialize video playback."
+                initializationError ?? String(localized: "Unable to initialize video playback.")
             )
         }
         // A new mpv load removes any internal effects track. Invalidate the
@@ -343,7 +343,7 @@ final class MpvPlayerEngine: PlaybackEngine {
         var errorMessage: NSString?
         guard client?.captureScreenshot(to: url, errorMessage: &errorMessage) == true else {
             throw MpvPlayerEngineError.mediaExportFailed(
-                errorMessage as String? ?? "Unable to capture the video frame."
+                errorMessage as String? ?? String(localized: "Unable to capture the video frame.")
             )
         }
     }
@@ -359,7 +359,7 @@ final class MpvPlayerEngine: PlaybackEngine {
     ) async throws {
         guard let loadedSource else {
             throw MpvPlayerEngineError.mediaExportFailed(
-                "Unable to determine the video source for animated AVIF capture."
+                String(localized: "Unable to determine the video source for animated AVIF capture.")
             )
         }
         let sourceURL: URL
@@ -391,7 +391,7 @@ final class MpvPlayerEngine: PlaybackEngine {
         }.value
         guard result.0 else {
             throw MpvPlayerEngineError.mediaExportFailed(
-                result.1 ?? "The bundled animated AVIF encoder could not export this subtitle range."
+                result.1 ?? String(localized: "The bundled animated AVIF encoder could not export this subtitle range.")
             )
         }
     }
@@ -408,7 +408,7 @@ final class MpvPlayerEngine: PlaybackEngine {
                 })?.id
               ) else {
             throw MpvPlayerEngineError.mediaExportFailed(
-                "Unable to determine the video audio range."
+                String(localized: "Unable to determine the video audio range.")
             )
         }
         try await VideoAudioClipExporter.export(

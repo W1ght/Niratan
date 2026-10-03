@@ -31,7 +31,7 @@ struct BookshelfView: View {
     @Binding var pendingTab: Int?
 
     private var sepiaInverted: Bool {
-        userConfig.theme == .sepia && userConfig.sepiaInvertInDark && systemColorScheme == .dark
+        userConfig.usesDarkSepia(in: systemColorScheme)
     }
 
     private var readerChromeBackground: Color {

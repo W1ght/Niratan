@@ -2,6 +2,7 @@ import Foundation
 
 let repo = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let screenURL = repo.appendingPathComponent("Features/Video/VideoPlayerScreen.swift")
+let screenSubtitlesURL = repo.appendingPathComponent("Features/Video/VideoPlayerScreen+Subtitles.swift")
 let osdURL = repo.appendingPathComponent("Features/Video/VideoOnScreenDisplay.swift")
 
 func read(_ url: URL) -> String {
@@ -19,7 +20,12 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     }
 }
 
-let screen = read(screenURL)
+let screen = read(screenURL) + read(screenSubtitlesURL)
+    + read(repo.appendingPathComponent("Features/Video/VideoPlayerScreen+Chrome.swift"))
+    + read(repo.appendingPathComponent("Features/Video/VideoPlayerScreen+OSD.swift"))
+    + read(repo.appendingPathComponent("Features/Video/VideoPlayerScreen+Mining.swift"))
+    + read(repo.appendingPathComponent("Features/Video/VideoPlayerScreen+Opening.swift"))
+    + read(repo.appendingPathComponent("Features/Video/VideoPlayerScreen+Shortcuts.swift"))
 let osd = read(osdURL)
 
 require(osd.contains("struct VideoOnScreenDisplayItem"), "reusable OSD item type")

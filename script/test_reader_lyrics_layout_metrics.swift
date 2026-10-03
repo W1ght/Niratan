@@ -1,3 +1,4 @@
+// test-sources: Features/Reader/Lyrics/ReaderLyricsLayoutMetrics.swift
 import CoreGraphics
 import Foundation
 

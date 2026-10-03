@@ -30,7 +30,7 @@ let nativeReader = read("NativeMac/NativeReaderView.swift")
 
 expectContains(
     controllerSettings,
-    "private let registry = ShortcutRegistry.application",
+    "let registry = ShortcutRegistry.application",
     "Controller settings should use the same registry as keyboard shortcuts"
 )
 expectContains(
@@ -98,7 +98,7 @@ for legacyKey in [
 
 expectContains(
     controllerManager,
-    "private let registry = ShortcutRegistry.application",
+    "let registry = ShortcutRegistry.application",
     "Controller input should resolve actions through the shared registry"
 )
 expectContains(

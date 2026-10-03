@@ -8,6 +8,11 @@ struct VideoControlsMetrics {
     let bottomInset: CGFloat
 }
 
+/// Playback chrome in two user-selectable layouts:
+/// - floating: one draggable Liquid Glass panel with the timeline on top and
+///   volume / transport / tools in three centered clusters below;
+/// - compactBottom: a full-width bar on a dark scrim, timeline first, then
+///   transport and time on the left and tools on the right.
 struct VideoControlsView: View {
     let snapshot: VideoPlaybackSnapshot
     let timelinePreview: VideoTimelinePreview?
@@ -16,6 +21,8 @@ struct VideoControlsView: View {
     let canMineCurrentSubtitle: Bool
     let isFullScreen: Bool
     let isSubtitleGapFastForwardEnabled: Bool
+    var isMiningHistoryVisible = false
+    var isInspectorVisible = false
     let layout: VideoControlBarLayout
     let availableWidth: CGFloat
     @Binding var isSpeedPanelVisible: Bool
@@ -49,28 +56,27 @@ struct VideoControlsView: View {
     @State private var speedInputText = ""
 
     private static let controlsWidth: CGFloat = 760
-    private static let floatingControlsWidth: CGFloat = 690
-    private static let floatingControlsHeight: CGFloat = 74
-    private static let floatingIconSize: CGFloat = 26
-    private static let floatingPlaybackButtonSize: CGFloat = 30
-    private static let compactIconSize: CGFloat = 28
-    private static let compactPlaybackButtonSize: CGFloat = 34
-    private static let compactControlsHeight: CGFloat = 58
-    static let timelinePreviewChromeHeight: CGFloat = 204
-    private static let compactTimelinePreviewChromeHeight: CGFloat = 108
-    private static let floatingProgressHorizontalInset: CGFloat = 58
+    private static let floatingControlsWidth: CGFloat = 760
+    private static let floatingControlsHeight: CGFloat = 90
+    private static let floatingCornerRadius: CGFloat = 24
+    private static let floatingIconSize: CGFloat = 30
+    private static let floatingPlaybackButtonSize: CGFloat = 42
+    private static let compactIconSize: CGFloat = 30
+    private static let compactPlaybackButtonSize: CGFloat = 38
+    private static let compactControlsHeight: CGFloat = 84
+    static let timelinePreviewChromeHeight: CGFloat = 214
+    private static let compactTimelinePreviewChromeHeight: CGFloat = 112
+    private static let floatingProgressHorizontalInset: CGFloat = 54
     private static let compactProgressHorizontalInset: CGFloat = 0
-    private static let floatingProgressSliderTopInControls: CGFloat = 43
-    private static let compactHorizontalPadding: CGFloat = 30
-    private static let compactProgressSliderTop: CGFloat = 44
-    private static let timelinePreviewWidth: CGFloat = 156
-    private static let timelinePreviewBubbleCenterY: CGFloat = -70
-    private static let compactTimelinePreviewBubbleCenterY: CGFloat = -54
+    private static let floatingHorizontalPadding: CGFloat = 16
+    private static let compactHorizontalPadding: CGFloat = 22
+    private static let timelineHitHeight: CGFloat = 18
+    private static let timelinePreviewWidth: CGFloat = 76
+    private static let timelinePreviewBubbleCenterY: CGFloat = -34
+    private static let compactTimelinePreviewBubbleCenterY: CGFloat = -24
     private static let controlsCoordinateSpace = "video-controls"
-    private static let speedPanelWidth: CGFloat = 258
-    private static let speedPanelCenterX: CGFloat = 552
-    private static let speedPanelCenterY: CGFloat = 68
-    private static let compactSpeedPanelCenterY: CGFloat = 18
+    private static let speedPanelWidth: CGFloat = 264
+    private static let speedPanelHalfHeight: CGFloat = 74
     private static let speedPresetRows = [
         [0.25, 0.5, 1.0, 1.5],
         [2.0, 3.0, 4.0, 5.0]
@@ -126,7 +132,7 @@ struct VideoControlsView: View {
     }
 
     private var controlDensity: ControlDensity {
-        let fullThreshold: CGFloat = layout == .floating ? 650 : 720
+        let fullThreshold: CGFloat = layout == .floating ? 680 : 720
         if activeChromeWidth >= fullThreshold {
             return .full
         }
@@ -134,10 +140,6 @@ struct VideoControlsView: View {
             return .condensed
         }
         return .minimal
-    }
-
-    private var compactProgressSliderWidth: CGFloat {
-        max(activeChromeWidth - Self.compactHorizontalPadding * 2, 220)
     }
 
     private var controlTreatment: VideoControlTreatment {
@@ -167,15 +169,6 @@ struct VideoControlsView: View {
         }
     }
 
-    private var speedButtonSize: CGSize {
-        switch layout {
-        case .floating:
-            CGSize(width: 62, height: 26)
-        case .compactBottom:
-            CGSize(width: 66, height: 28)
-        }
-    }
-
     private var compactControlForeground: Color {
         Color.white.opacity(0.92)
     }
@@ -185,7 +178,7 @@ struct VideoControlsView: View {
             switch layout {
             case .floating:
                 floatingControls
-                    .modifier(VideoFloatingGlassSurface())
+                    .modifier(VideoFloatingGlassSurface(cornerRadius: Self.floatingCornerRadius))
                     .zIndex(0)
             case .compactBottom:
                 compactBottomControls
@@ -195,7 +188,7 @@ struct VideoControlsView: View {
             if isSpeedPanelVisible {
                 speedControlPanel
                     .position(speedPanelPosition)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomTrailing)))
                     .zIndex(30)
             }
 
@@ -207,7 +200,7 @@ struct VideoControlsView: View {
                         y: progressFrame.minY + timelinePreviewBubbleCenterY
                     )
                     .allowsHitTesting(false)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
                     .zIndex(20)
             }
         }
@@ -217,6 +210,7 @@ struct VideoControlsView: View {
             height: Self.metrics(for: layout).chromeSize.height,
             alignment: .bottom
         )
+        .animation(.snappy(duration: 0.16), value: isProgressHovering || isScrubbing)
         .onPreferenceChange(VideoProgressFramePreferenceKey.self) { frame in
             progressFrame = frame
         }
@@ -236,13 +230,16 @@ struct VideoControlsView: View {
         }
     }
 
+    // MARK: Layouts
+
     private var floatingControls: some View {
-        VStack(spacing: 5) {
-            responsivePrimaryControlGroup
+        VStack(spacing: 6) {
             progressControlStrip
+            responsivePrimaryControlGroup
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.horizontal, Self.floatingHorizontalPadding)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
         .background {
             controlDragSurface
         }
@@ -250,32 +247,34 @@ struct VideoControlsView: View {
     }
 
     private var compactBottomControls: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             timelineProgressControl
                 .frame(maxWidth: .infinity)
-                .frame(height: 16)
+                .frame(height: Self.timelineHitHeight)
                 .padding(.horizontal, Self.compactProgressHorizontalInset)
 
             responsiveCompactControlGroup
-                .padding(.horizontal, Self.compactHorizontalPadding)
         }
+        .padding(.horizontal, Self.compactHorizontalPadding)
+        .padding(.bottom, 12)
         .frame(width: activeChromeWidth, height: Self.metrics(for: .compactBottom).chromeSize.height, alignment: .bottom)
         .background(alignment: .bottom) {
             compactBottomScrim
         }
     }
 
+    /// Tall enough that white controls stay legible over bright frames.
     private var compactBottomScrim: some View {
         LinearGradient(
-            colors: [
-                Color.black.opacity(0.30),
-                Color.black.opacity(0.16),
-                Color.black.opacity(0)
+            stops: [
+                .init(color: Color.black.opacity(0.62), location: 0),
+                .init(color: Color.black.opacity(0.38), location: 0.45),
+                .init(color: Color.black.opacity(0), location: 1)
             ],
             startPoint: .bottom,
             endPoint: .top
         )
-        .frame(height: Self.metrics(for: .compactBottom).chromeSize.height)
+        .frame(height: Self.metrics(for: .compactBottom).chromeSize.height + 48)
         .allowsHitTesting(false)
     }
 
@@ -294,19 +293,24 @@ struct VideoControlsView: View {
             )
     }
 
+    /// Volume, transport and tools as three clusters; the outer two share the
+    /// remaining width so play/pause stays centered in the panel.
     private var primaryControlGroup: some View {
-        HStack(spacing: layout == .floating ? 8 : 10) {
-            volumeControl
-                .frame(width: 112, alignment: .leading)
-
-            Spacer(minLength: 0)
+        HStack(spacing: 8) {
+            HStack(spacing: 0) {
+                volumeControl
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
 
             episodeControls
 
-            Spacer(minLength: 0)
-
-            speedControlButton
-            utilityControlGroup
+            HStack(spacing: 4) {
+                Spacer(minLength: 0)
+                speedControlButton
+                utilityControlGroup
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -326,16 +330,17 @@ struct VideoControlsView: View {
     private var responsiveCompactControlGroup: some View {
         switch controlDensity {
         case .full:
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 episodeControls
 
                 volumeControl
-                    .frame(width: 112, alignment: .leading)
+                    .padding(.leading, 6)
 
                 Text(compactTimeText)
-                    .font(.caption.monospacedDigit())
+                    .font(.callout.weight(.medium).monospacedDigit())
                     .foregroundStyle(compactControlForeground)
-                    .frame(width: 106, alignment: .leading)
+                    .padding(.leading, 8)
+                    .fixedSize()
 
                 Spacer(minLength: 0)
 
@@ -350,7 +355,7 @@ struct VideoControlsView: View {
     }
 
     private var condensedControlGroup: some View {
-        HStack(spacing: layout == .floating ? 8 : 10) {
+        HStack(spacing: 4) {
             episodeControls
             Spacer(minLength: 4)
             speedControlButton
@@ -362,7 +367,7 @@ struct VideoControlsView: View {
     }
 
     private var minimalControlGroup: some View {
-        HStack(spacing: layout == .floating ? 8 : 10) {
+        HStack(spacing: 4) {
             Spacer(minLength: 0)
             episodeControls
             Spacer(minLength: 4)
@@ -372,7 +377,7 @@ struct VideoControlsView: View {
     }
 
     private var utilityControlGroup: some View {
-        HStack(spacing: layout == .floating ? 8 : 10) {
+        HStack(spacing: 2) {
             subtitleGapFastForwardButton
             miningHistoryButton
             openVideoButton
@@ -383,18 +388,20 @@ struct VideoControlsView: View {
         }
     }
 
+    // MARK: Buttons
+
+    private func iconLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .labelStyle(.iconOnly)
+            .font(.system(size: 14, weight: .semibold))
+            .frame(width: iconButtonSize, height: iconButtonSize)
+    }
+
     private var subtitleGapFastForwardButton: some View {
         Button(action: onToggleSubtitleGapFastForward) {
-            Label("Fast-forward Subtitle Gaps", systemImage: "forward.fill")
-                .labelStyle(.iconOnly)
-                .frame(width: iconButtonSize, height: iconButtonSize)
+            iconLabel("Fast-forward Subtitle Gaps", systemImage: "forward.fill")
         }
-        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
-        .background {
-            if isSubtitleGapFastForwardEnabled {
-                Circle().fill(Color.white.opacity(0.16))
-            }
-        }
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment, isActive: isSubtitleGapFastForwardEnabled))
         .help("Fast-forward Subtitle Gaps")
         .accessibilityLabel(Text("Fast-forward Subtitle Gaps"))
         .accessibilityValue(Text(isSubtitleGapFastForwardEnabled ? "On" : "Off"))
@@ -402,19 +409,15 @@ struct VideoControlsView: View {
 
     private var miningHistoryButton: some View {
         Button(action: onToggleMiningHistory) {
-            Label("Mining History", systemImage: "clock.arrow.circlepath")
-                .labelStyle(.iconOnly)
-                .frame(width: iconButtonSize, height: iconButtonSize)
+            iconLabel("Mining History", systemImage: "clock.arrow.circlepath")
         }
-        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment, isActive: isMiningHistoryVisible))
         .help("Mining History")
     }
 
     private var openVideoButton: some View {
         Button(action: onOpenVideo) {
-            Label("Open Video", systemImage: "film")
-                .labelStyle(.iconOnly)
-                .frame(width: iconButtonSize, height: iconButtonSize)
+            iconLabel("Open Video", systemImage: "film")
         }
         .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .help("Open Video")
@@ -422,9 +425,7 @@ struct VideoControlsView: View {
 
     private var mineCurrentSubtitleButton: some View {
         Button(action: onMineCurrentSubtitle) {
-            Label("Mine Current Subtitle", systemImage: "tray.and.arrow.down")
-                .labelStyle(.iconOnly)
-                .frame(width: iconButtonSize, height: iconButtonSize)
+            iconLabel("Mine Current Subtitle", systemImage: "tray.and.arrow.down")
         }
         .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .disabled(!canMineCurrentSubtitle)
@@ -433,9 +434,7 @@ struct VideoControlsView: View {
 
     private var screenshotButton: some View {
         Button(action: onSaveScreenshot) {
-            Label("Save Clean Screenshot", systemImage: "camera")
-                .labelStyle(.iconOnly)
-                .frame(width: iconButtonSize, height: iconButtonSize)
+            iconLabel("Save Clean Screenshot", systemImage: "camera")
         }
         .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .disabled(!canSaveScreenshot)
@@ -445,11 +444,9 @@ struct VideoControlsView: View {
 
     private var inspectorButton: some View {
         Button(action: onToggleInspector) {
-            Label("Inspector", systemImage: "sidebar.trailing")
-                .labelStyle(.iconOnly)
-                .frame(width: iconButtonSize, height: iconButtonSize)
+            iconLabel("Inspector", systemImage: "sidebar.trailing")
         }
-        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
+        .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment, isActive: isInspectorVisible))
         .help("Inspector")
     }
 
@@ -458,12 +455,15 @@ struct VideoControlsView: View {
             Image(systemName: isFullScreen
                 ? "arrow.down.right.and.arrow.up.left"
                 : "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 14, weight: .semibold))
                 .frame(width: iconButtonSize, height: iconButtonSize)
         }
         .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
         .help("Toggle Full Screen")
     }
 
+    /// A text pill: the current rate is the label, so the gauge icon only
+    /// appears in the panel header.
     private var speedControlButton: some View {
         Button {
             synchronizeSpeedInput()
@@ -471,48 +471,48 @@ struct VideoControlsView: View {
                 isSpeedPanelVisible.toggle()
             }
         } label: {
-            HStack(spacing: 4) {
-                Label("Playback Speed", systemImage: "speedometer")
-                    .labelStyle(.iconOnly)
-                    .imageScale(.small)
-                Text(VideoPlaybackSpeed.label(snapshot.speed))
-                    .font(.caption2.weight(.semibold).monospacedDigit())
-                    .frame(minWidth: 30, alignment: .leading)
-            }
-            .frame(width: speedButtonSize.width, height: speedButtonSize.height)
+            Text(VideoPlaybackSpeed.label(snapshot.speed))
+                .font(.system(size: 12, weight: .bold).monospacedDigit())
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .frame(minWidth: 40)
+                .frame(height: 24)
         }
-        .buttonStyle(VideoSpeedControlButtonStyle(treatment: controlTreatment))
+        .buttonStyle(VideoSpeedControlButtonStyle(treatment: controlTreatment, isActive: isSpeedPanelVisible))
+        .padding(.horizontal, 2)
         .help("Playback Speed")
         .accessibilityLabel(Text("Playback Speed"))
         .accessibilityValue(Text(VideoPlaybackSpeed.label(snapshot.speed)))
     }
 
     private var speedControlPanel: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Label("Playback Speed", systemImage: "speedometer")
-                    .font(.caption.weight(.semibold))
+                    .font(.callout.weight(.semibold))
                     .labelStyle(.titleAndIcon)
 
                 Spacer(minLength: 0)
 
                 Text(VideoPlaybackSpeed.label(snapshot.speed))
-                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .font(.callout.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(Self.speedPresetRows, id: \.self) { row in
-                HStack(spacing: 6) {
-                    ForEach(row, id: \.self) { speed in
-                        Button {
-                            setSpeed(speed)
-                        } label: {
-                            Text(Self.speedLabel(speed))
-                                .font(.caption.weight(.semibold).monospacedDigit())
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 24)
+            VStack(spacing: 6) {
+                ForEach(Self.speedPresetRows, id: \.self) { row in
+                    HStack(spacing: 6) {
+                        ForEach(row, id: \.self) { speed in
+                            Button {
+                                setSpeed(speed)
+                            } label: {
+                                Text(Self.speedLabel(speed))
+                                    .font(.caption.weight(.semibold).monospacedDigit())
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 26)
+                            }
+                            .buttonStyle(VideoSpeedPresetButtonStyle(isSelected: isSpeedSelected(speed)))
                         }
-                        .buttonStyle(VideoSpeedPresetButtonStyle(isSelected: isSpeedSelected(speed)))
                     }
                 }
             }
@@ -533,7 +533,7 @@ struct VideoControlsView: View {
                         .textFieldStyle(.plain)
                         .multilineTextAlignment(.trailing)
                         .font(.caption.weight(.semibold).monospacedDigit())
-                        .frame(width: 48)
+                        .frame(width: 44)
                         .onSubmit {
                             commitSpeedInput()
                         }
@@ -546,42 +546,41 @@ struct VideoControlsView: View {
                 .modifier(VideoControlsTextFieldGlassSurface(cornerRadius: 10))
             }
         }
-        .padding(10)
+        .padding(14)
         .frame(width: Self.speedPanelWidth)
-        .modifier(VideoFloatingGlassSurface())
+        .modifier(VideoFloatingGlassSurface(cornerRadius: 20))
         .onAppear {
             synchronizeSpeedInput()
         }
     }
 
+    // MARK: Timeline
+
     private var progressControlStrip: some View {
-        ZStack(alignment: .center) {
+        HStack(spacing: 10) {
+            Text(VideoTimeFormatter.string(from: isScrubbing ? scrubTime : snapshot.currentTime))
+                .font(.caption.weight(.medium).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: Self.floatingProgressHorizontalInset - 10, alignment: .leading)
+                .allowsHitTesting(false)
+
             timelineProgressControl
                 .frame(maxWidth: .infinity)
-                .frame(height: 16)
-                .padding(.horizontal, Self.floatingProgressHorizontalInset)
+                .frame(height: Self.timelineHitHeight)
 
-            HStack {
-                Text(VideoTimeFormatter.string(from: isScrubbing ? scrubTime : snapshot.currentTime))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, alignment: .leading)
-
-                Spacer(minLength: 0)
-
-                Text(remainingTimeText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .trailing)
-            }
-            .allowsHitTesting(false)
+            Text(remainingTimeText)
+                .font(.caption.weight(.medium).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: Self.floatingProgressHorizontalInset - 10, alignment: .trailing)
+                .allowsHitTesting(false)
         }
     }
 
     private var episodeControls: some View {
-        HStack(spacing: layout == .floating ? 5 : 6) {
+        HStack(spacing: layout == .floating ? 10 : 4) {
             Button(action: onPrevious) {
                 Image(systemName: "backward.end.fill")
+                    .font(.system(size: 15, weight: .semibold))
                     .frame(width: iconButtonSize, height: iconButtonSize)
             }
             .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
@@ -590,6 +589,8 @@ struct VideoControlsView: View {
 
             Button(action: onTogglePlayback) {
                 Image(systemName: snapshot.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: layout == .floating ? 22 : 20, weight: .bold))
+                    .contentTransition(.symbolEffect(.replace))
                     .frame(width: playbackButtonSize, height: playbackButtonSize)
                     .contentShape(Circle())
             }
@@ -598,6 +599,7 @@ struct VideoControlsView: View {
 
             Button(action: onNext) {
                 Image(systemName: "forward.end.fill")
+                    .font(.system(size: 15, weight: .semibold))
                     .frame(width: iconButtonSize, height: iconButtonSize)
             }
             .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
@@ -606,44 +608,64 @@ struct VideoControlsView: View {
         }
     }
 
+    private var displayedProgress: Double {
+        guard snapshot.duration > 0 else { return 0 }
+        let time = isScrubbing ? scrubTime : snapshot.currentTime
+        return min(max(time / snapshot.duration, 0), 1)
+    }
+
     private var timelineProgressControl: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                progressSlider
-                    .frame(width: geometry.size.width)
-                    .background {
-                        VideoProgressHoverBridge(
-                            onHover: { localX in
-                                handleProgressHover(
-                                    localX: localX,
-                                    width: geometry.size.width
-                                )
-                            },
-                            onExit: {
-                                handleProgressExit()
-                            }
-                        )
-                        .allowsHitTesting(false)
-                    }
-                    .background {
-                        GeometryReader { proxy in
-                            Color.clear
-                                .preference(
-                                    key: VideoProgressFramePreferenceKey.self,
-                                    value: proxy.frame(in: .named(Self.controlsCoordinateSpace))
-                                )
+                VideoTimelineTrack(
+                    progress: displayedProgress,
+                    isEmphasized: isProgressHovering || isScrubbing,
+                    treatment: controlTreatment
+                )
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .background {
+                    VideoProgressHoverBridge(
+                        onHover: { localX in
+                            handleProgressHover(
+                                localX: localX,
+                                width: geometry.size.width
+                            )
+                        },
+                        onExit: {
+                            handleProgressExit()
                         }
+                    )
+                    .allowsHitTesting(false)
+                }
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(
+                                key: VideoProgressFramePreferenceKey.self,
+                                value: proxy.frame(in: .named(Self.controlsCoordinateSpace))
+                            )
                     }
+                }
 
                 VideoTimelineChapterMarkers(
                     chapters: snapshot.chapters,
-                    duration: snapshot.duration
+                    duration: snapshot.duration,
+                    treatment: controlTreatment
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        scrub(toX: value.location.x, width: geometry.size.width)
+                    }
+                    .onEnded { _ in
+                        endScrubbing()
+                    }
+            )
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
@@ -661,64 +683,75 @@ struct VideoControlsView: View {
             .onChange(of: geometry.size) { _, size in
                 progressWidth = size.width
             }
+            .accessibilityRepresentation {
+                Slider(
+                    value: Binding(
+                        get: { snapshot.currentTime },
+                        set: { onSeek(clampedProgressTime($0)) }
+                    ),
+                    in: 0...max(snapshot.duration, 0.01)
+                ) {
+                    Text("Playback Position")
+                }
+                .accessibilityValue(Text(VideoTimeFormatter.string(from: snapshot.currentTime)))
+            }
         }
     }
 
-    private var progressSlider: some View {
-        Slider(
-            value: Binding(
-                get: { isScrubbing ? scrubTime : snapshot.currentTime },
-                set: { value in
-                    let time = clampedProgressTime(value)
-                    scrubTime = time
-                    updateProgressPreview(time: time)
-                }
-            ),
-            in: 0...max(snapshot.duration, 0.01),
-            onEditingChanged: { editing in
-                isScrubbing = editing
-                if editing {
-                    let time = clampedProgressTime(snapshot.currentTime)
-                    progressPreviewHideTask?.cancel()
-                    isProgressPreviewActive = true
-                    scrubTime = time
-                    updateProgressPreview(time: time)
-                } else {
-                    onSeek(scrubTime)
-                    isProgressPreviewActive = true
-                    updateProgressPreview(time: scrubTime)
-                    if !isProgressHovering {
-                        scheduleProgressPreviewHide()
-                    }
-                }
-            }
-        )
-        .controlSize(.small)
+    private func scrub(toX x: CGFloat, width: CGFloat) {
+        guard width > 0 else { return }
+        if !isScrubbing {
+            isScrubbing = true
+            progressPreviewHideTask?.cancel()
+            isProgressPreviewActive = true
+        }
+        let time = progressTime(for: min(max(x, 0), width), width: width)
+        scrubTime = time
+        updateProgressPreview(time: time)
+    }
+
+    private func endScrubbing() {
+        guard isScrubbing else { return }
+        isScrubbing = false
+        onSeek(scrubTime)
+        isProgressPreviewActive = true
+        updateProgressPreview(time: scrubTime)
+        if !isProgressHovering {
+            scheduleProgressPreviewHide()
+        }
     }
 
     private var volumeControl: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 2) {
             Button(action: onToggleMuted) {
-                Image(systemName: snapshot.isMuted || snapshot.volume == 0
-                    ? "speaker.slash.fill"
-                    : "speaker.wave.2.fill")
-                .frame(width: iconButtonSize, height: iconButtonSize)
+                Image(systemName: volumeSymbolName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(width: iconButtonSize, height: iconButtonSize)
             }
             .buttonStyle(VideoGlassIconButtonStyle(treatment: controlTreatment))
             .help(snapshot.isMuted ? "Unmute" : "Mute")
 
-            Slider(
-                value: Binding(
-                    get: { snapshot.volume },
-                    set: { value in
-                        onSetVolume(value)
-                    }
-                ),
-                in: 0...100
+            VideoVolumeTrack(
+                volume: snapshot.isMuted ? 0 : snapshot.volume,
+                treatment: controlTreatment,
+                onSetVolume: onSetVolume
             )
-            .controlSize(.small)
-            .frame(width: 84)
+            .frame(width: 64, height: Self.timelineHitHeight)
         }
+    }
+
+    private var volumeSymbolName: String {
+        if snapshot.isMuted || snapshot.volume == 0 {
+            return "speaker.slash.fill"
+        }
+        if snapshot.volume < 34 {
+            return "speaker.wave.1.fill"
+        }
+        if snapshot.volume < 67 {
+            return "speaker.wave.2.fill"
+        }
+        return "speaker.wave.3.fill"
     }
 
     private static func speedLabel(_ speed: Double) -> String {
@@ -797,46 +830,47 @@ struct VideoControlsView: View {
         switch layout {
         case .floating:
             let controlsTop = Self.timelinePreviewChromeHeight - Self.floatingControlsHeight
-            let horizontalPadding: CGFloat = 24
+            let horizontalPadding = Self.floatingHorizontalPadding * 2
             let progressWidth = max(
                 activeChromeWidth - horizontalPadding - Self.floatingProgressHorizontalInset * 2,
                 0
             )
             return CGRect(
-                x: horizontalPadding / 2 + Self.floatingProgressHorizontalInset,
-                y: controlsTop + Self.floatingProgressSliderTopInControls,
+                x: Self.floatingHorizontalPadding + Self.floatingProgressHorizontalInset,
+                y: controlsTop + 12,
                 width: progressWidth,
-                height: 16
+                height: Self.timelineHitHeight
             )
         case .compactBottom:
             let progressWidth = max(
-                activeChromeWidth - Self.compactProgressHorizontalInset * 2,
+                activeChromeWidth - Self.compactHorizontalPadding * 2,
                 0
             )
             return CGRect(
-                x: Self.compactProgressHorizontalInset,
-                y: Self.compactProgressSliderTop,
+                x: Self.compactHorizontalPadding,
+                y: Self.compactTimelinePreviewChromeHeight - Self.compactControlsHeight,
                 width: progressWidth,
-                height: 16
+                height: Self.timelineHitHeight
             )
         }
     }
 
+    /// Opens above the tools cluster at the trailing edge of the controls.
     private var speedPanelPosition: CGPoint {
+        let halfWidth = Self.speedPanelWidth / 2
+        let trailingLimit = max(activeChromeWidth - halfWidth, halfWidth)
+        let controlsTop: CGFloat
         switch layout {
         case .floating:
-            let halfWidth = Self.speedPanelWidth / 2
-            let trailingLimit = max(activeChromeWidth - halfWidth, halfWidth)
-            return CGPoint(
-                x: min(max(Self.speedPanelCenterX, halfWidth), trailingLimit),
-                y: Self.speedPanelCenterY
-            )
+            controlsTop = Self.timelinePreviewChromeHeight - Self.floatingControlsHeight
         case .compactBottom:
-            return CGPoint(
-                x: max(activeChromeWidth - 222, Self.speedPanelWidth / 2),
-                y: Self.compactSpeedPanelCenterY
-            )
+            controlsTop = Self.compactTimelinePreviewChromeHeight - Self.compactControlsHeight
         }
+        let trailingInset: CGFloat = layout == .floating ? 8 : Self.compactHorizontalPadding
+        return CGPoint(
+            x: min(max(activeChromeWidth - halfWidth - trailingInset, halfWidth), trailingLimit),
+            y: controlsTop - 10 - Self.speedPanelHalfHeight
+        )
     }
 
     private var timelinePreviewBubbleCenterY: CGFloat {
@@ -921,17 +955,12 @@ struct VideoControlsView: View {
 
     private func timelinePreviewBubble(_ preview: VideoTimelinePreview) -> some View {
         Text(VideoTimeFormatter.string(from: preview.time))
-            .font(.caption.monospacedDigit().weight(.semibold))
+            .font(.callout.monospacedDigit().weight(.semibold))
             .foregroundStyle(.primary)
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(width: Self.timelinePreviewWidth)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.white.opacity(0.18), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.38), radius: 18, y: 8)
+            .padding(.vertical, 5)
+            .frame(minWidth: Self.timelinePreviewWidth)
+            .glassEffect(.regular, in: Capsule())
     }
 }
 
@@ -943,9 +972,99 @@ private struct VideoProgressFramePreferenceKey: PreferenceKey {
     }
 }
 
+/// Thin rounded track that thickens and shows its knob while hovered or
+/// scrubbed, so the timeline reads as part of the chrome rather than a form
+/// slider.
+private struct VideoTimelineTrack: View {
+    let progress: Double
+    let isEmphasized: Bool
+    let treatment: VideoControlTreatment
+    var restingHeight: CGFloat = 4
+    var emphasizedHeight: CGFloat = 7
+    var knobSize: CGFloat = 13
+
+    var body: some View {
+        GeometryReader { geometry in
+            let trackHeight = isEmphasized ? emphasizedHeight : restingHeight
+            let filledWidth = geometry.size.width * CGFloat(progress)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(treatment.trackBackground)
+                Capsule()
+                    .fill(treatment.trackFill)
+                    .frame(width: max(trackHeight, filledWidth))
+            }
+            .frame(height: trackHeight)
+            .frame(maxHeight: .infinity)
+            .overlay(alignment: .leading) {
+                if isEmphasized {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: knobSize, height: knobSize)
+                        .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                        .offset(x: min(max(filledWidth - knobSize / 2, -knobSize / 2), geometry.size.width - knobSize / 2))
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+        }
+    }
+}
+
+private struct VideoVolumeTrack: View {
+    let volume: Double
+    let treatment: VideoControlTreatment
+    let onSetVolume: (Double) -> Void
+
+    @State private var isHovered = false
+    @State private var isDragging = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            VideoTimelineTrack(
+                progress: min(max(volume / 100, 0), 1),
+                isEmphasized: isHovered || isDragging,
+                treatment: treatment,
+                restingHeight: 3,
+                emphasizedHeight: 5,
+                knobSize: 11
+            )
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        isDragging = true
+                        setVolume(x: value.location.x, width: geometry.size.width)
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                    }
+            )
+        }
+        .onHover { isHovered = $0 }
+        .animation(.snappy(duration: 0.16), value: isHovered || isDragging)
+        .help("Volume")
+        .accessibilityRepresentation {
+            Slider(
+                value: Binding(get: { volume }, set: { onSetVolume($0) }),
+                in: 0...100
+            ) {
+                Text("Volume")
+            }
+        }
+    }
+
+    private func setVolume(x: CGFloat, width: CGFloat) {
+        guard width > 0 else { return }
+        let fraction = min(max(Double(x / width), 0), 1)
+        onSetVolume((fraction * 100).rounded())
+    }
+}
+
 private struct VideoTimelineChapterMarkers: View {
     let chapters: [VideoChapter]
     let duration: TimeInterval
+    let treatment: VideoControlTreatment
 
     private var markerTimes: [TimeInterval] {
         guard duration.isFinite, duration > 0 else {
@@ -971,9 +1090,8 @@ private struct VideoTimelineChapterMarkers: View {
         GeometryReader { geometry in
             ForEach(markerTimes, id: \.self) { time in
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.82))
-                    .frame(width: 2, height: 8)
-                    .shadow(color: .black.opacity(0.45), radius: 0.5)
+                    .fill(treatment.chapterMarker)
+                    .frame(width: 2, height: 9)
                     .position(
                         x: markerX(for: time, width: geometry.size.width),
                         y: geometry.size.height / 2
@@ -1075,10 +1193,12 @@ private final class VideoProgressHoverMonitorView: NSView {
 }
 
 private struct VideoFloatingGlassSurface: ViewModifier {
+    var cornerRadius: CGFloat = 12
+
     func body(content: Content) -> some View {
         GlassEffectContainer(spacing: 10) {
             content
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
 }
@@ -1092,7 +1212,7 @@ private enum VideoControlTreatment {
         case .floating:
             AnyShapeStyle(isEnabled ? .primary : .tertiary)
         case .compactBottom:
-            AnyShapeStyle(Color.white.opacity(isEnabled ? 0.92 : 0.34))
+            AnyShapeStyle(Color.white.opacity(isEnabled ? 0.94 : 0.34))
         }
     }
 
@@ -1100,42 +1220,153 @@ private enum VideoControlTreatment {
         guard isPressed else { return Color.clear }
         switch self {
         case .floating:
-            return Color.white.opacity(0.12)
+            return Color.primary.opacity(0.16)
         case .compactBottom:
-            return Color.white.opacity(0.18)
+            return Color.white.opacity(0.24)
         }
     }
 
+    var hoverFill: Color {
+        switch self {
+        case .floating:
+            Color.primary.opacity(0.09)
+        case .compactBottom:
+            Color.white.opacity(0.14)
+        }
+    }
+
+    var activeFill: Color {
+        switch self {
+        case .floating:
+            Color.primary.opacity(0.16)
+        case .compactBottom:
+            Color.white.opacity(0.22)
+        }
+    }
+
+    var trackBackground: Color {
+        switch self {
+        case .floating:
+            Color.primary.opacity(0.18)
+        case .compactBottom:
+            Color.white.opacity(0.28)
+        }
+    }
+
+    var trackFill: Color {
+        switch self {
+        case .floating:
+            Color.primary.opacity(0.85)
+        case .compactBottom:
+            Color.white
+        }
+    }
+
+    var chapterMarker: Color {
+        switch self {
+        case .floating:
+            Color.primary.opacity(0.55)
+        case .compactBottom:
+            Color.black.opacity(0.55)
+        }
+    }
+
+    /// Bare white glyphs need a soft shadow to survive bright frames.
+    var glyphShadowOpacity: Double {
+        switch self {
+        case .floating:
+            0
+        case .compactBottom:
+            0.45
+        }
+    }
+}
+
+/// Hover and active highlight shared by the control button styles.
+private struct VideoControlHighlight<S: Shape>: View {
+    let shape: S
+    let treatment: VideoControlTreatment
+    let isPressed: Bool
+    let isActive: Bool
+    let isHovered: Bool
+
+    var body: some View {
+        if isPressed {
+            shape.fill(treatment.iconPressedFill(isPressed: true))
+        } else if isActive {
+            shape.fill(treatment.activeFill)
+        } else if isHovered {
+            shape.fill(treatment.hoverFill)
+        }
+    }
+}
+
+private struct VideoHoverTrackingLabel<Content: View, S: Shape>: View {
+    let shape: S
+    let treatment: VideoControlTreatment
+    let isPressed: Bool
+    let isActive: Bool
+    @ViewBuilder let content: () -> Content
+
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovered = false
+
+    var body: some View {
+        content()
+            .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
+            .shadow(color: .black.opacity(treatment.glyphShadowOpacity), radius: 2, y: 0.5)
+            .background {
+                VideoControlHighlight(
+                    shape: shape,
+                    treatment: treatment,
+                    isPressed: isPressed,
+                    isActive: isActive,
+                    isHovered: isHovered && isEnabled
+                )
+            }
+            .contentShape(shape)
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+    }
 }
 
 private struct VideoGlassIconButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
     let treatment: VideoControlTreatment
+    var isActive = false
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
-            .background {
-                Circle().fill(treatment.iconPressedFill(isPressed: configuration.isPressed))
-            }
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .contentShape(Circle())
+        VideoHoverTrackingLabel(
+            shape: Circle(),
+            treatment: treatment,
+            isPressed: configuration.isPressed,
+            isActive: isActive
+        ) {
+            configuration.label
+        }
+        .scaleEffect(configuration.isPressed ? 0.92 : 1)
+        .animation(.snappy(duration: 0.14), value: configuration.isPressed)
     }
 }
 
 private struct VideoSpeedControlButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
     let treatment: VideoControlTreatment
+    var isActive = false
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(treatment.iconPressedFill(isPressed: configuration.isPressed))
-            }
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        VideoHoverTrackingLabel(
+            shape: Capsule(),
+            treatment: treatment,
+            isPressed: configuration.isPressed,
+            isActive: isActive
+        ) {
+            configuration.label
+                .overlay {
+                    Capsule()
+                        .strokeBorder(treatment.trackBackground, lineWidth: 1)
+                }
+        }
+        .scaleEffect(configuration.isPressed ? 0.96 : 1)
+        .animation(.snappy(duration: 0.14), value: configuration.isPressed)
     }
 }
 
@@ -1145,26 +1376,22 @@ private struct VideoSpeedPresetButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .foregroundStyle(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(isEnabled ? .primary : .tertiary))
             .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(buttonFill(isPressed: configuration.isPressed))
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(.white.opacity(isSelected ? 0.22 : 0.1), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     private func buttonFill(isPressed: Bool) -> Color {
-        if isPressed {
-            return Color.white.opacity(0.16)
-        }
         if isSelected {
-            return Color.accentColor.opacity(0.24)
+            return Color.accentColor.opacity(isPressed ? 0.8 : 1)
         }
-        return Color.white.opacity(0.05)
+        if isPressed {
+            return Color.primary.opacity(0.16)
+        }
+        return Color.primary.opacity(0.07)
     }
 }
 
@@ -1177,17 +1404,24 @@ private struct VideoControlsTextFieldGlassSurface: ViewModifier {
     }
 }
 
+/// The play button is the largest control; it keeps a faint resting disc so
+/// it stays findable when the panel sits over a busy frame.
 private struct VideoPlaybackButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
     let treatment: VideoControlTreatment
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(treatment.foregroundStyle(isEnabled: isEnabled))
-            .background {
-                Circle().fill(treatment.iconPressedFill(isPressed: configuration.isPressed))
-            }
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .contentShape(Circle())
+        VideoHoverTrackingLabel(
+            shape: Circle(),
+            treatment: treatment,
+            isPressed: configuration.isPressed,
+            isActive: false
+        ) {
+            configuration.label
+                .background {
+                    Circle().fill(treatment.iconPressedFill(isPressed: configuration.isPressed))
+                }
+        }
+        .scaleEffect(configuration.isPressed ? 0.92 : 1)
+        .animation(.snappy(duration: 0.14), value: configuration.isPressed)
     }
 }

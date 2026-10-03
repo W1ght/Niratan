@@ -59,6 +59,12 @@ let app = read("NativeMac/HoshiNativeMacApp.swift")
 let root = read("NativeMac/NativeMacRootView.swift")
 let detail = read("NativeMac/NativeMacDetailView.swift")
 let player = read("Features/Video/VideoPlayerScreen.swift")
+    + read("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + read("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + read("Features/Video/VideoPlayerScreen+OSD.swift")
+    + read("Features/Video/VideoPlayerScreen+Mining.swift")
+    + read("Features/Video/VideoPlayerScreen+Opening.swift")
+    + read("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let renderView = read("Features/Video/Playback/MpvRenderView.swift")
 let windowChrome = read("Features/Video/VideoWindowChromeController.swift")
 let coordinator = read("Features/Video/VideoWindowCoordinator.swift")
@@ -66,6 +72,7 @@ let presenter = read("NativeMac/VideoWindowPresenter.swift")
 let shortcutManager = read("Core/Shortcuts/ShortcutManager.swift")
 let windowActivity = read("NativeMac/NativeWindowActivityReader.swift")
 let playbackEngine = read("Features/Video/Playback/PlaybackEngine.swift")
+    + read("Features/Video/Playback/VideoTrack.swift")
 let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
 let clientHeader = read("Features/Video/Playback/HSMpvClient.h")
 let clientImplementation = read("Features/Video/Playback/HSMpvClient.mm")
@@ -76,28 +83,28 @@ let liveResizeConstraint = sourceBlock(
 )
 let defaultFrameSizing = sourceBlock(
     presenter,
-    from: "private func defaultVideoWindowFrame() -> NSRect",
+    from: "func defaultVideoWindowFrame() -> NSRect",
     to: "func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize"
 )
 let makeVideoWindow = sourceBlock(
     presenter,
-    from: "private func makeWindow(",
-    to: "private func configureVideoWindowChrome(_ window: NSWindow)"
+    from: "func makeWindow(",
+    to: "func configureVideoWindowChrome(_ window: NSWindow)"
 )
 let titlebarAppearance = sourceBlock(
     windowChrome,
-    from: "private func applyTitlebarAppearance(for state: FullScreenState)",
-    to: "private func updateFullScreenState()"
+    from: "func applyTitlebarAppearance(for state: FullScreenState)",
+    to: "func updateFullScreenState()"
 )
 let chromeVisibility = sourceBlock(
     windowChrome,
-    from: "private func applyChromeVisibility(",
-    to: "private func restoreAttachedWindow()"
+    from: "func applyChromeVisibility(",
+    to: "func restoreAttachedWindow()"
 )
 let fullScreenSystemChrome = sourceBlock(
     windowChrome,
-    from: "private func prepareSystemChromeForFullScreenTransition()",
-    to: "private func applyTitlebarAppearance(for state: FullScreenState)"
+    from: "func prepareSystemChromeForFullScreenTransition()",
+    to: "func applyTitlebarAppearance(for state: FullScreenState)"
 )
 let windowedTitlebarPresentation = sourceBlock(
     windowChrome,
@@ -138,7 +145,7 @@ require(
 )
 require(
     windowChrome.contains("final class VideoWindowChromeController")
-        && windowChrome.contains("private weak var window: NSWindow?")
+        && windowChrome.contains("weak var window: NSWindow?")
         && windowChrome.contains("standardWindowButton(.closeButton)")
         && windowChrome.contains("standardWindowButton(.miniaturizeButton)")
         && windowChrome.contains("standardWindowButton(.zoomButton)")
@@ -149,13 +156,13 @@ require(
         && windowChrome.contains("NSWindow.willEnterFullScreenNotification")
         && windowChrome.contains("NSWindow.willExitFullScreenNotification")
         && windowChrome.contains("NSWindow.didExitFullScreenNotification")
-        && windowChrome.contains("private enum FullScreenState")
+        && windowChrome.contains("enum FullScreenState")
         && windowChrome.contains("currentSystemFullScreenState()")
         && windowChrome.contains("func fullScreenTransitionDidFail()")
         && presenter.contains("windowDidFailToEnterFullScreen")
         && presenter.contains("windowDidFailToExitFullScreen")
         && !windowChrome.contains("scheduleFullScreenTransitionFallback()")
-        && windowChrome.contains("private var chromeVisible = true")
+        && windowChrome.contains("var chromeVisible = true")
         && windowChrome.contains("chromeVisible = visible")
         && windowChrome.contains("applyChromeVisibility(animated: !isLiveResizing)")
         && windowChrome.contains("NSAnimationContext.runAnimationGroup")
@@ -198,10 +205,10 @@ require(
     "Video window chrome should fit the window frame without installing persistent AppKit aspect-ratio constraints"
 )
 require(
-    presenter.contains("private var videoWindowChrome: VideoWindowChromeController?")
+    presenter.contains("var videoWindowChrome: VideoWindowChromeController?")
         && presenter.contains("let videoWindowChrome = VideoWindowChromeController()")
         && presenter.contains("VideoWindowRootView(videoWindowChrome: videoWindowChrome)")
-        && presenter.contains("@State private var videoWindowChrome: VideoWindowChromeController")
+        && presenter.contains("var videoWindowChrome: VideoWindowChromeController")
         && presenter.contains("_videoWindowChrome = State(initialValue: videoWindowChrome)")
         && presenter.contains("windowChrome: videoWindowChrome")
         && presenter.contains("videoWindowChrome.attach(window)"),
@@ -257,7 +264,7 @@ require(
         && presenter.contains("func windowDidEndLiveResize(_ notification: Notification)")
         && presenter.contains("videoWindowChrome?.endLiveResize()")
         && windowChrome.contains("func constrainedFrameSize(for proposedFrameSize: NSSize) -> NSSize")
-        && windowChrome.contains("private var liveResizeSession: LiveResizeSession?")
+        && windowChrome.contains("var liveResizeSession: LiveResizeSession?")
         && windowChrome.contains("session.referenceFrameSize")
         && windowChrome.contains("session.resizeDriver")
         && windowChrome.contains("case .windowed = fullScreenState")
@@ -315,7 +322,7 @@ require(
     "Video playback snapshots should carry mpv display dimensions for window aspect fitting"
 )
 require(
-    mpvEngine.contains("private weak var attachedRenderView: HSMpvOpenGLView?")
+    mpvEngine.contains("weak var attachedRenderView: HSMpvOpenGLView?")
         && mpvEngine.contains("if attachedRenderView === view { return true }")
         && mpvEngine.contains("client.attach(to: view)")
         && mpvEngine.contains("attachedRenderView = view")
@@ -413,13 +420,13 @@ require(
     windowActivity.contains("struct NativeWindowActivityReader")
         && windowActivity.contains("NSWindow.didBecomeKeyNotification")
         && windowActivity.contains("NSWindow.didResignKeyNotification")
-        && shortcutManager.contains("private weak var managedWindow: NSWindow?")
+        && shortcutManager.contains("weak var managedWindow: NSWindow?")
         && shortcutManager.contains("func manageEvents(for window: NSWindow?)")
         && shortcutManager.contains("event.window === managedWindow"),
     "each scene should route keyboard events only through the manager that owns the event window"
 )
 require(
-    presenter.contains("@State private var isKeyWindow = false")
+    presenter.contains("var isKeyWindow = false")
         && presenter.contains("NativeWindowActivityReader")
         && presenter.contains("isActive: isKeyWindow")
         && player.contains("let isActive: Bool")

@@ -1,3 +1,4 @@
+// test-skip: manual screenshot comparison tool (needs before/after PNG arguments)
 import AppKit
 import Foundation
 

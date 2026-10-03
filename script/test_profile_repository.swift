@@ -1,3 +1,4 @@
+// test-sources: Models/Anki.swift Models/Book.swift Models/Profile.swift Models/Dictionary.swift Core/ProfileDictionaryBackup.swift Core/ProfileRepository.swift
 import Foundation
 
 @main
@@ -12,6 +13,7 @@ private enum ProfileRepositoryTests {
         try testEquivalentLegacyVideoProfileMerges()
         try testProfileLifecycleAndPathSafety()
         try testProfileDictionaryBackupRoundTrip()
+        try testKanjiDictionaryConfigCompatibility()
         print("Profile repository tests passed")
     }
 
@@ -110,6 +112,8 @@ private enum ProfileRepositoryTests {
         let japanese = DictionaryRecommendation.forLanguage(.japanese)
         precondition(japanese.contains { $0.name == "JMdict" })
         precondition(japanese.contains { $0.name == "Jitendex" })
+        precondition(japanese.contains { $0.name == "KANJIDIC" && $0.type == .kanji })
+        precondition(!english.contains { $0.type == .kanji })
         precondition(!japanese.contains { $0.name.contains("English-English") })
     }
 
@@ -422,5 +426,49 @@ private enum ProfileRepositoryTests {
         precondition(cleanedEnglish.termDictionaries.isEmpty)
         let ankiAfterCleanup = try Data(contentsOf: repository.ankiConfigURL(for: english.id))
         precondition(ankiAfterCleanup == preservedAnki)
+    }
+
+    private static func testKanjiDictionaryConfigCompatibility() throws {
+        precondition(DictionaryType(rawValue: "Kanji") == .kanji)
+
+        let legacy = try JSONDecoder().decode(
+            DictionaryConfig.self,
+            from: Data(#"{"termDictionaries":[],"frequencyDictionaries":[],"pitchDictionaries":[]}"#.utf8)
+        )
+        precondition(legacy.kanjiDictionaries == nil)
+
+        let current = Data(#"{"termDictionaries":[],"frequencyDictionaries":[],"pitchDictionaries":[],"kanjiDictionaries":[{"fileName":"KANJIDIC","isEnabled":true,"order":0},{"fileName":"Kanjium","isEnabled":false,"order":1}]}"#.utf8)
+        let decoded = try JSONDecoder().decode(DictionaryConfig.self, from: current)
+        precondition(decoded.kanjiDictionaries?.map(\.fileName) == ["KANJIDIC", "Kanjium"])
+        let roundTrip = try JSONDecoder().decode(DictionaryConfig.self, from: JSONEncoder().encode(decoded))
+        precondition(roundTrip.kanjiDictionaries?.map(\.isEnabled) == [true, false])
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suite = "profile-kanji-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let repository = try ProfileRepository(appDirectory: root, defaults: defaults)
+        let configURL = repository.dictionaryConfigURL(for: HoshiProfile.defaultJapanese.id)
+        try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try current.write(to: configURL)
+        repository.removeDictionaryReferences(fileName: "KANJIDIC", title: "KANJIDIC")
+        let cleaned = try JSONDecoder().decode(DictionaryConfig.self, from: Data(contentsOf: configURL))
+        precondition(cleaned.kanjiDictionaries?.map(\.fileName) == ["Kanjium"])
+        precondition(cleaned.kanjiDictionaries?.first?.order == 0)
+
+        let backupRoot = root.appendingPathComponent("BackupPayload")
+        let kanjiDictionary = backupRoot.appendingPathComponent("Kanji/KANJIDIC")
+        try FileManager.default.createDirectory(at: kanjiDictionary, withIntermediateDirectories: true)
+        try Data("not a dictionary".utf8).write(to: kanjiDictionary.appendingPathComponent("broken.bin"))
+        try current.write(to: backupRoot.appendingPathComponent("config.json"))
+        let backup = ProfileDictionaryBackup(appDirectory: root, repository: repository)
+        do {
+            try backup.restoreExtractedDirectory(backupRoot)
+            preconditionFailure("kanji dictionaries without index.json must be rejected")
+        } catch ProfileDictionaryBackupError.missingDictionaryPayload {
+        }
     }
 }

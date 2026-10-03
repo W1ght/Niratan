@@ -1,3 +1,4 @@
+// test-sources: Features/Sasayaki/SasayakiSpeechEngine.swift Models/Sasayaki.swift
 import Foundation
 
 @main struct SasayakiSpeechCueTests {

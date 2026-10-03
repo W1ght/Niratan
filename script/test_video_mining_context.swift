@@ -1,3 +1,4 @@
+// test-sources: Models/Anki.swift
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

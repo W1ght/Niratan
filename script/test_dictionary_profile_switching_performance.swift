@@ -129,8 +129,8 @@ guard let applyBody = methodBody(
     exit(1)
 }
 require(
-    dictionaryManager.contains("private struct PhysicalDictionaryCatalog")
-        && dictionaryManager.contains("private var physicalDictionaryCatalog: PhysicalDictionaryCatalog?")
+    dictionaryManager.contains("struct PhysicalDictionaryCatalog")
+        && dictionaryManager.contains("var physicalDictionaryCatalog: PhysicalDictionaryCatalog?")
         && loadBody.contains("physicalDictionaryCatalog = scanPhysicalDictionaryCatalog()"),
     "explicit dictionary refreshes must rebuild the shared physical catalog"
 )
@@ -146,9 +146,9 @@ guard let buildBody = methodBody(in: lookupEngine, signature: "func buildQuery("
     exit(1)
 }
 require(
-    lookupEngine.contains("private var activeConfiguration")
-        && lookupEngine.contains("private var requestedConfiguration")
-        && lookupEngine.contains("private nonisolated final class QueryBundle: @unchecked Sendable")
+    lookupEngine.contains("var activeConfiguration")
+        && lookupEngine.contains("var requestedConfiguration")
+        && lookupEngine.contains("nonisolated final class QueryBundle: @unchecked Sendable")
         && lookupEngine.contains("private(set) var isReadyForLookup = false")
         && buildBody.contains("Task.detached(priority: .userInitiated)")
         && buildBody.contains("configuration == self.requestedConfiguration")
@@ -187,7 +187,7 @@ require(
     "dictionary restore must refresh the shared physical catalog, Profile configuration, collapsed state, and native query"
 )
 require(
-    dictionaryManager.contains("private func loadCollapsedDictionaries() {\n        collapsedDictionaries = []"),
+    dictionaryManager.contains("func loadCollapsedDictionaries() {\n        collapsedDictionaries = []"),
     "a Profile without collapsed dictionary state must not inherit the previous Profile's state"
 )
 

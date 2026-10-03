@@ -7,6 +7,7 @@ enum ShortcutScope: String, Codable, CaseIterable, Hashable {
     case popup
     case sasayaki
     case video
+    case manga
 }
 
 enum ShortcutCategory: String, Codable, CaseIterable, Hashable, Identifiable {
@@ -15,6 +16,7 @@ enum ShortcutCategory: String, Codable, CaseIterable, Hashable, Identifiable {
     case dictionaryPopup
     case sasayaki
     case video
+    case manga
 
     var id: String { rawValue }
 
@@ -25,6 +27,7 @@ enum ShortcutCategory: String, Codable, CaseIterable, Hashable, Identifiable {
         case .dictionaryPopup: "Dictionary / Popup"
         case .sasayaki: "Sasayaki"
         case .video: "Video"
+        case .manga: "Manga"
         }
     }
 }

@@ -72,7 +72,7 @@ struct AppearanceView: View {
                     NativeGlassSegmentedPicker(
                         selection: $userConfig.theme,
                         values: Themes.allCases,
-                        minSegmentWidth: 62,
+                        minSegmentWidth: 44,
                         fillsWidth: true
                     ) { mode in
                         textForTheme(mode)
@@ -83,10 +83,6 @@ struct AppearanceView: View {
                     if userConfig.theme == .system {
                         NativeSettingsSeparator()
                         NativeSettingsToggle("Use Sepia as Light Theme", isOn: $userConfig.systemLightSepia)
-                    }
-                    if userConfig.theme == .sepia {
-                        NativeSettingsSeparator()
-                        NativeSettingsToggle("Invert in System Dark Theme", isOn: $userConfig.sepiaInvertInDark)
                     }
                     if userConfig.theme == .custom {
                         NativeSettingsSeparator()
@@ -166,12 +162,15 @@ struct AppearanceView: View {
                             ProgressView()
                                 .controlSize(.small)
                         }
-                    }
-                    NativeSettingsSeparator()
-                    NativeSettingsButtonRow {
-                        Button("Import Font") {
+
+                        Button {
                             isImportingFont = true
+                        } label: {
+                            Image(systemName: "plus")
                         }
+                        .buttonStyle(NativeSettingsActionButtonStyle())
+                        .help(Text("Import Font"))
+                        .accessibilityLabel(Text("Import Font"))
                         .fileImporter(
                             isPresented: $isImportingFont,
                             allowedContentTypes: [.font],
@@ -191,7 +190,20 @@ struct AppearanceView: View {
                             .labelsHidden()
                     }
                     NativeSettingsSeparator()
-                    NativeSettingsToggle("Hide Furigana", isOn: $userConfig.readerHideFurigana)
+                    NativeSettingsRow("Furigana") {
+                        NativeGlassSegmentedPicker(
+                            selection: $userConfig.readerFuriganaMode,
+                            values: FuriganaMode.allCases,
+                            minSegmentWidth: 64
+                        ) { mode in
+                            switch mode {
+                            case .off: Text("Show")
+                            case .dimmed: Text("Dimmed")
+                            case .toggle: Text("Tap to Reveal")
+                            case .hidden: Text("Hidden")
+                            }
+                        }
+                    }
                 }
 
             NativeSettingsSectionCard("Layout") {
@@ -204,7 +216,30 @@ struct AppearanceView: View {
                             Text(isContinuous ? "Continuous" : "Paginated")
                         }
                     }
-                    if !userConfig.continuousMode && !userConfig.verticalWriting {
+                    if !userConfig.continuousMode {
+                        NativeSettingsSeparator()
+                        NativeSettingsToggle("Paragraph Mode", isOn: $userConfig.paragraphMode)
+
+                        if userConfig.paragraphMode {
+                            NativeSettingsSeparator()
+                            NativeSettingsToggle("Text Animation", isOn: $userConfig.textAnimation)
+
+                            if userConfig.textAnimation {
+                                NativeSettingsSeparator()
+                                NativeSettingsSliderRow(
+                                    title: "Text Speed",
+                                    value: String(localized: "\(userConfig.textSpeed)/s")
+                                ) {
+                                    Slider(value: .init(
+                                        get: { Double(userConfig.textSpeed) },
+                                        set: { userConfig.textSpeed = Int($0) }
+                                    ), in: 25...100, step: 5)
+                                }
+                            }
+                        }
+                    }
+                    // Paragraph mode pages show one paragraph at a time, so spreads only apply without it.
+                    if !userConfig.continuousMode && !userConfig.verticalWriting && !userConfig.paragraphMode {
                         NativeSettingsSeparator()
                         NativeSettingsToggle("Two-Column Horizontal Pages", isOn: $userConfig.readerTwoColumnHorizontalPages)
                     }
@@ -275,11 +310,36 @@ struct AppearanceView: View {
             NativeSettingsSectionCard("Display") {
                     NativeSettingsToggle("Show Title", isOn: $userConfig.readerShowTitle)
                     NativeSettingsSeparator()
-                    NativeSettingsToggle("Show Character Count", isOn: $userConfig.readerShowCharacters)
+                    NativeSettingsToggle("Show Progress", isOn: $userConfig.readerShowProgress)
                     NativeSettingsSeparator()
-                    NativeSettingsToggle("Show Percentage", isOn: $userConfig.readerShowPercentage)
+                    NativeSettingsToggle("Show Chapter Progress", isOn: $userConfig.readerShowChapterProgress)
 
-                    if userConfig.readerShowCharacters || userConfig.readerShowPercentage {
+                    if userConfig.readerShowProgress || userConfig.readerShowChapterProgress {
+                        NativeSettingsSeparator()
+                        NativeSettingsRow {
+                            if userConfig.readerProgressCount == .pages {
+                                NativeSettingsSubtitledLabel(
+                                    "Count",
+                                    subtitle: "Pages are counted for the current layout and window size, and are unavailable in continuous mode."
+                                )
+                            } else {
+                                Text("Count")
+                            }
+                        } accessory: {
+                            NativeGlassSegmentedPicker(
+                                selection: $userConfig.readerProgressCount,
+                                values: ReaderProgressCount.allCases,
+                                minSegmentWidth: 64
+                            ) { count in
+                                switch count {
+                                case .off: Text("Off")
+                                case .characters: Text("Characters")
+                                case .pages: Text("Pages")
+                                }
+                            }
+                        }
+                        NativeSettingsSeparator()
+                        NativeSettingsToggle("Show Percentage", isOn: $userConfig.readerShowPercentage)
                         NativeSettingsSeparator()
                         NativeSettingsRow("Progress Position") {
                             NativeGlassSegmentedPicker(

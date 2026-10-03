@@ -22,7 +22,15 @@ struct AnkiView: View {
             .selectedGlossaryBrief,
             .selectedGlossaryBriefFallback,
             .selectedGlossaryNoDictionary,
-            .selectedGlossaryNoDictionaryFallback
+            .selectedGlossaryNoDictionaryFallback,
+            .monolingualDefinitionBrief,
+            .monolingualDefinitionNoDictionary,
+            .bilingualDefinitionBrief,
+            .bilingualDefinitionNoDictionary,
+            .monolingualDefinitionFallbackBrief,
+            .monolingualDefinitionFallbackNoDictionary,
+            .bilingualDefinitionFallbackBrief,
+            .bilingualDefinitionFallbackNoDictionary
         ]
         var options = Handlebars.allCases
             .filter { !hidden.contains($0) }
@@ -38,17 +46,6 @@ struct AnkiView: View {
             NativeSettingsSectionCard {
                 Text("AnkiConnect", tableName: "Dictionaries")
             } content: {
-                NativeSettingsButtonRow {
-                    Text("Mac card creation uses AnkiConnect.")
-                        .foregroundStyle(.secondary)
-                }
-            } footer: {
-                Text("AnkiMobile callbacks are not used in the Mac app.")
-            }
-
-            NativeSettingsSectionCard {
-                Text("Connection", tableName: "Dictionaries")
-            } content: {
                 NativeSettingsRow {
                     Text("Address", tableName: "Dictionaries")
                 } accessory: {
@@ -62,7 +59,10 @@ struct AnkiView: View {
                     .onSubmit { ankiManager.save() }
                 }
                 NativeSettingsSeparator()
-                NativeSettingsButtonRow {
+                NativeSettingsRow {
+                    Text("Status: \(connectionStatus)", tableName: "Dictionaries")
+                        .foregroundStyle(.secondary)
+                } accessory: {
                     Button {
                         if ankiManager.ankiConnectConfig?.url?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
                             ankiManager.ankiConnectConfig?.url = "http://127.0.0.1:8765"
@@ -72,8 +72,12 @@ struct AnkiView: View {
                     } label: {
                         Text("Connect", tableName: "Dictionaries")
                     }
-                    Text("Status: \(connectionStatus)", tableName: "Dictionaries")
-                        .foregroundStyle(.secondary)
+                    .buttonStyle(NativeSettingsActionButtonStyle())
+                }
+            } footer: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Mac card creation uses AnkiConnect.")
+                    Text("AnkiMobile callbacks are not used in the Mac app.")
                 }
             }
 

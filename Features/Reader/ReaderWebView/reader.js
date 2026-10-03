@@ -216,6 +216,110 @@ window.hoshiReader = {
     
     notifyRestoreComplete() {
         window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
+        this.registerPageTracking();
+    },
+
+    pageCount(context) {
+        if (context.pageSize <= 0 || context.maxScroll <= context.limitTolerance) {
+            return 1;
+        }
+        // The last page may be a partial step that stops at maxScroll.
+        return Math.ceil((context.maxScroll - context.limitTolerance) / context.pageSize) + 1;
+    },
+
+    currentPageIndex() {
+        const context = this.getScrollContext();
+        if (context.pageSize <= 0) {
+            return 0;
+        }
+        const pageCount = this.pageCount(context);
+        const scroll = context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;
+        if (scroll >= context.maxScroll - context.limitTolerance) {
+            return pageCount - 1;
+        }
+        return Math.min(pageCount - 1, Math.max(0, Math.round(scroll / context.pageSize)));
+    },
+
+    notifyPageChanged() {
+        window.webkit?.messageHandlers?.pageChanged?.postMessage(this.currentPageIndex());
+    },
+
+    registerPageTracking() {
+        if (!window.webkit?.messageHandlers?.pageChanged) {
+            return;
+        }
+        if (!this.pageTrackingRegistered) {
+            this.pageTrackingRegistered = true;
+            let frame = null;
+            this.getScrollContext().scrollEl.addEventListener('scroll', () => {
+                if (frame === null) {
+                    frame = requestAnimationFrame(() => {
+                        frame = null;
+                        this.notifyPageChanged();
+                    });
+                }
+            }, { passive: true });
+        }
+        this.notifyPageChanged();
+    },
+
+    // Spine-local character offset at which each page starts, measured on an
+    // unscrolled document laid out exactly like the visible Reader.
+    calculatePageStarts() {
+        const context = this.getScrollContext();
+        const { vertical, pageSize } = context;
+        if (pageSize <= 0) {
+            return [0];
+        }
+        const pageCount = this.pageCount(context);
+        const starts = new Array(pageCount).fill(null);
+        const walker = this.createWalker();
+        const range = document.createRange();
+        const pageOf = position => Math.min(pageCount - 1, Math.max(0, Math.floor(position / pageSize)));
+        let totalChars = 0;
+        let node;
+
+        while (node = walker.nextNode()) {
+            const nodeLen = this.countChars(node.textContent);
+            if (!nodeLen) {
+                continue;
+            }
+            const nodeStart = this.nodeStartOffsets.get(node) ?? totalChars;
+            totalChars = nodeStart + nodeLen;
+            range.selectNodeContents(node);
+            for (const rect of range.getClientRects()) {
+                if (!rect.width || !rect.height) {
+                    continue;
+                }
+                const page = pageOf(vertical ? rect.top : rect.left);
+                if (starts[page] !== null) {
+                    continue;
+                }
+                let low = 0;
+                let high = node.textContent.length;
+                while (low < high) {
+                    const mid = (low + high) >> 1;
+                    range.setStart(node, mid);
+                    range.setEnd(node, Math.min(mid + 1, node.textContent.length));
+                    const charRect = this.getRect(range);
+                    if ((vertical ? charRect.top : charRect.left) >= page * pageSize) {
+                        high = mid;
+                    } else {
+                        low = mid + 1;
+                    }
+                }
+                starts[page] = nodeStart + this.countChars(node.textContent.slice(0, low));
+                range.selectNodeContents(node);
+            }
+        }
+
+        for (let page = pageCount - 1; page >= 0; page--) {
+            starts[page] ??= starts[page + 1] ?? totalChars;
+        }
+        for (let page = 1; page < pageCount; page++) {
+            starts[page] = Math.max(starts[page], starts[page - 1]);
+        }
+        return starts;
     },
 
     forEachContentRect(visitor) {

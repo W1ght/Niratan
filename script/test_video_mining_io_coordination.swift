@@ -1,3 +1,5 @@
+// test-sources: Features/Video/Playback/PlaybackEngine.swift Features/Video/Playback/VideoTrack.swift Features/Video/Remote/RemoteVideoSource.swift Models/Subtitle.swift Features/Video/VideoMiningCoordinator.swift Features/Video/VideoMiningMediaStore.swift Features/Video/Remote/YouTubeURLParser.swift Models/Anki.swift Features/Popup/MiningContextSelection.swift Features/Video/VideoAudioClipRange.swift Features/Video/VideoMiningSelectionResolution.swift Features/Video/VideoMiningMediaStore+Audio.swift Core/AnkiMediaProcessor.swift Core/AnkiAudioCompressor.swift
+// test-modules: SwiftLAME LAME
 import AppKit
 import AVFAudio
 import Foundation
@@ -205,22 +207,19 @@ private enum VideoMiningIOCoordinationTests {
 
         let screenshotURL = ankiMediaDirectory.appendingPathComponent(screenshotFilename)
         let audioURL = ankiMediaDirectory.appendingPathComponent(audioFilename)
+        // Since 1.5.6 the card waits for its media, so Anki never receives a
+        // reference to a file that is still being written.
         expect(
-            elapsed < 0.20,
-            "direct media path should return context quickly instead of blocking Anki card creation"
-        )
-        let suspendedAfterContext = await VideoThumbnailScheduler.shared.isSuspended()
-        expect(
-            suspendedAfterContext,
-            "video thumbnails should be suspended before direct media context returns"
+            elapsed >= 0.25,
+            "direct media context should wait for the delayed capture and export"
         )
         expect(
-            !fileManager.fileExists(atPath: screenshotURL.path(percentEncoded: false)),
-            "direct screenshot generation should continue in the background"
+            fileManager.fileExists(atPath: screenshotURL.path(percentEncoded: false)),
+            "direct screenshot should be written before the context is returned"
         )
         expect(
-            !fileManager.fileExists(atPath: audioURL.path(percentEncoded: false)),
-            "direct audio generation should continue in the background"
+            fileManager.fileExists(atPath: audioURL.path(percentEncoded: false)),
+            "direct audio should be written before the context is returned"
         )
 
         try? await Task.sleep(for: .seconds(1))

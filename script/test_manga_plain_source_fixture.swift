@@ -1,3 +1,4 @@
+// test-skip: manual fixture tool (needs an image folder and a CBZ/ZIP argument)
 import Foundation
 
 @main

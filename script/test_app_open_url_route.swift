@@ -1,3 +1,4 @@
+// test-sources: NativeMac/AppOpenURLRoute.swift
 import Foundation
 
 @main

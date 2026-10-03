@@ -1,3 +1,4 @@
+// test-sources: Features/Popup/MiningContextSelection.swift Models/Subtitle.swift Features/Video/VideoMiningContextSelectionBuilder.swift Features/Video/VideoMiningSelectionResolution.swift
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Subtitles/VideoSubtitleEdgeStyle.swift
 import CoreGraphics
 import Foundation
 

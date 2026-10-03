@@ -35,10 +35,28 @@ enum AudioPlaybackMode: String, CaseIterable, Codable {
     case mix = "mix"
 }
 
+enum FuriganaMode: String, CaseIterable, Codable {
+    case off = "Off"
+    case dimmed = "Dimmed"
+    case toggle = "Toggle"
+    case hidden = "Hidden"
+
+    /// Older Profiles only stored a Boolean; a missing mode falls back to it.
+    static func resolve(rawValue: String?, legacyHidden: Bool) -> FuriganaMode {
+        rawValue.flatMap(FuriganaMode.init(rawValue:)) ?? (legacyHidden ? .hidden : .off)
+    }
+}
+
 enum CollapseMode: String, CaseIterable, Codable {
     case expandAll = "Expand All"
     case collapseAll = "Collapse All"
     case custom = "Custom"
+}
+
+enum ReaderProgressCount: String, CaseIterable, Codable {
+    case off = "Off"
+    case characters = "Characters"
+    case pages = "Pages"
 }
 
 enum Themes: String, CaseIterable, Codable {
@@ -52,7 +70,6 @@ enum Themes: String, CaseIterable, Codable {
         switch self {
         case .light: .light
         case .dark: .dark
-        case .sepia: .light
         default: nil
         }
     }
@@ -75,37 +92,37 @@ struct XboxControllerBinding: Codable, Equatable, Identifiable {
 
     var label: String {
         switch input {
-        case "buttonA": "A / Cross / B"
-        case "buttonB": "B / Circle / A"
-        case "buttonX": "X / Square / Y"
-        case "buttonY": "Y / Triangle / X"
-        case "dpadUp": "D-Pad ↑"
-        case "dpadDown": "D-Pad ↓"
-        case "dpadLeft": "D-Pad ←"
-        case "dpadRight": "D-Pad →"
+        case "buttonA": String(localized: "A / Cross / B")
+        case "buttonB": String(localized: "B / Circle / A")
+        case "buttonX": String(localized: "X / Square / Y")
+        case "buttonY": String(localized: "Y / Triangle / X")
+        case "dpadUp": String(localized: "D-Pad ↑")
+        case "dpadDown": String(localized: "D-Pad ↓")
+        case "dpadLeft": String(localized: "D-Pad ←")
+        case "dpadRight": String(localized: "D-Pad →")
         case "leftShoulder": "LB / L1 / L"
         case "rightShoulder": "RB / R1 / R"
         case "leftTrigger": "LT / L2 / ZL"
         case "rightTrigger": "RT / R2 / ZR"
         case "leftThumbstickButton": "L3"
         case "rightThumbstickButton": "R3"
-        case "buttonMenu": "Menu / Options / +"
-        case "buttonOptions": "View / Share / -"
+        case "buttonMenu": String(localized: "Menu / Options / +")
+        case "buttonOptions": String(localized: "View / Share / -")
         case "buttonHome": "Home / PS"
-        case "buttonShare": "Share / Create / Capture"
-        case "playStationTouchpad": "Touchpad"
-        case "xboxPaddle1": "Paddle 1"
-        case "xboxPaddle2": "Paddle 2"
-        case "xboxPaddle3": "Paddle 3"
-        case "xboxPaddle4": "Paddle 4"
-        case "leftThumbstickUp": "Left Stick ↑"
-        case "leftThumbstickDown": "Left Stick ↓"
-        case "leftThumbstickLeft": "Left Stick ←"
-        case "leftThumbstickRight": "Left Stick →"
-        case "rightThumbstickUp": "Right Stick ↑"
-        case "rightThumbstickDown": "Right Stick ↓"
-        case "rightThumbstickLeft": "Right Stick ←"
-        case "rightThumbstickRight": "Right Stick →"
+        case "buttonShare": String(localized: "Share / Create / Capture")
+        case "playStationTouchpad": String(localized: "Touchpad")
+        case "xboxPaddle1": String(localized: "Paddle 1")
+        case "xboxPaddle2": String(localized: "Paddle 2")
+        case "xboxPaddle3": String(localized: "Paddle 3")
+        case "xboxPaddle4": String(localized: "Paddle 4")
+        case "leftThumbstickUp": String(localized: "Left Stick ↑")
+        case "leftThumbstickDown": String(localized: "Left Stick ↓")
+        case "leftThumbstickLeft": String(localized: "Left Stick ←")
+        case "leftThumbstickRight": String(localized: "Left Stick →")
+        case "rightThumbstickUp": String(localized: "Right Stick ↑")
+        case "rightThumbstickDown": String(localized: "Right Stick ↓")
+        case "rightThumbstickLeft": String(localized: "Right Stick ←")
+        case "rightThumbstickRight": String(localized: "Right Stick →")
         default: input
         }
     }
@@ -220,6 +237,24 @@ class UserConfig {
         didSet { Self.defaults.set(harmonicFrequency, forKey: "harmonicFrequency") }
     }
 
+    var frequencySortOrder: LookupFrequencySortOrder {
+        didSet {
+            Self.defaults.set(frequencySortOrder.rawValue, forKey: "frequencySortOrder")
+            LookupEngine.shared.frequencySortOrder = frequencySortOrder
+        }
+    }
+
+    var frequencySortDictionary: String {
+        didSet {
+            Self.defaults.set(frequencySortDictionary, forKey: "frequencySortDictionary")
+            LookupEngine.shared.frequencySortDictionary = frequencySortDictionary
+        }
+    }
+
+    var searchTextSize: Int {
+        didSet { Self.defaults.set(searchTextSize, forKey: "searchTextSize") }
+    }
+
     var deduplicatePitchAccents: Bool {
         didSet { Self.defaults.set(deduplicatePitchAccents, forKey: "deduplicatePitchAccents") }
     }
@@ -248,6 +283,10 @@ class UserConfig {
         didSet { Self.defaults.set(googleClientId, forKey: "googleClientId") }
     }
 
+    var syncProvider: SyncProvider {
+        didSet { Self.defaults.set(syncProvider.rawValue, forKey: "syncProvider") }
+    }
+
     var syncUploadBooks: Bool {
         didSet { Self.defaults.set(syncUploadBooks, forKey: "syncUploadBooks") }
     }
@@ -264,8 +303,26 @@ class UserConfig {
         didSet { Self.defaults.set(systemLightSepia, forKey: "systemLightSepia") }
     }
 
+    /// Legacy toggle kept only for stored settings and profile compatibility:
+    /// Sepia now always follows the macOS appearance (dark sepia in Dark Mode).
     var sepiaInvertInDark: Bool {
         didSet { Self.defaults.set(sepiaInvertInDark, forKey: "sepiaInvertInDark") }
+    }
+
+    /// The color scheme app windows force, or `nil` to follow macOS live.
+    /// System and Sepia both follow macOS; Sepia switches to its dark variant.
+    var preferredColorScheme: ColorScheme? {
+        switch theme {
+        case .custom: uiTheme.colorScheme
+        case .light: .light
+        case .dark: .dark
+        case .system, .sepia: nil
+        }
+    }
+
+    /// Whether Sepia should use its dark variant for the given macOS appearance.
+    func usesDarkSepia(in colorScheme: ColorScheme) -> Bool {
+        theme == .sepia && colorScheme == .dark
     }
 
     var customBackgroundColor: Color {
@@ -292,8 +349,11 @@ class UserConfig {
         didSet { Self.defaults.set(fontSize, forKey: "fontSize") }
     }
 
-    var readerHideFurigana: Bool {
-        didSet { Self.defaults.set(readerHideFurigana, forKey: "readerHideFurigana") }
+    var readerFuriganaMode: FuriganaMode {
+        didSet {
+            Self.defaults.set(readerFuriganaMode.rawValue, forKey: "furiganaMode")
+            Self.defaults.set(readerFuriganaMode == .hidden, forKey: "readerHideFurigana")
+        }
     }
 
     var continuousMode: Bool {
@@ -302,6 +362,18 @@ class UserConfig {
 
     var readerTwoColumnHorizontalPages: Bool {
         didSet { Self.defaults.set(readerTwoColumnHorizontalPages, forKey: "readerTwoColumnHorizontalPages") }
+    }
+
+    var paragraphMode: Bool {
+        didSet { Self.defaults.set(paragraphMode, forKey: "paragraphMode") }
+    }
+
+    var textAnimation: Bool {
+        didSet { Self.defaults.set(textAnimation, forKey: "textAnimation") }
+    }
+
+    var textSpeed: Int {
+        didSet { Self.defaults.set(textSpeed, forKey: "textSpeed") }
     }
 
     var readerWheelPageTurnEnabled: Bool {
@@ -607,8 +679,20 @@ class UserConfig {
         didSet { Self.defaults.set(readerShowTitle, forKey: "readerShowTitle") }
     }
 
-    var readerShowCharacters: Bool {
-        didSet { Self.defaults.set(readerShowCharacters, forKey: "readerShowCharacters") }
+    var readerShowProgress: Bool {
+        didSet { Self.defaults.set(readerShowProgress, forKey: "readerShowProgress") }
+    }
+
+    var readerShowChapterProgress: Bool {
+        didSet { Self.defaults.set(readerShowChapterProgress, forKey: "readerShowChapterProgress") }
+    }
+
+    var readerProgressCount: ReaderProgressCount {
+        didSet {
+            Self.defaults.set(readerProgressCount.rawValue, forKey: "readerProgressCount")
+            // Older builds only know the character-count toggle.
+            Self.defaults.set(readerProgressCount != .off, forKey: "readerShowCharacters")
+        }
     }
 
     var readerShowPercentage: Bool {
@@ -918,6 +1002,10 @@ class UserConfig {
         self.compactGlossaries = defaults.object(forKey: "compactGlossaries") as? Bool ?? true
         self.showExpressionTags = defaults.object(forKey: "showExpressionTags") as? Bool ?? false
         self.harmonicFrequency = defaults.object(forKey: "harmonicFrequency") as? Bool ?? false
+        self.frequencySortOrder = defaults.string(forKey: "frequencySortOrder")
+            .flatMap(LookupFrequencySortOrder.init(rawValue:)) ?? .auto
+        self.frequencySortDictionary = defaults.string(forKey: "frequencySortDictionary") ?? ""
+        self.searchTextSize = defaults.object(forKey: "searchTextSize") as? Int ?? 26
         self.deduplicatePitchAccents = defaults.object(forKey: "deduplicatePitchAccents") as? Bool ?? false
         self.desktopLookupHoverDelayMs = defaults.object(forKey: "desktopLookupHoverDelayMs") as? Int ?? 45
         self.compactPitchAccents = defaults.object(forKey: "compactPitchAccents") as? Bool ?? true
@@ -927,6 +1015,15 @@ class UserConfig {
             .flatMap(SyncMode.init) ?? .auto
         self.enableAutoSync = defaults.object(forKey: "enableAutoSync") as? Bool ?? false
         self.googleClientId = defaults.object(forKey: "googleClientId") as? String ?? ""
+        // Installations that already synced per book keep the ッツ/ttu provider.
+        let hadTtuSync = defaults.bool(forKey: "enableSync")
+            || !(defaults.string(forKey: "googleClientId") ?? "").isEmpty
+        let syncProvider = defaults.string(forKey: "syncProvider").flatMap(SyncProvider.init(rawValue:))
+            ?? (hadTtuSync ? .ttu : .gdrive)
+        self.syncProvider = syncProvider
+        if defaults.string(forKey: "syncProvider") == nil {
+            defaults.set(syncProvider.rawValue, forKey: "syncProvider")
+        }
         self.syncUploadBooks = defaults.object(forKey: "syncUploadBooks") as? Bool ?? true
 
         self.theme = defaults.string(forKey: "theme")
@@ -942,10 +1039,16 @@ class UserConfig {
         self.verticalWriting = defaults.object(forKey: "verticalWriting") as? Bool ?? true
         self.selectedFont = defaults.string(forKey: "selectedFont") ?? "Hiragino Mincho ProN"
         self.fontSize = defaults.object(forKey: "fontSize") as? Int ?? 22
-        self.readerHideFurigana = defaults.object(forKey: "readerHideFurigana") as? Bool ?? false
+        self.readerFuriganaMode = FuriganaMode.resolve(
+            rawValue: defaults.string(forKey: "furiganaMode"),
+            legacyHidden: defaults.object(forKey: "readerHideFurigana") as? Bool ?? false
+        )
 
         self.continuousMode = defaults.object(forKey: "continuousMode") as? Bool ?? false
         self.readerTwoColumnHorizontalPages = defaults.object(forKey: "readerTwoColumnHorizontalPages") as? Bool ?? false
+        self.paragraphMode = defaults.object(forKey: "paragraphMode") as? Bool ?? false
+        self.textAnimation = defaults.object(forKey: "textAnimation") as? Bool ?? false
+        self.textSpeed = defaults.object(forKey: "textSpeed") as? Int ?? 35
         self.readerWheelPageTurnEnabled = defaults.object(forKey: "readerWheelPageTurnEnabled") as? Bool ?? true
         self.videoAutoPlayNext = defaults.object(forKey: "videoAutoPlayNext") as? Bool ?? true
         self.videoRememberPlaybackPosition =
@@ -1059,7 +1162,10 @@ class UserConfig {
         self.paragraphSpacing = defaults.object(forKey: "paragraphSpacing") as? Double ?? 0
 
         self.readerShowTitle = defaults.object(forKey: "readerShowTitle") as? Bool ?? true
-        self.readerShowCharacters = defaults.object(forKey: "readerShowCharacters") as? Bool ?? true
+        self.readerShowProgress = defaults.object(forKey: "readerShowProgress") as? Bool ?? true
+        self.readerShowChapterProgress = defaults.object(forKey: "readerShowChapterProgress") as? Bool ?? false
+        self.readerProgressCount = defaults.string(forKey: "readerProgressCount").flatMap(ReaderProgressCount.init)
+            ?? (defaults.object(forKey: "readerShowCharacters") as? Bool ?? true ? .characters : .off)
         self.readerShowPercentage = defaults.object(forKey: "readerShowPercentage") as? Bool ?? true
         self.readerShowProgressTop = defaults.object(forKey: "readerShowProgressTop") as? Bool ?? true
         self.readerShowStatisticsToggle = defaults.object(forKey: "readerShowStatisticsToggle") as? Bool ?? false
@@ -1114,6 +1220,21 @@ class UserConfig {
         self.sasayakiDarkBackgroundColor = UserConfig.loadColor(key: "sasayakiDarkBackgroundColor") ?? Color(.sRGB, red: 0.53, green: 0.81, blue: 0.98, opacity: 0.4)
         Self.saveShortcutConfiguration(shortcutConfiguration)
         syncLocalAudioSource()
+        LookupEngine.shared.frequencySortOrder = frequencySortOrder
+        LookupEngine.shared.frequencySortDictionary = frequencySortDictionary
+        NotificationCenter.default.addObserver(
+            forName: DictionaryManager.frequencyDictionaryRenamedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let old = notification.userInfo?["old"] as? String,
+                  let new = notification.userInfo?["new"] as? String else { return }
+            MainActor.assumeIsolated {
+                if self?.frequencySortDictionary == old {
+                    self?.frequencySortDictionary = new
+                }
+            }
+        }
     }
 
     func resetVideoSubtitleAppearance() {
@@ -1149,9 +1270,13 @@ class UserConfig {
             verticalWriting: verticalWriting,
             selectedFont: selectedFont,
             fontSize: fontSize,
-            hideFurigana: readerHideFurigana,
+            hideFurigana: readerFuriganaMode == .hidden,
+            furiganaMode: readerFuriganaMode.rawValue,
             continuousMode: continuousMode,
             twoColumnHorizontalPages: readerTwoColumnHorizontalPages,
+            paragraphMode: paragraphMode,
+            textAnimation: textAnimation,
+            textSpeed: textSpeed,
             horizontalPadding: horizontalPadding,
             verticalPadding: verticalPadding,
             avoidPageBreak: avoidPageBreak,
@@ -1162,7 +1287,10 @@ class UserConfig {
             characterSpacing: characterSpacing,
             paragraphSpacing: paragraphSpacing,
             showTitle: readerShowTitle,
-            showCharacters: readerShowCharacters,
+            showCharacters: readerProgressCount != .off,
+            showProgress: readerShowProgress,
+            showChapterProgress: readerShowChapterProgress,
+            progressCount: readerProgressCount.rawValue,
             showPercentage: readerShowPercentage,
             showProgressTop: readerShowProgressTop,
             showStatisticsToggle: readerShowStatisticsToggle,
@@ -1183,9 +1311,12 @@ class UserConfig {
         verticalWriting = settings.verticalWriting
         selectedFont = settings.selectedFont
         fontSize = settings.fontSize
-        readerHideFurigana = settings.hideFurigana
+        readerFuriganaMode = FuriganaMode.resolve(rawValue: settings.furiganaMode, legacyHidden: settings.hideFurigana)
         continuousMode = settings.continuousMode
         readerTwoColumnHorizontalPages = settings.twoColumnHorizontalPages ?? false
+        paragraphMode = settings.paragraphMode ?? false
+        textAnimation = settings.textAnimation ?? false
+        textSpeed = settings.textSpeed ?? 35
         horizontalPadding = settings.horizontalPadding
         verticalPadding = settings.verticalPadding
         avoidPageBreak = settings.avoidPageBreak
@@ -1196,7 +1327,10 @@ class UserConfig {
         characterSpacing = settings.characterSpacing
         paragraphSpacing = settings.paragraphSpacing
         readerShowTitle = settings.showTitle
-        readerShowCharacters = settings.showCharacters
+        readerShowProgress = settings.showProgress ?? true
+        readerShowChapterProgress = settings.showChapterProgress ?? false
+        readerProgressCount = settings.progressCount.flatMap(ReaderProgressCount.init)
+            ?? (settings.showCharacters ? .characters : .off)
         readerShowPercentage = settings.showPercentage
         readerShowProgressTop = settings.showProgressTop
         readerShowStatisticsToggle = settings.showStatisticsToggle
@@ -1219,7 +1353,10 @@ class UserConfig {
             harmonicFrequency: harmonicFrequency,
             deduplicatePitchAccents: deduplicatePitchAccents,
             compactPitchAccents: compactPitchAccents,
-            customCSS: customCSS
+            customCSS: customCSS,
+            frequencySortOrder: frequencySortOrder.rawValue,
+            frequencySortDictionary: frequencySortDictionary,
+            searchTextSize: searchTextSize
         )
     }
 
@@ -1237,6 +1374,9 @@ class UserConfig {
         deduplicatePitchAccents = settings.deduplicatePitchAccents
         compactPitchAccents = settings.compactPitchAccents
         customCSS = settings.customCSS
+        frequencySortOrder = settings.frequencySortOrder.flatMap(LookupFrequencySortOrder.init(rawValue:)) ?? .auto
+        frequencySortDictionary = settings.frequencySortDictionary ?? ""
+        searchTextSize = settings.searchTextSize ?? 26
     }
 
     private static func profileColorHex(_ color: Color) -> String {

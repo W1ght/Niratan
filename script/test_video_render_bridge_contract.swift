@@ -535,7 +535,7 @@ require(
         && renderView.contains("detachRenderView(ifAttachedTo: nsView)")
         && engine.contains("func detachRenderView(ifAttachedTo view: HSMpvOpenGLView)")
         && engine.contains("guard attachedRenderView === view else { return }")
-        && engine.contains("private var renderDetachGeneration: UInt64 = 0")
+        && engine.contains("var renderDetachGeneration: UInt64 = 0")
         && engine.contains("Task.sleep(for: .milliseconds(100))")
         && engine.contains("self.renderDetachGeneration == generation")
         && engine.contains("self.attachedRenderView == nil"),

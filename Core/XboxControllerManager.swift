@@ -28,6 +28,20 @@ extension ShortcutAction {
             .buttonB
         case ReaderShortcutActions.toggleStatistics.id:
             .buttonY
+        // Fushi's manga gamepad defaults: D-pad follows the reading
+        // direction, shoulders turn pages, Y toggles the interface, B backs out.
+        case MangaShortcutActions.pageLeft.id:
+            .dpadLeft
+        case MangaShortcutActions.pageRight.id:
+            .dpadRight
+        case MangaShortcutActions.previousPage.id:
+            .leftShoulder
+        case MangaShortcutActions.nextPage.id:
+            .rightShoulder
+        case MangaShortcutActions.toggleInterface.id:
+            .buttonY
+        case MangaShortcutActions.back.id:
+            .buttonB
         default:
             nil
         }
@@ -252,35 +266,35 @@ final class XboxControllerManager {
         case "rightShoulder": "RB"
         case "leftTrigger": "LT"
         case "rightTrigger": "RT"
-        case "buttonOptions": "View"
-        case "buttonMenu": "Menu"
+        case "buttonOptions": String(localized: "View")
+        case "buttonMenu": String(localized: "Menu")
         case "buttonHome": "Xbox"
-        case "buttonShare": "Share"
-        case "xboxPaddle1": "Paddle 1"
-        case "xboxPaddle2": "Paddle 2"
-        case "xboxPaddle3": "Paddle 3"
-        case "xboxPaddle4": "Paddle 4"
+        case "buttonShare": String(localized: "Share")
+        case "xboxPaddle1": String(localized: "Paddle 1")
+        case "xboxPaddle2": String(localized: "Paddle 2")
+        case "xboxPaddle3": String(localized: "Paddle 3")
+        case "xboxPaddle4": String(localized: "Paddle 4")
         default: XboxControllerBinding(input: input).label
         }
     }
 
     private func playStationLabel(for input: String) -> String {
         switch input {
-        case "buttonA": "Cross"
-        case "buttonB": "Circle"
-        case "buttonX": "Square"
-        case "buttonY": "Triangle"
+        case "buttonA": String(localized: "Cross")
+        case "buttonB": String(localized: "Circle")
+        case "buttonX": String(localized: "Square")
+        case "buttonY": String(localized: "Triangle")
         case "leftShoulder": "L1"
         case "rightShoulder": "R1"
         case "leftTrigger": "L2"
         case "rightTrigger": "R2"
         case "leftThumbstickButton": "L3"
         case "rightThumbstickButton": "R3"
-        case "buttonOptions": "Share/Create"
+        case "buttonOptions": String(localized: "Share/Create")
         case "buttonMenu": "Options"
         case "buttonHome": "PS"
         case "buttonShare": "Create"
-        case "playStationTouchpad": "Touchpad"
+        case "playStationTouchpad": String(localized: "Touchpad")
         default: XboxControllerBinding(input: input).label
         }
     }
@@ -298,7 +312,7 @@ final class XboxControllerManager {
         case "buttonOptions": "-"
         case "buttonMenu": "+"
         case "buttonHome": "Home"
-        case "buttonShare": "Capture"
+        case "buttonShare": String(localized: "Capture")
         default: XboxControllerBinding(input: input).label
         }
     }

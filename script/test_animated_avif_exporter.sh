@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# test-requires-path: Vendor/libmpv/lib/libmpv.2.dylib
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/niratan-avif-exporter.XXXXXX")"

@@ -40,6 +40,7 @@ final class ReaderWindowCoordinator {
         let request = ReaderWindowOpenRequest(book: book)
         let model = NativeReaderModel(book: book)
         currentModel = model
+        SyncReaderBridge.model = model
         pendingRequest = request
         currentRequest = request
         return request
@@ -57,6 +58,7 @@ final class ReaderWindowCoordinator {
     func windowDidDisappear() {
         isWindowPresented = false
         currentModel = nil
+        SyncReaderBridge.model = nil
         pendingRequest = nil
         currentRequest = nil
     }

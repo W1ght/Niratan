@@ -22,6 +22,9 @@ let extractorSource = try String(
     encoding: .utf8
 )
 let playbackBoundary = try String(
+    contentsOfFile: "Features/Video/Playback/VideoTrack.swift",
+    encoding: .utf8
+) + String(
     contentsOfFile: "Features/Video/Playback/PlaybackEngine.swift",
     encoding: .utf8
 )
@@ -32,7 +35,12 @@ let subtitleController = try String(
 let playerScreen = try String(
     contentsOfFile: "Features/Video/VideoPlayerScreen.swift",
     encoding: .utf8
-)
+) + String(contentsOfFile: "Features/Video/VideoPlayerScreen+Subtitles.swift", encoding: .utf8)
+    + String(contentsOfFile: "Features/Video/VideoPlayerScreen+Chrome.swift", encoding: .utf8)
+    + String(contentsOfFile: "Features/Video/VideoPlayerScreen+OSD.swift", encoding: .utf8)
+    + String(contentsOfFile: "Features/Video/VideoPlayerScreen+Mining.swift", encoding: .utf8)
+    + String(contentsOfFile: "Features/Video/VideoPlayerScreen+Opening.swift", encoding: .utf8)
+    + String(contentsOfFile: "Features/Video/VideoPlayerScreen+Shortcuts.swift", encoding: .utf8)
 require(
     source,
     contains: "track.type == \"sub\" ? \"subtitle\" : track.type",
@@ -177,8 +185,8 @@ require(
 )
 require(
     playerScreen,
-    contains: "subtitles.document?.assRenderPlan == nil ? .overlayOnly : .nativeOnly",
-    "ASS lookup hit targets should stay disabled while no logical native track is selected"
+    contains: "applyPreparedSubtitleRendering(logicalTrackID: nil)",
+    "external and catalog documents should keep their interactive renderer while no mpv track is selected"
 )
 require(
     playerScreen,

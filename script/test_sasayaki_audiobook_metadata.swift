@@ -1,3 +1,4 @@
+// test-sources: Features/Sasayaki/SasayakiAudiobookMetadata.swift Models/Sasayaki.swift
 import Foundation
 
 @main

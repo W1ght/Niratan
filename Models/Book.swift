@@ -44,8 +44,8 @@ enum BookReorder {
 struct BookMetadata: Codable, Identifiable, Hashable {
     let id: UUID
     let title: String
-    let epub: String?
-    let cover: String?
+    var epub: String?
+    var cover: String?
     let folder: String
     var lastAccess: Date
     var renamedTitle: String?
@@ -53,6 +53,11 @@ struct BookMetadata: Codable, Identifiable, Hashable {
     var bookLanguage: String?
     var externalSourceID: String?
     var externalISBN: String?
+    /// Library sync (Google Drive provider): author and character count of a book that may only
+    /// exist remotely, and when its title was last changed.
+    var author: String?
+    var characterCount: Int?
+    var modified: Int64?
     var displayTitle: String { renamedTitle ?? title }
     
     init(
@@ -182,6 +187,6 @@ struct BookInfo: Codable {
 }
 
 struct BookShelf: Codable {
-    let name: String
+    var name: String
     var bookIds: [UUID]
 }

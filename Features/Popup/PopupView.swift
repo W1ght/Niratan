@@ -24,10 +24,10 @@ struct AnkiMiningToastView: View {
 
     private var title: String {
         switch toast.result.status {
-        case .added: return "Card Added"
-        case .duplicate: return "Duplicate Found"
-        case .failed: return "Add Failed"
-        case .pending: return "Sent to Anki"
+        case .added: return String(localized: "Card Added")
+        case .duplicate: return String(localized: "Duplicate Found")
+        case .failed: return String(localized: "Add Failed")
+        case .pending: return String(localized: "Sent to Anki")
         }
     }
 
@@ -50,35 +50,20 @@ struct AnkiMiningToastView: View {
     }
 
     var body: some View {
-        if #available(iOS 26, macOS 26, *) {
-            GlassEffectContainer(spacing: 12) {
-                toastContent
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: 420, alignment: .leading)
-                    .glassEffect(.regular.tint(tint.opacity(0.16)), in: .rect(cornerRadius: 28))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(tint.opacity(0.32), lineWidth: 1)
-                    )
-                    .shadow(color: tint.opacity(0.20), radius: 18, y: 8)
-                    .shadow(color: .black.opacity(0.12), radius: 24, y: 12)
-            }
-            .padding(.horizontal, 18)
-        } else {
+        GlassEffectContainer(spacing: 12) {
             toastContent
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .frame(maxWidth: 420, alignment: .leading)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .glassEffect(.regular.tint(tint.opacity(0.16)), in: .rect(cornerRadius: 28))
                 .overlay(
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
                         .stroke(tint.opacity(0.32), lineWidth: 1)
                 )
-                .shadow(color: tint.opacity(0.18), radius: 18, y: 8)
-                .shadow(color: .black.opacity(0.14), radius: 24, y: 12)
-                .padding(.horizontal, 18)
+                .shadow(color: tint.opacity(0.20), radius: 18, y: 8)
+                .shadow(color: .black.opacity(0.12), radius: 24, y: 12)
         }
+        .padding(.horizontal, 18)
     }
 
     private var toastContent: some View {
@@ -110,21 +95,6 @@ private struct ContextMiningDraft: Identifiable {
     let content: [String: String]
     let selection: MiningContextSelection
     let entryIndex: Int?
-}
-
-private struct PopupSurfaceStyle: ViewModifier {
-    let useLiquidGlass: Bool
-
-    func body(content: Content) -> some View {
-        if useLiquidGlass, #available(iOS 26, macOS 26, *) {
-            content
-                .glassEffect(.regular, in: .rect(cornerRadius: 8))
-        } else {
-            content
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
-        }
-    }
 }
 
 struct PopupView: View {
@@ -485,6 +455,14 @@ struct PopupView: View {
                         forwardCount = 0
                     }
                     return entries
+                },
+                onKanjiRedirect: { kanji in
+                    let data = LookupEngine.shared.queryKanji(kanji)
+                    if data != nil {
+                        backCount += 1
+                        forwardCount = 0
+                    }
+                    return data
                 }
             )
         }
@@ -510,7 +488,7 @@ struct PopupView: View {
                     if isVisible, let selectionData, let layout, !content.isEmpty {
                         popupContent(selectionData: selectionData, layout: layout)
                             .background(
-                                userConfig.popupDisableTransparency ? opaquePopupBackground : AnyShapeStyle(.ultraThinMaterial),
+                                opaquePopupBackground,
                                 in: RoundedRectangle(cornerRadius: 8)
                             )
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.2), lineWidth: 1))
@@ -753,6 +731,10 @@ struct PopupView: View {
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]") : "[]"
         let audioSources = (try? JSONEncoder().encode(userConfig.enabledAudioSources))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let audioSourceNames = (try? JSONEncoder().encode(userConfig.audioSources.filter(\.isEnabled).map(\.name)))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let excludedDictionaries = (try? JSONEncoder().encode(DictionaryManager.shared.excludedDictionaries))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let scaledCSS = userConfig.customCSS.replacingOccurrences(of: #"(-?(?:\d+(?:\.\d+)?|\.\d+))px"#, with: "calc($1px * var(--popup-scale))", options: .regularExpression)
         let customCSS = (try? JSONSerialization.data(withJSONObject: scaledCSS, options: .fragmentsAllowed))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
@@ -763,12 +745,14 @@ struct PopupView: View {
             window.expandFirstDictionary = \(userConfig.expandFirstDictionary);
             window.twoColumnLayout = \(userConfig.twoColumnLayout);
             window.collapsedDictionaries = \(collapsedDictionaries);
+            window.excludedDictionaries = \(excludedDictionaries);
             window.compactGlossaries = \(userConfig.compactGlossaries);
             window.showExpressionTags = \(userConfig.showExpressionTags);
             window.harmonicFrequency = \(userConfig.harmonicFrequency);
             window.deduplicatePitchAccents = \(userConfig.deduplicatePitchAccents);
             window.compactPitchAccents = \(userConfig.compactPitchAccents);
             window.audioSources = \(audioSources);
+            window.audioSourceNames = \(audioSourceNames);
             window.audioEnableAutoplay = \(userConfig.audioEnableAutoplay);
             window.audioPlaybackMode = "\(userConfig.audioPlaybackMode.rawValue)";
             window.needsAudio = \(AnkiManager.shared.needsAudio);

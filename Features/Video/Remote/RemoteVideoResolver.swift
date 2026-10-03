@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 #if canImport(YouTubeKit)
 @preconcurrency import YouTubeKit
 #endif
@@ -47,6 +48,32 @@ protocol RemoteVideoResolving: Sendable {
         url: URL,
         preferredSubtitleLanguages: [String]
     ) async throws -> ResolvedRemoteVideoSource
+
+    /// Identity-based resolution for providers whose items are not addressed
+    /// by a public URL, such as media servers.
+    func canResolve(identity: RemoteVideoIdentity) -> Bool
+
+    func resolve(
+        identity: RemoteVideoIdentity,
+        preferredSubtitleLanguages: [String]
+    ) async throws -> ResolvedRemoteVideoSource
+}
+
+extension RemoteVideoResolving {
+    func canResolve(identity: RemoteVideoIdentity) -> Bool {
+        provider.id == identity.providerID
+            && canResolve(url: identity.canonicalURL ?? identity.originalURL)
+    }
+
+    func resolve(
+        identity: RemoteVideoIdentity,
+        preferredSubtitleLanguages: [String]
+    ) async throws -> ResolvedRemoteVideoSource {
+        try await resolve(
+            url: identity.canonicalURL ?? identity.originalURL,
+            preferredSubtitleLanguages: preferredSubtitleLanguages
+        )
+    }
 }
 
 struct RemoteVideoResolverRegistry: Sendable {
@@ -64,12 +91,30 @@ struct RemoteVideoResolverRegistry: Sendable {
     init(cache: RemoteVideoResolutionCache = .shared) {
 #if canImport(YouTubeKit)
         self.init(
-            resolvers: [YouTubeKitRemoteVideoResolver()],
+            resolvers: [YouTubeKitRemoteVideoResolver()] + Self.registeredResolvers,
             cache: cache
         )
 #else
-        self.init(resolvers: [], cache: cache)
+        self.init(resolvers: Self.registeredResolvers, cache: cache)
 #endif
+    }
+
+    private static let additionalResolvers = Mutex<[any RemoteVideoResolving]>([])
+
+    /// Resolvers contributed by feature modules (media servers) at launch, so
+    /// this file does not depend on them.
+    static func register(_ resolvers: [any RemoteVideoResolving]) {
+        additionalResolvers.withLock { registered in
+            for resolver in resolvers where !registered.contains(where: {
+                $0.provider == resolver.provider
+            }) {
+                registered.append(resolver)
+            }
+        }
+    }
+
+    private static var registeredResolvers: [any RemoteVideoResolving] {
+        additionalResolvers.withLock { $0 }
     }
 
     func resolver(for url: URL) -> (any RemoteVideoResolving)? {
@@ -109,16 +154,20 @@ struct RemoteVideoResolverRegistry: Sendable {
             return cached
         }
         let url = identity.canonicalURL ?? identity.originalURL
-        let resolver = resolvers.first {
-            $0.provider.id == identity.providerID && $0.canResolve(url: url)
-        } ?? resolver(for: url)
-        guard let resolver else {
+        let source: ResolvedRemoteVideoSource
+        if let identityResolver = resolvers.first(where: { $0.canResolve(identity: identity) }) {
+            source = try await identityResolver.resolve(
+                identity: identity,
+                preferredSubtitleLanguages: preferredSubtitleLanguages
+            )
+        } else if let urlResolver = resolver(for: url) {
+            source = try await urlResolver.resolve(
+                url: url,
+                preferredSubtitleLanguages: preferredSubtitleLanguages
+            )
+        } else {
             throw RemoteVideoResolverError.unsupportedURL
         }
-        let source = try await resolver.resolve(
-            url: url,
-            preferredSubtitleLanguages: preferredSubtitleLanguages
-        )
         await cache.store(
             source,
             keys: [

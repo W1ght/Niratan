@@ -1,3 +1,4 @@
+// test-sources: NativeMac/NativeReaderWheelNavigation.swift
 import Foundation
 
 @main

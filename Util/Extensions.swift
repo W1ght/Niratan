@@ -94,8 +94,20 @@ final class UpdateChecker {
 
     private static let latestReleaseURL = URL(string: "https://api.github.com/repos/W1ght/Niratan/releases/latest")!
     private static let autoCheckKey = "updateCheckerLastAutomaticCheck"
+    private static let automaticChecksEnabledKey = "updateCheckerAutomaticChecksEnabled"
     private static let autoCheckInterval: TimeInterval = 24 * 60 * 60
+    private static let autoCheckPollInterval: Duration = .seconds(60 * 60)
 
+    /// Shared by the main window's background checks and Settings > About.
+    static let shared = UpdateChecker()
+
+    var automaticChecksEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(automaticChecksEnabled, forKey: Self.automaticChecksEnabledKey)
+        }
+    }
+    var lastCheckedAt: Date?
+    var lastCheckFailed = false
     var isChecking = false
     var isDownloading = false
     var downloadProgress: Double?
@@ -125,6 +137,23 @@ final class UpdateChecker {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     }
 
+    init() {
+        let defaults = UserDefaults.standard
+        automaticChecksEnabled = defaults.object(forKey: Self.automaticChecksEnabledKey) as? Bool ?? true
+        lastCheckedAt = defaults.object(forKey: Self.autoCheckKey) as? Date
+    }
+
+    /// Checks the latest GitHub release at launch and then at most once a day while the app keeps running.
+    func runAutomaticChecks() async {
+        try? await Task.sleep(for: .seconds(3))
+        while !Task.isCancelled {
+            if automaticChecksEnabled {
+                await checkAutomaticallyIfNeeded()
+            }
+            try? await Task.sleep(for: Self.autoCheckPollInterval)
+        }
+    }
+
     func checkAutomaticallyIfNeeded() async {
         let defaults = UserDefaults.standard
         if let lastCheck = defaults.object(forKey: Self.autoCheckKey) as? Date,
@@ -132,8 +161,6 @@ final class UpdateChecker {
             return
         }
 
-        try? await Task.sleep(for: .seconds(3))
-        defaults.set(Date(), forKey: Self.autoCheckKey)
         await check(manual: false)
     }
 
@@ -147,19 +174,22 @@ final class UpdateChecker {
 
         do {
             let release = try await fetchLatestRelease()
+            let now = Date()
+            lastCheckedAt = now
+            lastCheckFailed = false
+            UserDefaults.standard.set(now, forKey: Self.autoCheckKey)
             if Self.isVersion(release.version, newerThan: currentVersion) {
+                let isNewRelease = availableRelease?.tagName != release.tagName
                 availableRelease = release
-                alert = .available(release, currentVersion: currentVersion)
+                // Manual checks report inline in Settings; background checks announce each new release once.
+                if !manual && isNewRelease {
+                    alert = .available(release, currentVersion: currentVersion)
+                }
             } else {
                 availableRelease = nil
-                if manual {
-                    alert = .upToDate(currentVersion: currentVersion)
-                }
             }
         } catch {
-            if manual {
-                alert = .failed
-            }
+            lastCheckFailed = true
         }
     }
 

@@ -25,13 +25,21 @@ private func requireOrdered(_ source: String, _ snippets: [String], _ message: S
 }
 
 let manager = try source("Features/Video/Anime4KShaderManager.swift")
+    + source("Features/Video/Playback/VideoShaderPreset.swift")
 let playbackProtocol = try source("Features/Video/Playback/PlaybackEngine.swift")
+    + source("Features/Video/Playback/VideoTrack.swift")
 let mpvClient = try source("Features/Video/Playback/HSMpvClient.mm")
 let mpvEngine = try source("Features/Video/Playback/MpvPlayerEngine.swift")
 let userConfig = try source("Core/UserConfig.swift")
 let settings = try source("Features/Settings/VideoSettingsView.swift")
 let inspector = try source("Features/Video/VideoInspectorView.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
+    + source("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + source("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + source("Features/Video/VideoPlayerScreen+OSD.swift")
+    + source("Features/Video/VideoPlayerScreen+Mining.swift")
+    + source("Features/Video/VideoPlayerScreen+Opening.swift")
+    + source("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let project = try source("Niratan.xcodeproj/project.pbxproj")
 let localization = try source("Localizable.xcstrings")
 
@@ -116,7 +124,7 @@ require(
     "Video Settings and the player Video sidebar must reuse one Anime4K control"
 )
 require(
-    manager.contains("@State private var downloadTask: Task<Void, Never>?")
+    manager.contains("var downloadTask: Task<Void, Never>?")
         && manager.contains("downloadTask = Task { @MainActor in")
         && manager.contains(".buttonStyle(.glassProminent)")
         && manager.contains(".buttonBorderShape(.capsule)")

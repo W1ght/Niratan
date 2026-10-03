@@ -2,6 +2,60 @@ import AppKit
 import Foundation
 import Observation
 
+nonisolated enum MangaPageTurn: Equatable, Sendable {
+    case forward
+    case backward
+}
+
+/// Where a newly shown spread should start when it is larger than the window:
+/// turning backward with the wheel lands on the end of the previous page.
+nonisolated enum MangaPageEntryEdge: Equatable, Sendable {
+    case start
+    case end
+}
+
+/// One-shot instructions from the reader model to the AppKit canvas.
+nonisolated struct MangaCanvasCommand: Equatable, Sendable {
+    nonisolated enum Kind: Equatable, Sendable {
+        /// Pans by a fraction of the viewport.
+        case pan(dx: Double, dy: Double)
+        /// Zooms to a panel, given as a normalized top-left rect on the page
+        /// at `pageOffset` of the displayed spread.
+        case focusPanel(pageOffset: Int, rect: CGRect)
+        /// Returns to the configured fit and zoom.
+        case resetZoom
+    }
+
+    let id: UUID
+    let kind: Kind
+
+    init(_ kind: Kind) {
+        id = UUID()
+        self.kind = kind
+    }
+}
+
+nonisolated enum MangaReaderSettingsScope: String, CaseIterable, Identifiable, Sendable {
+    case thisManga
+    case allManga
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .thisManga: "This Manga"
+        case .allManga: "All Manga"
+        }
+    }
+}
+
+nonisolated enum MangaPanelNavigationStatus: Equatable, Sendable {
+    case panel(Int, of: Int)
+    case noPanels
+    case unavailable
+    case failed
+}
+
 @Observable
 @MainActor
 final class MangaReaderViewModel {
@@ -12,66 +66,46 @@ final class MangaReaderViewModel {
         let completed: Bool
     }
 
+    private struct PanelCursor: Equatable {
+        let spreadKey: [Int]
+        let index: Int
+    }
+
     let session: MangaReadingSession
     let pageProvider: any MangaPageContentProvider
     let popupPresentation = PopupPresentationCoordinator()
+    let settingsStore: MangaReaderSettingsStore
 
-    var layout: MangaReaderLayout {
+    /// The effective settings for this title: global values merged with this
+    /// title's overrides.
+    private(set) var settings: MangaReaderSettings
+    var settingsScope: MangaReaderSettingsScope = .thisManga
+    var showsSettingsPanel = false {
         didSet {
-            guard layout != oldValue else { return }
-            MangaReaderPreferences.save(layout: layout, in: preferences)
-            popupPresentation.closeAll()
-        }
-    }
-    var direction: MangaReadingDirection {
-        didSet {
-            guard direction != oldValue else { return }
-            MangaReaderPreferences.save(direction: direction, in: preferences)
-            popupPresentation.closeAll()
-            rebuildPresentationPagesIfPossible()
-        }
-    }
-    var splitsWidePages = false {
-        didSet {
-            guard splitsWidePages != oldValue else { return }
-            MangaPageProcessingPreferences.save(
-                splitsWidePages: splitsWidePages,
-                in: preferences
-            )
-            pageProcessingPreferenceDidChange()
-        }
-    }
-    var cropsWhiteBorders = false {
-        didSet {
-            guard cropsWhiteBorders != oldValue else { return }
-            MangaPageProcessingPreferences.save(
-                cropsWhiteBorders: cropsWhiteBorders,
-                in: preferences
-            )
-            pageProcessingPreferenceDidChange()
-        }
-    }
-    var zoomPercentage: Int {
-        didSet {
-            let clamped = MangaReaderPreferences.clampedZoomPercentage(
-                zoomPercentage
-            )
-            guard clamped == zoomPercentage else {
-                zoomPercentage = clamped
-                return
+            guard showsSettingsPanel != oldValue else { return }
+            if showsSettingsPanel {
+                popupPresentation.closeAll()
             }
-            guard zoomPercentage != oldValue else { return }
-            MangaReaderPreferences.save(
-                zoomPercentage: zoomPercentage,
-                in: preferences
-            )
-            popupPresentation.closeAll()
         }
     }
+    var isInterfaceHidden = false
+    /// Viewport size of the reading area, reported by the view; automatic
+    /// spreads show two pages only when it is landscape.
+    var viewportSize: CGSize = .zero {
+        didSet {
+            let wasLandscape = oldValue.width > oldValue.height
+            let isLandscape = viewportSize.width > viewportSize.height
+            if wasLandscape != isLandscape || oldValue == .zero {
+                rebuildSpreads()
+            }
+        }
+    }
+
     var currentPageIndex: Int
     private(set) var currentChapterIndex: Int
     private(set) var pageReferences: [MangaPageReference]
     private(set) var presentationPages: [MangaPresentationPage] = []
+    private(set) var spreads: [[Int]] = []
     private(set) var isPreparingPages = false
     private(set) var isLoadingChapter = false
     private(set) var isContentAvailable = true
@@ -85,12 +119,23 @@ final class MangaReaderViewModel {
     var ocrTotalPageCount = 0
     var ocrScanCancellationID = 0
     private(set) var lookupPageIndex: Int?
+    private(set) var pageTurn: MangaPageTurn?
+    private(set) var pageTurnToken = 0
+    private(set) var pageEntryEdge: MangaPageEntryEdge = .start
+    private(set) var canvasCommand: MangaCanvasCommand?
+    private(set) var transientHint: String?
+    private(set) var panelStatus: MangaPanelNavigationStatus?
+    private(set) var pageLuminanceBySource: [Int: Double] = [:]
+    private(set) var detectedLongStrip: Bool?
+    /// The resolved OCR engine for this session; nil until resolved.
+    private(set) var ocrEngine: MangaOCREngineSelection?
+    private var sourcePixelSizes: [Int: CGSize] = [:]
 
     @ObservationIgnored private var statusTask: Task<Void, Never>?
+    @ObservationIgnored private var hintTask: Task<Void, Never>?
     @ObservationIgnored private var activeOCRScanID: UUID?
     @ObservationIgnored private var ocrContentGeneration = UUID()
     @ObservationIgnored private var isOCRScanPaused = false
-    @ObservationIgnored private let preferences: UserDefaults
     @ObservationIgnored private var cachedPageAnalyses: [MangaPageAnalysis]?
     @ObservationIgnored private var activeChapterLoadID: UUID?
     @ObservationIgnored private var pendingProgressByChapter:
@@ -99,30 +144,44 @@ final class MangaReaderViewModel {
     @ObservationIgnored private var completedProgressChapterIDs:
         Set<String> = []
     @ObservationIgnored private var progressWriteTask: Task<Void, Never>?
+    @ObservationIgnored private var boundaryNoticeKey: String?
+    @ObservationIgnored private var sizeProbeTask: Task<Void, Never>?
+    @ObservationIgnored private var probedSourcePages: Set<Int> = []
+    @ObservationIgnored private var panelCursor: PanelCursor?
+    @ObservationIgnored private var panelsByPresentationPage: [Int: [CGRect]] = [:]
+    @ObservationIgnored private var panelTask: Task<Void, Never>?
+    @ObservationIgnored private let suggestedMode: MangaReaderMode?
+    @ObservationIgnored private let suggestedDirection: MangaReadingDirection?
+    /// Resolves panels for a page image in reading order (normalized,
+    /// top-left origin). Nil when the panel model is unavailable.
+    @ObservationIgnored var panelDetector: (@Sendable (CGImage, Bool) async throws -> [CGRect]?)?
 
     init(
         session: MangaReadingSession,
         pageProvider: any MangaPageContentProvider,
-        preferences: UserDefaults = .standard
+        settingsStore: MangaReaderSettingsStore = .shared
     ) {
         self.session = session
         self.pageProvider = pageProvider
-        self.preferences = preferences
-        let initialLayout = preferences.object(forKey: MangaReaderPreferences.layoutKey) == nil
-            ? session.suggestedLayout ?? MangaReaderPreferences.layout(in: preferences)
-            : MangaReaderPreferences.layout(in: preferences)
-        layout = initialLayout
-        direction = preferences.object(forKey: MangaReaderPreferences.directionKey) == nil
-            ? session.suggestedDirection ?? MangaReaderPreferences.direction(in: preferences)
-            : MangaReaderPreferences.direction(in: preferences)
-        splitsWidePages = MangaPageProcessingPreferences.splitsWidePages(
-            in: preferences
+        self.settingsStore = settingsStore
+        suggestedMode = session.suggestedLayout.map {
+            $0 == .continuous ? .continuous : .paged
+        }
+        suggestedDirection = session.suggestedDirection
+        let resolvedSettings = Self.resolvedSettings(
+            store: settingsStore,
+            documentID: session.documentID,
+            suggestedMode: session.suggestedLayout.map {
+                $0 == .continuous ? .continuous : .paged
+            },
+            suggestedDirection: session.suggestedDirection
         )
-        cropsWhiteBorders = MangaPageProcessingPreferences.cropsWhiteBorders(
-            in: preferences
-        )
-        zoomPercentage = MangaReaderPreferences.zoomPercentage(in: preferences)
-        isOCREnabled = MangaReaderPreferences.isOCREnabled(in: preferences)
+        settings = resolvedSettings
+        // Recognition starts on open only for on-device engines, or for
+        // Google Lens after the upload disclosure was accepted.
+        isOCREnabled = resolvedSettings.ocrTrigger == .automatic
+            && (!resolvedSettings.ocrEngine.uploadsPages
+                || MangaOCREngineRouter.hasGoogleLensConsent())
         currentChapterIndex = min(
             max(0, session.initialChapterIndex),
             max(0, session.chapters.count - 1)
@@ -137,13 +196,22 @@ final class MangaReaderViewModel {
             sourcePaths: sourcePaths
         )
         isPreparingPages = pageProcessingOptions.requiresAnalysis
+        rebuildSpreads()
+        alignCurrentPageToSpread()
+        panelDetector = { image, rightToLeft in
+            guard await MangaPanelDetector.shared.isReady() else { return nil }
+            return try await MangaPanelDetector.shared.detectPanels(
+                in: image,
+                rightToLeft: rightToLeft
+            )
+        }
     }
 
     convenience init(
         item: MangaLibraryItem,
         source: MangaLibrarySource,
         profileID: String = ProfileRepository.shared.activeProfile.id,
-        preferences: UserDefaults = .standard
+        settingsStore: MangaReaderSettingsStore = .shared
     ) {
         do {
             let local = try MangaReadingSession.local(
@@ -154,7 +222,7 @@ final class MangaReaderViewModel {
             self.init(
                 session: local.session,
                 pageProvider: local.provider,
-                preferences: preferences
+                settingsStore: settingsStore
             )
         } catch {
             let chapter = MangaReadingChapter(
@@ -179,7 +247,7 @@ final class MangaReaderViewModel {
             self.init(
                 session: fallback,
                 pageProvider: UnavailableMangaPageContentProvider(),
-                preferences: preferences
+                settingsStore: settingsStore
             )
             errorMessage = error.localizedDescription
             isContentAvailable = false
@@ -196,6 +264,200 @@ final class MangaReaderViewModel {
             : nil
     }
 
+    // MARK: Settings
+
+    var direction: MangaReadingDirection { settings.direction }
+
+    var mode: MangaReaderMode {
+        if settings.autoDetectsMode, let detectedLongStrip {
+            return detectedLongStrip ? .continuous : .paged
+        }
+        return settings.mode
+    }
+
+    var isDoubleSpread: Bool {
+        guard mode == .paged else { return false }
+        switch settings.spreadMode {
+        case .single: return false
+        case .double: return true
+        case .automatic: return viewportSize.width > viewportSize.height
+        }
+    }
+
+    /// The legacy three-way layout, kept for the canvas and tests.
+    var layout: MangaReaderLayout {
+        switch mode {
+        case .continuous: .continuous
+        case .verticalPaged: .singlePage
+        case .paged: isDoubleSpread ? .doublePage : .singlePage
+        }
+    }
+
+    var zoomPercentage: Int {
+        get { settings.zoomPercentage }
+        set {
+            let clamped = min(
+                MangaReaderSettings.maximumZoomPercentage,
+                max(settings.minimumEffectiveZoomPercentage, newValue)
+            )
+            guard clamped != settings.zoomPercentage else { return }
+            var next = settings
+            next.zoomPercentage = clamped
+            // In-page zoom is shared by every title, like Fushi's global zoom,
+            // unless this title already keeps its own zoom.
+            apply(
+                next,
+                scope: overriddenSettingKeys().contains("zoomPercentage")
+                    ? .thisManga
+                    : .allManga
+            )
+        }
+    }
+
+    var zoomScale: Double {
+        Double(zoomPercentage) / 100
+    }
+
+    func overriddenSettingKeys() -> Set<String> {
+        settingsStore.overriddenKeys(for: session.documentID)
+    }
+
+    /// Applies edited settings to the selected scope. Only the fields that
+    /// changed are written, so a title override never copies unrelated values.
+    func apply(
+        _ newSettings: MangaReaderSettings,
+        scope: MangaReaderSettingsScope? = nil
+    ) {
+        var newSettings = newSettings
+        newSettings.normalize()
+        guard newSettings != settings,
+              let oldValues = MangaReaderSettingsStore.dictionary(from: settings),
+              let newValues = MangaReaderSettingsStore.dictionary(from: newSettings) else {
+            return
+        }
+        let resolvedScope = scope ?? settingsScope
+        let documentID = resolvedScope == .thisManga ? session.documentID : nil
+        for (key, value) in newValues {
+            guard let oldValue = oldValues[key],
+                  (oldValue as? NSObject)?.isEqual(value) != true else {
+                continue
+            }
+            settingsStore.update(key, from: newSettings, documentID: documentID)
+        }
+        reloadSettings()
+    }
+
+    func resetOverride(_ key: String) {
+        settingsStore.clearOverride(key, documentID: session.documentID)
+        reloadSettings()
+    }
+
+    func resetAllOverrides() {
+        settingsStore.clearOverrides(documentID: session.documentID)
+        reloadSettings()
+    }
+
+    func toggleDirection() {
+        var next = settings
+        next.direction = settings.direction == .rightToLeft ? .leftToRight : .rightToLeft
+        apply(next, scope: .thisManga)
+    }
+
+    func toggleReadingMode() {
+        var next = settings
+        next.autoDetectsMode = false
+        next.mode = mode == .continuous ? .paged : .continuous
+        apply(next, scope: .thisManga)
+        showHint(String(localized: String.LocalizationValue(mode.titleKey)))
+    }
+
+    func cycleSpreadMode() {
+        var next = settings
+        switch settings.spreadMode {
+        case .automatic: next.spreadMode = .single
+        case .single: next.spreadMode = .double
+        case .double: next.spreadMode = .automatic
+        }
+        apply(next, scope: .thisManga)
+        showHint(String(localized: String.LocalizationValue(next.spreadMode.titleKey)))
+    }
+
+    func zoom(by percentage: Int) {
+        zoomPercentage = zoomPercentage + percentage
+    }
+
+    private func reloadSettings() {
+        let previous = settings
+        let previousMode = mode
+        settings = Self.resolvedSettings(
+            store: settingsStore,
+            documentID: session.documentID,
+            suggestedMode: suggestedMode,
+            suggestedDirection: suggestedDirection
+        )
+        settingsDidChange(from: previous, previousMode: previousMode)
+    }
+
+    private func settingsDidChange(
+        from previous: MangaReaderSettings,
+        previousMode: MangaReaderMode
+    ) {
+        guard previous != settings else { return }
+        let processingChanged = previous.splitsWidePages != settings.splitsWidePages
+            || previous.cropsBorders != settings.cropsBorders
+            || previous.rotatesWidePages != settings.rotatesWidePages
+        if previous.direction != settings.direction || processingChanged
+            || previousMode != mode
+            || previous.spreadMode != settings.spreadMode
+            || previous.scaleType != settings.scaleType
+            || previous.zoomPercentage != settings.zoomPercentage {
+            popupPresentation.closeAll()
+            resetPanelNavigation()
+        }
+        if processingChanged {
+            pageProcessingPreferenceDidChange()
+        } else if previous.direction != settings.direction {
+            rebuildPresentationPagesIfPossible()
+        }
+        if previous.spreadMode != settings.spreadMode
+            || previous.showsCoverAlone != settings.showsCoverAlone
+            || previous.showsWidePagesAlone != settings.showsWidePagesAlone
+            || previousMode != mode {
+            rebuildSpreads()
+        }
+        if settings.autoDetectsMode, detectedLongStrip == nil {
+            detectLongStrip()
+        }
+        if previous.ocrEngine != settings.ocrEngine {
+            Task { await refreshOCREngine() }
+        }
+        if previous.panelNavigation != settings.panelNavigation {
+            resetPanelNavigation()
+            panelStatus = nil
+        }
+    }
+
+    private static func resolvedSettings(
+        store: MangaReaderSettingsStore,
+        documentID: String,
+        suggestedMode: MangaReaderMode?,
+        suggestedDirection: MangaReadingDirection?
+    ) -> MangaReaderSettings {
+        var settings = store.effectiveSettings(for: documentID)
+        let overridden = store.overriddenKeys(for: documentID)
+        // Source hints (for example a webtoon source) act as this title's
+        // default until the reader chooses a value for the title.
+        if let suggestedMode, !overridden.contains("mode"), !settings.autoDetectsMode {
+            settings.mode = suggestedMode
+        }
+        if let suggestedDirection, !overridden.contains("direction") {
+            settings.direction = suggestedDirection
+        }
+        return settings
+    }
+
+    // MARK: Pages
+
     var pageCount: Int {
         presentationPages.count
     }
@@ -204,21 +466,10 @@ final class MangaReaderViewModel {
         pageReferences.count
     }
 
-    var zoomScale: Double {
-        Double(zoomPercentage) / 100
-    }
-
     var displayedPageIndices: [Int] {
-        switch layout {
-        case .singlePage, .continuous:
-            [currentPageIndex]
-        case .doublePage:
-            MangaPagePairResolver.indices(
-                startingAt: currentPageIndex,
-                pageCount: pageCount,
-                direction: direction
-            )
-        }
+        guard mode != .continuous else { return [currentPageIndex] }
+        let spread = currentSpread
+        return direction == .rightToLeft ? Array(spread.reversed()) : spread
     }
 
     var displayedPages: [MangaPresentationPage] {
@@ -229,45 +480,76 @@ final class MangaReaderViewModel {
         }
     }
 
+    private var currentSpread: [Int] {
+        guard pageCount > 0 else { return [] }
+        if let index = MangaSpreadResolver.spreadIndex(
+            containing: currentPageIndex,
+            in: spreads
+        ) {
+            return spreads[index]
+        }
+        return [min(max(0, currentPageIndex), pageCount - 1)]
+    }
+
+    private var currentSpreadIndex: Int? {
+        MangaSpreadResolver.spreadIndex(containing: currentPageIndex, in: spreads)
+    }
+
     var pageLabel: String {
         guard pageCount > 0 else { return "0 / 0" }
-        if layout == .doublePage, displayedPageIndices.count > 1 {
-            let ordered = displayedPageIndices.sorted()
-            return "\(ordered[0] + 1)–\(ordered[1] + 1) / \(pageCount)"
+        let spread = currentSpread
+        if mode != .continuous, spread.count > 1 {
+            return "\(spread[0] + 1)–\(spread[spread.count - 1] + 1) / \(pageCount)"
         }
         return "\(currentPageIndex + 1) / \(pageCount)"
     }
 
+    var hasPreviousChapter: Bool {
+        currentChapterIndex > 0
+    }
+
+    var hasNextChapter: Bool {
+        currentChapterIndex + 1 < chapters.count
+    }
+
     var canGoBackward: Bool {
-        currentPageIndex > 0
+        if mode == .continuous {
+            return currentPageIndex > 0 || hasPreviousChapter
+        }
+        return (currentSpreadIndex ?? 0) > 0 || hasPreviousChapter
     }
 
     var canGoForward: Bool {
-        currentPageIndex < pageCount - 1
+        if mode == .continuous {
+            return currentPageIndex < pageCount - 1 || hasNextChapter
+        }
+        return (currentSpreadIndex ?? 0) < spreads.count - 1 || hasNextChapter
     }
 
     var visibleOCRRequestID: String {
         let sourceIndices = displayedPages.map(\.sourcePageIndex)
-        return "\(currentChapterIndex)|\(isOCREnabled)|\(sourceIndices.map(String.init).joined(separator: ","))"
+        return "\(currentChapterIndex)|\(isOCREnabled)|\(ocrEngine?.signature ?? "-")|\(sourceIndices.map(String.init).joined(separator: ","))"
     }
 
     var fullOCRRequestID: String {
-        "\(currentChapterIndex)|\(isOCREnabled)|\(layout == .continuous)|\(ocrScanCancellationID)"
+        "\(currentChapterIndex)|\(isOCREnabled)|\(mode == .continuous)|\(ocrScanCancellationID)|\(ocrEngine?.signature ?? "-")"
     }
 
     var pageProcessingOptions: MangaPageProcessingOptions {
         MangaPageProcessingOptions(
-            splitsWidePages: splitsWidePages,
+            splitsWidePages: settings.splitsWidePages,
             readingDirection: direction,
-            cropsWhiteBorders: cropsWhiteBorders
+            cropsWhiteBorders: settings.cropsBorders,
+            rotatesWidePages: settings.rotatesWidePages
         )
     }
 
     var pageProcessingRequestID: String {
         [
-            splitsWidePages.description,
+            settings.splitsWidePages.description,
             direction.rawValue,
-            cropsWhiteBorders.description,
+            settings.cropsBorders.description,
+            settings.rotatesWidePages.description,
             String(currentChapterIndex),
         ].joined(separator: "|")
     }
@@ -312,7 +594,20 @@ final class MangaReaderViewModel {
         }
     }
 
+    /// Background luminance of the first displayed page, for the automatic
+    /// background.
+    var currentPageLuminance: Double? {
+        displayedPages.first.flatMap { pageLuminanceBySource[$0.sourcePageIndex] }
+    }
+
+    var pageBackgroundColor: NSColor {
+        settings.backgroundColor(pageLuminance: currentPageLuminance)
+    }
+
     func preparePageProcessing() async {
+        if settings.autoDetectsMode, detectedLongStrip == nil {
+            detectLongStrip()
+        }
         guard pageProcessingOptions.requiresAnalysis else {
             isPreparingPages = false
             rebuildPresentationPages(using: nil)
@@ -363,6 +658,13 @@ final class MangaReaderViewModel {
             }
             try Task.checkCancellation()
             cachedPageAnalyses = analyses
+            for (index, analysis) in analyses.enumerated() {
+                sourcePixelSizes[index] = CGSize(
+                    width: analysis.pixelWidth,
+                    height: analysis.pixelHeight
+                )
+                pageLuminanceBySource[index] = analysis.backgroundLuminance
+            }
             isPreparingPages = false
             rebuildPresentationPages(using: analyses)
         } catch is CancellationError {
@@ -373,12 +675,19 @@ final class MangaReaderViewModel {
         }
     }
 
+    // MARK: Navigation
+
     func goBackward() {
-        move(by: layout == .doublePage ? -2 : -1)
+        turn(.backward, entryEdge: .start)
     }
 
     func goForward() {
-        move(by: layout == .doublePage ? 2 : 1)
+        turn(.forward, entryEdge: .start)
+    }
+
+    /// Wheel paging lands on the matching edge of an enlarged page.
+    func turnFromWheel(_ turn: MangaPageTurn) {
+        self.turn(turn, entryEdge: turn == .backward ? .end : .start)
     }
 
     func handleLeftArrow() {
@@ -397,20 +706,139 @@ final class MangaReaderViewModel {
         }
     }
 
+    func handleTapZone(_ action: MangaTapZoneAction) {
+        switch action {
+        case .next: goForward()
+        case .previous: goBackward()
+        case .menu: toggleInterface()
+        }
+    }
+
+    func toggleInterface() {
+        isInterfaceHidden.toggle()
+    }
+
+    func pan(dx: Double, dy: Double) {
+        canvasCommand = MangaCanvasCommand(.pan(dx: dx, dy: dy))
+    }
+
     @discardableResult
     func handleEscape() -> Bool {
-        guard !popupPresentation.popups.isEmpty else { return false }
-        popupPresentation.closeAll()
-        return true
+        if !popupPresentation.popups.isEmpty {
+            popupPresentation.closeAll()
+            return true
+        }
+        if showsSettingsPanel {
+            showsSettingsPanel = false
+            return true
+        }
+        if isInterfaceHidden {
+            isInterfaceHidden = false
+            return true
+        }
+        return false
     }
 
     func go(to pageIndex: Int) {
+        go(to: pageIndex, turn: nil, entryEdge: .start)
+    }
+
+    func goToFirstPage() {
+        go(to: 0, turn: .backward, entryEdge: .start)
+    }
+
+    func goToLastPage() {
+        go(to: pageCount - 1, turn: .forward, entryEdge: .start)
+    }
+
+    private func go(
+        to pageIndex: Int,
+        turn: MangaPageTurn?,
+        entryEdge: MangaPageEntryEdge
+    ) {
         guard pageCount > 0 else { return }
-        let clamped = min(max(0, pageIndex), pageCount - 1)
+        var clamped = min(max(0, pageIndex), pageCount - 1)
+        if mode != .continuous,
+           let spreadIndex = MangaSpreadResolver.spreadIndex(
+               containing: clamped,
+               in: spreads
+           ) {
+            clamped = spreads[spreadIndex][0]
+        }
         guard clamped != currentPageIndex else { return }
         popupPresentation.closeAll()
+        resetPanelNavigation()
+        if let turn {
+            pageTurn = turn
+            pageTurnToken += 1
+        } else {
+            pageTurn = nil
+        }
+        pageEntryEdge = entryEdge
         currentPageIndex = clamped
         persistProgress()
+        probePageSizesIfNeeded()
+    }
+
+    private func turn(_ turn: MangaPageTurn, entryEdge: MangaPageEntryEdge) {
+        guard pageCount > 0 else {
+            advanceChapter(turn)
+            return
+        }
+        if mode != .continuous,
+           settings.panelNavigation,
+           advancePanel(turn) {
+            return
+        }
+        if mode == .continuous {
+            let target = currentPageIndex + (turn == .forward ? 1 : -1)
+            if presentationPages.indices.contains(target) {
+                go(to: target, turn: turn, entryEdge: entryEdge)
+            } else {
+                advanceChapter(turn)
+            }
+            return
+        }
+        let spreadIndex = currentSpreadIndex ?? 0
+        let target = spreadIndex + (turn == .forward ? 1 : -1)
+        if spreads.indices.contains(target) {
+            go(to: spreads[target][0], turn: turn, entryEdge: entryEdge)
+        } else {
+            advanceChapter(turn)
+        }
+    }
+
+    /// Fushi opens the neighbouring chapter when paging past either end; going
+    /// backward lands on the previous chapter's last page.
+    private func advanceChapter(_ turn: MangaPageTurn) {
+        guard !isLoadingChapter else { return }
+        switch turn {
+        case .forward:
+            guard hasNextChapter else {
+                showBoundaryNotice(String(localized: "This is the last page."))
+                return
+            }
+            let next = currentChapterIndex + 1
+            pageTurn = .forward
+            pageTurnToken += 1
+            Task { await openChapter(at: next, pageIndex: 0) }
+        case .backward:
+            guard hasPreviousChapter else {
+                showBoundaryNotice(String(localized: "This is the first page."))
+                return
+            }
+            let previous = currentChapterIndex - 1
+            pageTurn = .backward
+            pageTurnToken += 1
+            Task { await openChapter(at: previous, pageIndex: Int.max) }
+        }
+    }
+
+    private func showBoundaryNotice(_ message: String) {
+        let key = "\(currentChapterIndex)|\(message)"
+        guard boundaryNoticeKey != key else { return }
+        boundaryNoticeKey = key
+        showOCRStatus(message)
     }
 
     func openChapter(at index: Int, pageIndex: Int = 0) async {
@@ -421,6 +849,7 @@ final class MangaReaderViewModel {
         invalidateOCRForChapterChange()
         persistProgress()
         popupPresentation.closeAll()
+        resetPanelNavigation()
         isLoadingChapter = true
         isPreparingPages = false
         errorMessage = nil
@@ -435,6 +864,12 @@ final class MangaReaderViewModel {
             currentChapterIndex = index
             pageReferences = pages
             cachedPageAnalyses = nil
+            sourcePixelSizes = [:]
+            pageLuminanceBySource = [:]
+            probedSourcePages = []
+            detectedLongStrip = nil
+            panelsByPresentationPage = [:]
+            boundaryNoticeKey = nil
             currentPageIndex = min(
                 max(0, pageIndex),
                 max(0, pages.count - 1)
@@ -443,12 +878,17 @@ final class MangaReaderViewModel {
                 MangaPagePresentationResolver.unprocessedPages(
                     sourcePaths: pages.map(\.displayPath)
                 )
+            rebuildSpreads()
+            alignCurrentPageToSpread()
             isContentAvailable = !pages.isEmpty
             isLoadingChapter = false
             activeChapterLoadID = nil
             isPreparingPages = pageProcessingOptions.requiresAnalysis
+            persistProgress()
             if isPreparingPages {
                 await preparePageProcessing()
+            } else if settings.autoDetectsMode {
+                detectLongStrip()
             }
         } catch is CancellationError {
             guard activeChapterLoadID == loadID else { return }
@@ -463,23 +903,379 @@ final class MangaReaderViewModel {
     }
 
     func goToPreviousChapter() async {
-        guard currentChapterIndex > 0 else { return }
+        guard hasPreviousChapter else { return }
         await openChapter(at: currentChapterIndex - 1)
     }
 
     func goToNextChapter() async {
-        guard currentChapterIndex + 1 < chapters.count else { return }
+        guard hasNextChapter else { return }
         await openChapter(at: currentChapterIndex + 1)
+    }
+
+    // MARK: Hints
+
+    func showReadingModeHintIfNeeded() {
+        guard settings.showsReadingModeHint else { return }
+        let modeTitle = String(localized: String.LocalizationValue(mode.titleKey))
+        if mode == .paged {
+            let spreadTitle = String(
+                localized: String.LocalizationValue(
+                    isDoubleSpread ? MangaSpreadMode.double.titleKey : MangaSpreadMode.single.titleKey
+                )
+            )
+            showHint("\(modeTitle) · \(spreadTitle)")
+        } else {
+            showHint(modeTitle)
+        }
+    }
+
+    func showHint(_ message: String) {
+        transientHint = message
+        hintTask?.cancel()
+        hintTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            transientHint = nil
+        }
+    }
+
+    // MARK: Spreads and geometry
+
+    /// Height / width of a display page, from its decoded size when known.
+    /// Long-strip placeholders use it so scrolling to a page lands correctly
+    /// before every image above it has been decoded.
+    func pageAspectRatio(for page: MangaPresentationPage) -> CGFloat {
+        guard let size = sourcePixelSizes[page.sourcePageIndex],
+              size.width > 0, size.height > 0 else {
+            return 1.42
+        }
+        var width = size.width * page.transform.sourceRect.width
+        var height = size.height * page.transform.sourceRect.height
+        if page.transform.rotatesClockwise {
+            swap(&width, &height)
+        }
+        return width > 0 ? height / width : 1.42
+    }
+
+    private func rebuildSpreads() {
+        let double = isDoubleSpread
+        let pages = presentationPages
+        let sizes = sourcePixelSizes
+        let next = MangaSpreadResolver.spreads(
+            pageCount: pages.count,
+            isDouble: double,
+            showsCoverAlone: settings.showsCoverAlone,
+            showsWidePagesAlone: settings.showsWidePagesAlone,
+            isWide: { index in
+                guard pages.indices.contains(index),
+                      let size = sizes[pages[index].sourcePageIndex] else {
+                    return false
+                }
+                let transform = pages[index].transform
+                var width = size.width * transform.sourceRect.width
+                var height = size.height * transform.sourceRect.height
+                if transform.rotatesClockwise {
+                    swap(&width, &height)
+                }
+                return width >= height
+            }
+        )
+        guard next != spreads else { return }
+        spreads = next
+        alignCurrentPageToSpread()
+        if double {
+            probePageSizesIfNeeded()
+        }
+    }
+
+    private func alignCurrentPageToSpread() {
+        guard mode != .continuous,
+              let spreadIndex = currentSpreadIndex else {
+            return
+        }
+        currentPageIndex = spreads[spreadIndex][0]
+    }
+
+    /// Wide-page pairing needs page sizes; read the image headers of nearby
+    /// pages ahead of time so spreads settle before the reader reaches them.
+    private func probePageSizesIfNeeded() {
+        guard isDoubleSpread, settings.showsWidePagesAlone,
+              !presentationPages.isEmpty else {
+            return
+        }
+        let center = presentationPages.indices.contains(currentPageIndex)
+            ? presentationPages[currentPageIndex].sourcePageIndex
+            : 0
+        let indices = ((center - 2)...(center + 8)).filter {
+            pageReferences.indices.contains($0)
+                && sourcePixelSizes[$0] == nil
+                && !probedSourcePages.contains($0)
+        }
+        guard !indices.isEmpty else { return }
+        probedSourcePages.formUnion(indices)
+        let references = indices.map { pageReferences[$0] }
+        let provider = pageProvider
+        let generation = ocrContentGeneration
+        sizeProbeTask = Task(priority: .utility) { [weak self] in
+            var sizes: [Int: CGSize] = [:]
+            for (index, reference) in zip(indices, references) {
+                guard !Task.isCancelled,
+                      let payload = try? await provider.payload(for: reference),
+                      let data = payload.imageData,
+                      let size = MangaPageProcessor.pixelSize(of: data) else {
+                    continue
+                }
+                sizes[index] = size
+            }
+            guard let self, !Task.isCancelled,
+                  self.ocrContentGeneration == generation,
+                  !sizes.isEmpty else {
+                return
+            }
+            self.sourcePixelSizes.merge(sizes) { _, new in new }
+            self.rebuildSpreads()
+        }
+    }
+
+    private func recordPageGeometry(sourcePageIndex: Int, data: Data) {
+        guard sourcePixelSizes[sourcePageIndex] == nil
+                || (settings.usesAutomaticBackground
+                    && pageLuminanceBySource[sourcePageIndex] == nil) else {
+            return
+        }
+        let needsLuminance = settings.usesAutomaticBackground
+            && pageLuminanceBySource[sourcePageIndex] == nil
+        let generation = ocrContentGeneration
+        Task(priority: .utility) { [weak self] in
+            let geometry = await Task.detached(priority: .utility) {
+                (
+                    MangaPageProcessor.pixelSize(of: data),
+                    needsLuminance ? MangaPageProcessor.backgroundLuminance(of: data) : nil
+                )
+            }.value
+            guard let self, self.ocrContentGeneration == generation else { return }
+            if let luminance = geometry.1 {
+                self.pageLuminanceBySource[sourcePageIndex] = luminance
+            }
+            if let size = geometry.0, self.sourcePixelSizes[sourcePageIndex] == nil {
+                self.sourcePixelSizes[sourcePageIndex] = size
+                if self.isDoubleSpread, self.settings.showsWidePagesAlone {
+                    self.rebuildSpreads()
+                }
+            }
+        }
+    }
+
+    /// Fushi's automatic mode: a median page height/width ratio above 2 means
+    /// a long-strip (webtoon) chapter.
+    private func detectLongStrip() {
+        let references = Array(pageReferences.prefix(5))
+        guard !references.isEmpty else { return }
+        let provider = pageProvider
+        let generation = ocrContentGeneration
+        Task(priority: .utility) { [weak self] in
+            var ratios: [Double] = []
+            for reference in references {
+                guard let payload = try? await provider.payload(for: reference),
+                      let data = payload.imageData,
+                      let size = MangaPageProcessor.pixelSize(of: data),
+                      size.width > 0 else {
+                    continue
+                }
+                ratios.append(size.height / size.width)
+            }
+            guard let self, self.ocrContentGeneration == generation,
+                  !ratios.isEmpty else {
+                return
+            }
+            let sorted = ratios.sorted()
+            let median = sorted[sorted.count / 2]
+            let previousMode = self.mode
+            self.detectedLongStrip = median > MangaReaderSettings.webtoonAspectThreshold
+            if previousMode != self.mode {
+                self.rebuildSpreads()
+                self.alignCurrentPageToSpread()
+            }
+        }
+    }
+
+    // MARK: Panel navigation
+
+    private func resetPanelNavigation() {
+        panelTask?.cancel()
+        panelTask = nil
+        if panelCursor != nil {
+            panelCursor = nil
+            canvasCommand = MangaCanvasCommand(.resetZoom)
+        }
+        if settings.panelNavigation {
+            panelStatus = nil
+        }
+    }
+
+    /// Steps through the panels of the displayed spread in reading order.
+    /// Returns false when the page itself should turn.
+    private func advancePanel(_ turn: MangaPageTurn) -> Bool {
+        let spread = currentSpread
+        guard !spread.isEmpty else { return false }
+        let readingOrderPages = spread
+        var flattened: [(pageIndex: Int, rect: CGRect)] = []
+        var missing: [Int] = []
+        for pageIndex in readingOrderPages {
+            if let panels = panelsByPresentationPage[pageIndex] {
+                flattened.append(contentsOf: panels.map { (pageIndex, $0) })
+            } else {
+                missing.append(pageIndex)
+            }
+        }
+        if !missing.isEmpty {
+            guard panelDetector != nil else {
+                panelStatus = .unavailable
+                return false
+            }
+            loadPanels(for: missing, thenAdvance: turn)
+            return true
+        }
+        guard !flattened.isEmpty else {
+            panelStatus = .noPanels
+            return false
+        }
+        let next: Int
+        if let panelCursor, panelCursor.spreadKey == spread {
+            next = panelCursor.index + (turn == .forward ? 1 : -1)
+        } else {
+            next = turn == .forward ? 0 : flattened.count - 1
+        }
+        guard flattened.indices.contains(next) else {
+            panelCursor = nil
+            return false
+        }
+        panelCursor = PanelCursor(spreadKey: spread, index: next)
+        let target = flattened[next]
+        let displayOffset = displayedPageIndices.firstIndex(of: target.pageIndex) ?? 0
+        canvasCommand = MangaCanvasCommand(
+            .focusPanel(pageOffset: displayOffset, rect: target.rect)
+        )
+        panelStatus = .panel(next + 1, of: flattened.count)
+        return true
+    }
+
+    private func loadPanels(for pageIndices: [Int], thenAdvance turn: MangaPageTurn) {
+        guard panelTask == nil, let panelDetector else { return }
+        let pages = pageIndices.compactMap { index in
+            presentationPages.indices.contains(index) ? presentationPages[index] : nil
+        }
+        let references = pageReferences
+        let provider = pageProvider
+        let rightToLeft = direction == .rightToLeft
+        let spread = currentSpread
+        panelTask = Task { [weak self] in
+            var results: [Int: [CGRect]] = [:]
+            var failed = false
+            var unavailable = false
+            for page in pages {
+                guard references.indices.contains(page.sourcePageIndex) else { continue }
+                do {
+                    let payload = try await provider.payload(for: references[page.sourcePageIndex])
+                    guard let data = payload.imageData else {
+                        results[page.index] = []
+                        continue
+                    }
+                    let rendered = try await Task.detached(priority: .userInitiated) {
+                        try MangaPageProcessor.renderedImage(from: data, transform: page.transform)
+                    }.value
+                    guard let image = rendered.image.cgImage(
+                        forProposedRect: nil,
+                        context: nil,
+                        hints: nil
+                    ) else {
+                        results[page.index] = []
+                        continue
+                    }
+                    guard let panels = try await panelDetector(image, rightToLeft) else {
+                        unavailable = true
+                        break
+                    }
+                    results[page.index] = panels
+                } catch is CancellationError {
+                    return
+                } catch {
+                    failed = true
+                    results[page.index] = []
+                }
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.panelTask = nil
+            if unavailable {
+                self.panelStatus = .unavailable
+                return
+            }
+            self.panelsByPresentationPage.merge(results) { _, new in new }
+            if failed {
+                self.panelStatus = .failed
+            }
+            guard self.currentSpread == spread else { return }
+            if !self.advancePanel(turn) {
+                self.turnPageIgnoringPanels(turn)
+            }
+        }
+    }
+
+    private func turnPageIgnoringPanels(_ turn: MangaPageTurn) {
+        let spreadIndex = currentSpreadIndex ?? 0
+        let target = spreadIndex + (turn == .forward ? 1 : -1)
+        if spreads.indices.contains(target) {
+            go(to: spreads[target][0], turn: turn, entryEdge: .start)
+        } else {
+            advanceChapter(turn)
+        }
+    }
+
+    // MARK: OCR
+
+    /// Resolves "Automatic" against the downloaded models. Called on open,
+    /// when the engine preference changes and after model downloads.
+    func refreshOCREngine() async {
+        let selection = await MangaOCREngineRouter.resolve(settings.ocrEngine)
+        guard selection != ocrEngine else { return }
+        let hadEngine = ocrEngine != nil
+        ocrEngine = selection
+        if hadEngine {
+            // Each engine has its own cache; show the new engine's pages.
+            ocrRegionsByPage = [:]
+            activeOCRScanID = nil
+            isRecognizingText = false
+            isOCRScanPaused = false
+            ocrScanCancellationID += 1
+        }
+    }
+
+    /// Fushi's "Re-run OCR on this volume": drops this engine's cached pages
+    /// for the current chapter and recognizes them again.
+    func rerunOCR() {
+        guard let ocrEngine else { return }
+        let itemID = ocrCacheItemID
+        let language = ocrLanguage
+        popupPresentation.closeAll()
+        ocrRegionsByPage = [:]
+        activeOCRScanID = nil
+        isRecognizingText = false
+        isOCRScanPaused = false
+        isOCREnabled = true
+        Task {
+            await MangaOCRService.shared.clear(
+                itemID: itemID,
+                engineID: ocrEngine.engine.cacheEngineID,
+                language: language
+            )
+            ocrScanCancellationID += 1
+        }
     }
 
     func toggleOCR() {
         isOCREnabled.toggle()
         isOCRScanPaused = false
         ocrScanCancellationID += 1
-        MangaReaderPreferences.save(
-            isOCREnabled: isOCREnabled,
-            in: preferences
-        )
         popupPresentation.closeAll()
         if !isOCREnabled {
             isRecognizingText = false
@@ -578,7 +1374,19 @@ final class MangaReaderViewModel {
               !isOCRScanPaused,
               !isLoadingChapter,
               sourcePageCount > 0,
-              let currentChapter else {
+              let currentChapter,
+              let selection = ocrEngine else {
+            return
+        }
+        // Google Lens never runs without the upload disclosure.
+        if selection.engine.uploadsPages,
+           !MangaOCREngineRouter.hasGoogleLensConsent() {
+            return
+        }
+        guard selection.isAvailable else {
+            showOCRStatus(
+                String(localized: "Download the OCR model in Reader Settings to recognize text.")
+            )
             return
         }
         let contentGeneration = ocrContentGeneration
@@ -661,11 +1469,32 @@ final class MangaReaderViewModel {
                     throw CancellationError()
                 }
                 requestedNetworkPage = true
-                let regions = try await MangaOCRService.shared.recognizeText(
-                    in: imageData,
-                    key: key,
-                    pagePaths: pagePaths
-                )
+                let regions: [MangaOCRTextRegion]
+                switch selection.engine {
+                case .googleLens:
+                    regions = try await MangaOCRService.shared.recognizeText(
+                        in: imageData,
+                        key: key,
+                        pagePaths: pagePaths
+                    )
+                case .appleVision, .local:
+                    let engine = selection.engine
+                    let language = key.language
+                    let rightToLeft = direction == .rightToLeft
+                    regions = try await MangaOCRService.shared.recognizeText(
+                        in: imageData,
+                        key: key,
+                        pagePaths: pagePaths,
+                        idPrefix: engine.cacheEngineID
+                    ) { data in
+                        try await MangaOCREngineRouter.recognize(
+                            data,
+                            engine: engine,
+                            language: language,
+                            rightToLeft: rightToLeft
+                        )
+                    }
+                }
                 try Task.checkCancellation()
                 guard isOCREnabled,
                       activeOCRScanID == scanID,
@@ -696,6 +1525,8 @@ final class MangaReaderViewModel {
             showOCRStatus(String(localized: "Text recognition complete."))
         }
     }
+
+    // MARK: Lookup
 
     func presentOCRLookup(
         region: MangaOCRTextRegion,
@@ -801,6 +1632,7 @@ final class MangaReaderViewModel {
                 )
             }
             prefetchPages(around: page.sourcePageIndex)
+            recordPageGeometry(sourcePageIndex: page.sourcePageIndex, data: imageData)
             let rendered = try await Task.detached(priority: .userInitiated) {
                 try MangaPageProcessor.renderedImage(
                     from: imageData,
@@ -875,10 +1707,6 @@ final class MangaReaderViewModel {
         )
     }
 
-    private func move(by amount: Int) {
-        go(to: currentPageIndex + amount)
-    }
-
     private var currentSourcePageIndex: Int {
         guard presentationPages.indices.contains(currentPageIndex) else {
             return min(
@@ -940,8 +1768,10 @@ final class MangaReaderViewModel {
         }
 
         presentationPages = nextPages
+        panelsByPresentationPage = [:]
         guard !nextPages.isEmpty else {
             currentPageIndex = 0
+            rebuildSpreads()
             return
         }
         if let currentPage,
@@ -957,19 +1787,26 @@ final class MangaReaderViewModel {
                 $0.sourcePageIndex == sourcePageIndex
             }) ?? 0
         }
+        rebuildSpreads()
+        alignCurrentPageToSpread()
     }
 
     private func ocrCacheKey(
         pageIndex: Int,
         pagePaths: [String]
     ) -> MangaOCRCacheKey? {
-        guard pagePaths.indices.contains(pageIndex) else { return nil }
+        guard pagePaths.indices.contains(pageIndex),
+              let ocrEngine else {
+            return nil
+        }
         return MangaOCRCacheKey(
             itemID: ocrCacheItemID,
             pageIndex: pageIndex,
             pagePath: pagePaths[pageIndex],
             modifiedAt: session.modifiedAt,
-            language: ocrLanguage
+            language: ocrLanguage,
+            engineID: ocrEngine.engine.cacheEngineID,
+            engineSignature: ocrEngine.signature
         )
     }
 
@@ -1114,5 +1951,7 @@ final class MangaReaderViewModel {
         statusTask?.cancel()
         statusTask = nil
         ocrStatusMessage = nil
+        sizeProbeTask?.cancel()
+        sizeProbeTask = nil
     }
 }

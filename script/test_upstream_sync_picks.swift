@@ -1,3 +1,4 @@
+// test-sources: Models/Anki.swift
 import Foundation
 
 @main
@@ -46,7 +47,7 @@ private enum UpstreamSyncPickTests {
             "Google token exchange and refresh requests should time out after 10 seconds"
         )
         expect(
-            driveHandler.contains("private let session: URLSession")
+            driveHandler.contains("let session: URLSession")
                 && driveHandler.contains("config.timeoutIntervalForRequest = 10")
                 && driveHandler.contains("config.waitsForConnectivity = false"),
             "Google Drive API requests should use a non-waiting 10 second session"
@@ -70,7 +71,7 @@ private enum UpstreamSyncPickTests {
 
         let coverImage = read("Util/CoverImage.swift")
         expect(
-            coverImage.contains("private actor ThumbnailDecoder")
+            coverImage.contains("actor ThumbnailDecoder")
                 && coverImage.contains("ThumbnailDecoder.shared.thumbnail"),
             "Book covers should serialize thumbnail decoding through one actor"
         )

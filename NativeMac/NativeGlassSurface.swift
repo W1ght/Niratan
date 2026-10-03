@@ -1,33 +1,18 @@
 import AppKit
 import SwiftUI
 
+/// Page background for surfaces that host glass cards. A solid neutral layer keeps the
+/// recessed tone that separates cards from the page without a blur layer under glass.
 struct NativeGlassPageBackground: View {
-    @Environment(UserConfig.self) private var userConfig
     @Environment(\.colorScheme) private var colorScheme
-    var isolatesContainerMaterial = false
 
     var body: some View {
-        ZStack {
-            if isolatesContainerMaterial {
-                Rectangle()
-                    .fill(Color(nsColor: .windowBackgroundColor))
+        NativeShelfPageBackground()
+            .overlay {
+                NativeGlassPalette.recessTint(for: colorScheme)
+                    .ignoresSafeArea(.container, edges: .top)
+                    .allowsHitTesting(false)
             }
-
-            Rectangle()
-                .fill(.regularMaterial)
-
-            NativeGlassPalette.tint(for: userConfig, colorScheme: colorScheme)
-
-            LinearGradient(
-                colors: [
-                    NativeGlassPalette.depthTint(for: colorScheme),
-                    .clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-        .ignoresSafeArea(.container, edges: .top)
     }
 }
 
@@ -108,6 +93,10 @@ enum NativeGlassPalette {
         return colorScheme == .dark ? Color.black.opacity(0.36) : Color.white.opacity(0.42)
     }
 
+    static func recessTint(for colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? Color.white.opacity(0.03) : Color.black.opacity(0.055)
+    }
+
     static func depthTint(for colorScheme: ColorScheme) -> Color {
         colorScheme == .dark ? Color.black.opacity(0.16) : Color.white.opacity(0.12)
     }
@@ -133,10 +122,7 @@ private struct NativeGlassCardSurfaceModifier: ViewModifier {
         content
             .background {
                 shape
-                    .fill(.thinMaterial)
-                    .overlay {
-                        shape.fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                    }
+                    .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
                     .overlay {
                         shape.strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.7)
                     }
@@ -154,10 +140,7 @@ private struct NativeGlassCapsuleSurfaceModifier: ViewModifier {
         content
             .background {
                 Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Capsule().fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
-                    }
+                    .fill(NativeGlassPalette.cardTint(for: userConfig, colorScheme: colorScheme))
                     .overlay {
                         Capsule().strokeBorder(NativeGlassPalette.stroke(for: colorScheme), lineWidth: 0.8)
                     }

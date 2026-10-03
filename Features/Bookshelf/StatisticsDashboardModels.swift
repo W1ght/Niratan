@@ -835,7 +835,6 @@ enum StatisticsDashboardCalculator {
 }
 
 enum StatisticsDashboardRepository {
-    nonisolated private static let statisticsFileName = "statistics.json"
     nonisolated private static let bookInfoFileName = "bookinfo.json"
     nonisolated private static let cacheFileName = "statistics_dashboard_cache.json"
     nonisolated private static let cacheSchemaVersion = 1
@@ -863,16 +862,15 @@ enum StatisticsDashboardRepository {
     nonisolated static func loadSnapshot(
         bookInputs: [StatisticsBookSnapshotInput],
         booksDirectory: URL,
-        calendar: Calendar
+        calendar: Calendar,
+        resetMinutes: Int = StatisticsStorage.currentResetMinutes
     ) -> StatisticsDashboardSnapshot {
         var skippedCorruptBookIDs: [UUID] = []
         var contributionsByDate: [Date: [StatisticsBookContribution]] = [:]
         var bookRecords: [StatisticsBookRecord] = []
-        let decoder = JSONDecoder()
 
         for book in bookInputs {
             let root = booksDirectory.appendingPathComponent(book.folder)
-            let statisticsURL = root.appendingPathComponent(statisticsFileName)
             let coverPath = resolvedCoverPath(
                 for: book,
                 root: root,
@@ -887,20 +885,17 @@ enum StatisticsDashboardRepository {
                 )
             )
 
-            guard FileManager.default.fileExists(atPath: statisticsURL.path(percentEncoded: false)) else {
+            guard StatisticsStorage.hasStatistics(root: root) else {
                 continue
             }
 
-            let statistics: [Statistics]
-            do {
-                let data = try Data(contentsOf: statisticsURL)
-                statistics = try decoder.decode([Statistics].self, from: data)
-            } catch {
+            // Days are derived from sessions, so they follow the current reset time.
+            guard let statistics = StatisticsStorage.dailyStatistics(root: root, resetMinutes: resetMinutes) else {
                 skippedCorruptBookIDs.append(book.id)
                 continue
             }
 
-            for statistic in deduplicateStatistics(statistics) where statistic.charactersRead > 0 || statistic.readingTime > 0 {
+            for statistic in statistics where statistic.charactersRead > 0 || statistic.readingTime > 0 {
                 guard let date = parseDateKey(statistic.dateKey, calendar: calendar) else { continue }
                 let contribution = StatisticsBookContribution(
                     bookID: book.id,
@@ -999,20 +994,6 @@ enum StatisticsDashboardRepository {
                 ].joined(separator: "\u{1F}")
             }
             .joined(separator: "\u{1E}")
-    }
-
-    nonisolated private static func deduplicateStatistics(_ statistics: [Statistics]) -> [Statistics] {
-        var grouped: [String: Statistics] = [:]
-        for statistic in statistics {
-            if let existing = grouped[statistic.dateKey] {
-                if statistic.lastStatisticModified > existing.lastStatisticModified {
-                    grouped[statistic.dateKey] = statistic
-                }
-            } else {
-                grouped[statistic.dateKey] = statistic
-            }
-        }
-        return Array(grouped.values)
     }
 
     nonisolated private static func loadBookCharacterCount(root: URL) -> Int? {

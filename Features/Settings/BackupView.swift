@@ -23,8 +23,10 @@ struct BackupView: View {
     
     var body: some View {
         NativeSettingsForm {
-            NativeSettingsSectionCard("Books") {
-                NativeSettingsButtonRow {
+            NativeSettingsSectionCard {
+                EmptyView()
+            } content: {
+                backupRow("Books") {
                     Button("Backup") {
                         backupFolder(folder: "Books")
                     }
@@ -33,12 +35,8 @@ struct BackupView: View {
                         isImporting = true
                     }
                 }
-            }
-
-            NativeSettingsSectionCard {
-                Text("Dictionaries")
-            } content: {
-                NativeSettingsButtonRow {
+                NativeSettingsSeparator()
+                backupRow("Dictionaries") {
                     Button("Backup") {
                         backupFolder(folder: "Dictionaries")
                     }
@@ -47,14 +45,8 @@ struct BackupView: View {
                         isImporting = true
                     }
                 }
-            } footer: {
-                Text("Restoring will overwrite the current collection.")
-            }
-
-            NativeSettingsSectionCard {
-                Text("ッツ Backup")
-            } content: {
-                NativeSettingsButtonRow {
+                NativeSettingsSeparator()
+                backupRow("ッツ Backup") {
                     Button("Export") {
                         exportTtuBookData()
                     }
@@ -63,7 +55,10 @@ struct BackupView: View {
                     }
                 }
             } footer: {
-                Text("Importing a backup adds new books and overwrites the statistics and reading progress of books already present.")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Restoring will overwrite the current collection.")
+                    Text("Importing a backup adds new books and overwrites the statistics and reading progress of books already present.")
+                }
             }
         }
         .fileMover(isPresented: $isExporting, file: exportURL) { result in
@@ -105,6 +100,21 @@ struct BackupView: View {
         }
     }
     
+    private func backupRow<Actions: View>(
+        _ title: LocalizedStringKey,
+        @ViewBuilder actions: () -> Actions
+    ) -> some View {
+        let actions = actions()
+        return NativeSettingsRow(title) {
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    actions
+                }
+            }
+            .buttonStyle(NativeSettingsActionButtonStyle())
+        }
+    }
+
     private func backupFolder(folder: String) {
         isLoading = true
         loadingString = String(localized: "Archiving...")
@@ -168,6 +178,10 @@ struct BackupView: View {
         let destination = appDirectory.appendingPathComponent(folder)
         Task {
             defer { url.stopAccessingSecurityScopedResource() }
+            if folder == "Books" {
+                // Library sync must not run against a half-restored library.
+                await GoogleDriveSyncManager.shared.suspendForRestore()
+            }
             let temporaryRestore = FileManager.default.temporaryDirectory
                 .appendingPathComponent("hoshi-restore-\(UUID().uuidString)", isDirectory: true)
             defer { try? FileManager.default.removeItem(at: temporaryRestore) }
@@ -199,6 +213,9 @@ struct BackupView: View {
                     errorMessage = error.localizedDescription
                     showError = true
                 }
+                if folder == "Books" {
+                    GoogleDriveSyncManager.shared.resumeAfterRestore()
+                }
                 return
             }
             await MainActor.run {
@@ -206,6 +223,14 @@ struct BackupView: View {
                 if folder == "Dictionaries" {
                     DictionaryManager.shared.reloadActiveProfileDictionaryState()
                 }
+            }
+            if folder == "Books" {
+                try? SyncStorage.shared.reload()
+                if GoogleDriveSyncManager.isSelectedProvider {
+                    // The restored library is merged with Drive like a newly connected device.
+                    try? GoogleDriveSyncManager.shared.resetConnection()
+                }
+                GoogleDriveSyncManager.shared.resumeAfterRestore()
             }
         }
     }
@@ -244,7 +269,7 @@ struct BackupView: View {
                     if let statsFile = files.first(where: { $0.lastPathComponent.hasPrefix("statistics_") }) {
                         let statsData = try Data(contentsOf: statsFile)
                         let stats = try JSONDecoder().decode([Statistics].self, from: statsData)
-                        try BookStorage.save(stats, inside: bookFolder, as: FileNames.statistics)
+                        try StatisticsStorage.importDaily(stats, root: bookFolder, mode: .replace)
                     }
 
                     if let progressFile = files.first(where: { $0.lastPathComponent.hasPrefix("progress_") }) {
@@ -310,7 +335,7 @@ struct BackupView: View {
                     if let coverURL = metadata.coverURL {
                         try archive.addEntry(with: "\(canonicalTitle)/cover_1_6.\(coverURL.pathExtension)", fileURL: coverURL, compressionMethod: .deflate)
                     }
-                    if let stats = BookStorage.loadStatistics(root: folder), !stats.isEmpty {
+                    if let stats = StatisticsStorage.dailyStatistics(root: folder), !stats.isEmpty {
                         let statsFileName = GoogleDriveHandler.getStatisticsFileName(stats: stats)
                         let statsData = try JSONEncoder().encode(stats)
                         let statsURL = bookDir.appendingPathComponent(statsFileName)

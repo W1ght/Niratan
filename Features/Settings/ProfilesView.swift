@@ -26,20 +26,18 @@ struct ProfilesView: View {
                     if index > 0 { NativeSettingsSeparator() }
                     profileRow(profile)
                 }
-            } footer: {
-                Text("Dictionary, Reader appearance and Anki mining settings follow the active profile.")
-            }
-
-            NativeSettingsSectionCard {
-                Label("New Profile", systemImage: "plus.circle")
-            } content: {
+                NativeSettingsSeparator()
                 NativeSettingsButtonRow {
-                    Button("Create Profile") {
+                    Button {
                         draftName = ""
                         draftLanguage = repository.activeProfile.language
                         isCreating = true
+                    } label: {
+                        Label("Create Profile", systemImage: "plus")
                     }
                 }
+            } footer: {
+                Text("Dictionary, Reader appearance and Anki mining settings follow the active profile.")
             }
         }
         .navigationTitle("Profiles")

@@ -1,3 +1,5 @@
+// test-sources: Models/Anki.swift Core/AnkiAudioCompressor.swift
+// test-modules: SwiftLAME LAME
 import AVFAudio
 import Foundation
 

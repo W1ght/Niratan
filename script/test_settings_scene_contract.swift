@@ -3,6 +3,7 @@ import Foundation
 private let appSource = try String(contentsOfFile: "NativeMac/HoshiNativeMacApp.swift", encoding: .utf8)
 private let nativeReuseViews = try String(contentsOfFile: "NativeMac/NativeReuseViews.swift", encoding: .utf8)
 private let videoWindowPresenter = try String(contentsOfFile: "NativeMac/VideoWindowPresenter.swift", encoding: .utf8)
+private let userConfigSource = try String(contentsOfFile: "Core/UserConfig.swift", encoding: .utf8)
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else {
@@ -76,15 +77,51 @@ expectContains(
 )
 
 expectContains(
-    appSource,
-    "if userConfig.theme == .system {\n            return nil",
-    "The System theme should inherit the current macOS appearance instead of forcing a cached color scheme"
+    userConfigSource,
+    "case .system, .sepia: nil",
+    "System and Sepia themes should inherit the live macOS appearance instead of forcing a color scheme"
+)
+
+expectContains(
+    userConfigSource,
+    "theme == .sepia && colorScheme == .dark",
+    "Sepia should switch to its dark variant whenever macOS is in Dark Mode"
 )
 
 expectContains(
     appSource,
-    "if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {\n            return nil",
-    "Inverted Sepia should inherit the current macOS appearance while preserving Reader sepia colors"
+    "userConfig.preferredColorScheme",
+    "The app should resolve its forced appearance from the shared UserConfig rule"
+)
+
+expectContains(
+    videoWindowPresenter,
+    "userConfig.preferredColorScheme ?? NativeSystemAppearance.shared.colorScheme",
+    "Video windows should resolve their forced appearance from the shared UserConfig rule"
+)
+
+expectContains(
+    appSource,
+    "userConfig.preferredColorScheme ?? NativeSystemAppearance.shared.colorScheme",
+    "Follow-system themes should hand SwiftUI the live macOS scheme because a nil preference keeps the last forced scheme"
+)
+
+expectContains(
+    appSource,
+    "NSApp.observe(\\.effectiveAppearance)",
+    "The live macOS scheme should track NSApp.effectiveAppearance"
+)
+
+expectContains(
+    appSource,
+    "switch userConfig.preferredColorScheme {",
+    "Only forced themes may pin NSApp.appearance; follow-system must leave AppKit live"
+)
+
+expectNotContains(
+    appSource,
+    "MainActor.assumeIsolated",
+    "Window KVO callbacks must not trap when AppKit reports style changes off the main thread"
 )
 
 expectNotContains(

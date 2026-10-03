@@ -973,7 +973,7 @@ nonisolated struct AidokuKeychainStore: Sendable {
 }
 
 nonisolated private enum AidokuKeychain {
-    static let service = "moe.shishamo.hoshi.aidoku"
+    static let service = DevelopmentDataIsolation.keychainName("moe.shishamo.hoshi.aidoku")
     static func account(sourceID: String, key: String) -> String { "\(sourceID)\u{1f}\(key)" }
     static func liveSave(_ data: Data, sourceID: String, key: String) throws {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account(sourceID: sourceID, key: key)]
@@ -982,8 +982,8 @@ nonisolated private enum AidokuKeychain {
         if status == errSecItemNotFound {
             var item = query
             attributes.forEach { item[$0.key] = $0.value }
-            guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { throw AidokuRuntimeError.runtimeFailure("Unable to save Aidoku credential") }
-        } else if status != errSecSuccess { throw AidokuRuntimeError.runtimeFailure("Unable to save Aidoku credential") }
+            guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { throw AidokuRuntimeError.runtimeFailure(String(localized: "Unable to save Aidoku credential")) }
+        } else if status != errSecSuccess { throw AidokuRuntimeError.runtimeFailure(String(localized: "Unable to save Aidoku credential")) }
     }
     static func liveRead(sourceID: String, key: String) -> Data? {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account(sourceID: sourceID, key: key), kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
@@ -994,6 +994,6 @@ nonisolated private enum AidokuKeychain {
     static func liveRemoveAll(sourceID: String) throws {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrGeneric as String: Data(sourceID.utf8)]
         let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else { throw AidokuRuntimeError.runtimeFailure("Unable to remove Aidoku credentials") }
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw AidokuRuntimeError.runtimeFailure(String(localized: "Unable to remove Aidoku credentials")) }
     }
 }

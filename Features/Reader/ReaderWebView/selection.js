@@ -142,9 +142,24 @@ window.hoshiSelection = {
         return !!el?.closest('rt, rp');
     },
 
+    revealFurigana(ruby) {
+        const group = [ruby];
+        for (const direction of ['previousSibling', 'nextSibling']) {
+            let node = ruby[direction];
+            while (node && (node.localName === 'ruby' ||
+                            (node.nodeType === Node.TEXT_NODE && /^[\t\n\r ]*$/.test(node.nodeValue)))) {
+                if (node.localName === 'ruby') {
+                    group.push(node);
+                }
+                node = node[direction];
+            }
+        }
+        group.forEach(el => el.classList.remove('furigana-hidden'));
+    },
+
     findParagraph(node) {
         let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-        return el?.closest('p, .glossary-content, .expr-tag, .dictionary-query-source') || null;
+        return el?.closest('p, .kanji-entry li, .glossary-content, .expr-tag, .dictionary-query-source') || null;
     },
 
     createWalker(rootNode) {
@@ -531,6 +546,12 @@ window.hoshiSelection = {
     },
 
     selectText(x, y, maxLength) {
+        const furigana = document.elementFromPoint(x, y)?.closest('ruby.furigana-hidden');
+        if (furigana) {
+            this.revealFurigana(furigana);
+            this.clearSelection();
+            return 'furigana';
+        }
         return this.selectTextAtPoint(x, y, maxLength, true);
     },
 

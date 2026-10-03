@@ -4,9 +4,9 @@ import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 
-private let videoScreenLog = Logger(subsystem: "moe.shishamo.hoshi", category: "VideoScreen")
+let videoScreenLog = Logger(subsystem: "moe.shishamo.hoshi", category: "VideoScreen")
 
-private nonisolated final class DroppedFileURLAccumulator: @unchecked Sendable {
+nonisolated final class DroppedFileURLAccumulator: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [URL] = []
 
@@ -35,78 +35,79 @@ struct VideoPlayerScreen: View {
     let onConsumeOpenRequest: (UUID) -> Void
     let windowChrome: VideoWindowChromeController
 
-    @Environment(UserConfig.self) private var userConfig
-    @Environment(ShortcutManager.self) private var shortcutManager
+    @Environment(UserConfig.self) var userConfig
+    @Environment(ShortcutManager.self) var shortcutManager
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var modelStore = VideoPlayerModelStore()
-    @State private var openGate = VideoWindowOpenGate()
-    @State private var subtitles = VideoSubtitleController()
-    @State private var lookup = VideoLookupCoordinator()
-    @State private var miningHistory = VideoMiningHistoryStore()
+    @State var openGate = VideoWindowOpenGate()
+    @State var subtitles = VideoSubtitleController()
+    @State var lookup = VideoLookupCoordinator()
+    @State var miningHistory = VideoMiningHistoryStore()
     @State private var ambientBackdrop = VideoAmbientBackdropModel()
     @State private var profileRepository = ProfileRepository.shared
-    @State private var isInspectorVisible = false
-    @State private var isMiningHistoryVisible = false
-    @State private var selectedStudySidebarTab: VideoStudySidebarTab = .history
-    @State private var isPlaybackChromeVisible = true
+    @State var isInspectorVisible = false
+    @State var isMiningHistoryVisible = false
+    @State var selectedStudySidebarTab: VideoStudySidebarTab = .history
+    @State var isPlaybackChromeVisible = true
     @State private var isSpeedPanelVisible = false
     @State private var isSavingScreenshot = false
-    @State private var isPointerInsidePlayerSurface = true
-    @State private var lastPlaybackChromePointerLocation: CGPoint?
-    @State private var areSubtitlesVisible = true
-    @State private var subtitleRenderingMode: VideoSubtitleRenderingMode = .overlayOnly
-    @State private var lastSelectedSubtitleTrackID: Int?
-    @State private var playbackChromeDragOffset: CGSize = .zero
-    @State private var playbackChromeStoredOffset: CGSize = .zero
+    @State var isPointerInsidePlayerSurface = true
+    @State var lastPlaybackChromePointerLocation: CGPoint?
+    @State var areSubtitlesVisible = true
+    @State var subtitleRenderingMode: VideoSubtitleRenderingMode = .overlayOnly
+    @State var lastSelectedSubtitleTrackID: Int?
+    @State var playbackChromeDragOffset: CGSize = .zero
+    @State var playbackChromeStoredOffset: CGSize = .zero
     @State private var selectedInspectorTab: VideoInspectorTab = .subtitles
-    @State private var shortcutRegistrationIDs: [UUID] = []
-    @State private var pendingFileImportKind: VideoFileImportKind?
-    @State private var activeFileImportKind: VideoFileImportKind?
+    @State var shortcutRegistrationIDs: [UUID] = []
+    @State var pendingFileImportKind: VideoFileImportKind?
+    @State var activeFileImportKind: VideoFileImportKind?
     @State private var isOpeningRemoteLink = false
-    @State private var isResolvingRemoteVideo = false
-    @State private var remoteVideoOpenErrorMessage: String?
-    @State private var remoteVideoOpenTask: Task<Void, Never>?
-    @State private var remoteVideoOpenGeneration = 0
-    @State private var playbackChromeAutoHideTask: Task<Void, Never>?
-    @State private var miningHistoryNotice: VideoMiningHistoryNotice?
-    @State private var miningHistoryNoticeTask: Task<Void, Never>?
-    @State private var miningHistoryNavigationTask: Task<Void, Never>?
-    @State private var miningHistoryNavigationGeneration = 0
-    @State private var videoOSD: VideoOnScreenDisplayItem?
-    @State private var videoOSDTask: Task<Void, Never>?
-    @State private var pendingHistoryEmbeddedSubtitleTrackID: Int?
-    @State private var subtitleTrackExtractionTask: Task<Void, Never>?
-    @State private var activeSubtitleTrackExtractionKey: String?
-    @State private var isLoadingPrimarySubtitle = false
-    @State private var primarySubtitleLoadGeneration = 0
-    @State private var shouldSkipNextAutomaticSubtitleRestore = false
-    @State private var remoteSubtitleLoader = RemoteSubtitleLoader()
-    @State private var remoteSubtitleGeneration = 0
-    @State private var selectedRemoteSubtitleID: String?
-    @State private var selectedJimakuSubtitleID: String?
-    @State private var selectedJimakuSubtitleName: String?
-    @State private var selectedAJATTSubtitleID: String?
-    @State private var selectedAJATTSubtitleName: String?
+    @State var isResolvingRemoteVideo = false
+    @State var remoteVideoOpenErrorMessage: String?
+    @State var remoteVideoOpenTask: Task<Void, Never>?
+    @State var remoteVideoOpenGeneration = 0
+    @State var playbackChromeAutoHideTask: Task<Void, Never>?
+    @State var miningHistoryNotice: VideoMiningHistoryNotice?
+    @State var miningHistoryNoticeTask: Task<Void, Never>?
+    @State var miningHistoryNavigationTask: Task<Void, Never>?
+    @State var miningHistoryNavigationGeneration = 0
+    @State var videoOSD: VideoOnScreenDisplayItem?
+    @State var videoOSDTask: Task<Void, Never>?
+    @State var pendingHistoryEmbeddedSubtitleTrackID: Int?
+    @State var subtitleTrackExtractionTask: Task<Void, Never>?
+    @State var activeSubtitleTrackExtractionKey: String?
+    @State var isLoadingPrimarySubtitle = false
+    @State var primarySubtitleLoadGeneration = 0
+    @State var shouldSkipNextAutomaticSubtitleRestore = false
+    @State var isAwaitingEmbeddedSubtitleDefault = false
+    @State var remoteSubtitleLoader = RemoteSubtitleLoader()
+    @State var remoteSubtitleGeneration = 0
+    @State var selectedRemoteSubtitleID: String?
+    @State var selectedJimakuSubtitleID: String?
+    @State var selectedJimakuSubtitleName: String?
+    @State var selectedAJATTSubtitleID: String?
+    @State var selectedAJATTSubtitleName: String?
     @State private var timelinePreview: VideoTimelinePreview?
-    @State private var timelinePreviewRequestedTime: TimeInterval?
+    @State var timelinePreviewRequestedTime: TimeInterval?
     @AppStorage("videoStudySidebarWidth") private var studySidebarWidth: Double = Double(VideoMiningHistorySidebar.defaultWidth)
     @State private var studySidebarDragStartWidth: CGFloat?
-    @State private var inspectorOverlayFrame: CGRect = .zero
+    @State var inspectorOverlayFrame: CGRect = .zero
 
-    private static let playbackChromeEdgeInset: CGFloat = 16
-    private static let inspectorOverlayTrailingInset: CGFloat = 16
+    static let playbackChromeEdgeInset: CGFloat = 16
+    static let inspectorOverlayTrailingInset: CGFloat = 16
     private static let inspectorOverlayVerticalInset: CGFloat = 16
     private static let minimumVideoSurfaceWidth: CGFloat = 360
     private static let videoPlayerCoordinateSpace = "video-player"
-    private static let audioDelayRange: ClosedRange<TimeInterval> = -30...30
+    static let audioDelayRange: ClosedRange<TimeInterval> = -30...30
 
-    private static let subtitleFileExtensions = ["srt", "vtt", "ass", "ssa"]
+    static let subtitleFileExtensions = ["srt", "vtt", "ass", "ssa"]
 
     private let subtitleTypes: [UTType] = Self.subtitleFileExtensions.compactMap {
         UTType(filenameExtension: $0)
     }
 
-    private var model: VideoPlayerViewModel {
+    var model: VideoPlayerViewModel {
         modelStore.model
     }
 
@@ -326,11 +327,13 @@ struct VideoPlayerScreen: View {
             .onChange(of: model.snapshot.tracks) { _, _ in
                 restorePendingHistorySubtitleTrackIfAvailable()
                 restoreRememberedSubtitleSelectionOrAutoload()
+                applyEmbeddedSubtitleDefaultIfReady()
                 synchronizeSelectedSubtitleTrack()
             }
             .onChange(of: model.snapshot.isLoaded) { _, isLoaded in
                 guard isLoaded else { return }
                 restoreRememberedSubtitleSelectionOrAutoload()
+                applyEmbeddedSubtitleDefaultIfReady()
                 refreshAmbientBackdrop(reason: .load)
             }
             .onChange(of: model.snapshot.isPlaying) { wasPlaying, isPlaying in
@@ -478,6 +481,7 @@ struct VideoPlayerScreen: View {
                         transcript: sidebarTranscript,
                         chapters: sidebarChapters,
                         currentTime: sidebarCurrentTime,
+                        duration: isChaptersSidebarTab ? model.snapshot.duration : 0,
                         pendingABLoopStart: sidebarPendingABLoopStart,
                         abLoop: sidebarABLoop,
                         isTranscriptLoading: sidebarIsTranscriptLoading,
@@ -885,6 +889,8 @@ struct VideoPlayerScreen: View {
                         canMineCurrentSubtitle: canMineCurrentSubtitle,
                         isFullScreen: windowChrome.isFullScreen,
                         isSubtitleGapFastForwardEnabled: userConfig.videoSubtitleGapFastForwardEnabled,
+                        isMiningHistoryVisible: isMiningHistoryVisible,
+                        isInspectorVisible: isInspectorVisible,
                         layout: userConfig.videoControlBarLayout,
                         availableWidth: geometry.size.width,
                         isSpeedPanelVisible: $isSpeedPanelVisible,
@@ -1050,7 +1056,7 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private var videoControlsMetrics: VideoControlsMetrics {
+    var videoControlsMetrics: VideoControlsMetrics {
         VideoControlsView.metrics(for: userConfig.videoControlBarLayout)
     }
 
@@ -1177,11 +1183,28 @@ struct VideoPlayerScreen: View {
             }
         )
         .equatable()
-        .padding(.vertical, Self.inspectorOverlayVerticalInset)
+        .padding(.top, Self.inspectorOverlayVerticalInset)
+        .padding(.bottom, inspectorOverlayBottomInset)
         .padding(.trailing, Self.inspectorOverlayTrailingInset)
     }
 
-    private var currentRemoteSubtitleOptions: [RemoteVideoSubtitleOption] {
+    /// Playback chrome stays visible while the inspector is open, so the
+    /// inspector ends above the controls instead of covering their trailing
+    /// tools (including its own toggle). The floating panel sits in its
+    /// default bottom position; a panel dragged elsewhere can still overlap.
+    private var inspectorOverlayBottomInset: CGFloat {
+        switch userConfig.videoControlBarLayout {
+        case .floating:
+            Self.playbackChromeEdgeInset
+                + videoControlsMetrics.bottomInset
+                + videoControlsMetrics.controlHeight
+                + Self.inspectorOverlayVerticalInset / 2
+        case .compactBottom:
+            videoControlsMetrics.controlHeight + Self.inspectorOverlayVerticalInset / 2
+        }
+    }
+
+    var currentRemoteSubtitleOptions: [RemoteVideoSubtitleOption] {
         guard case .remoteStream(let source) = model.currentSource else { return [] }
         return source.subtitleOptions
     }
@@ -1199,12 +1222,12 @@ struct VideoPlayerScreen: View {
 
     private var currentRemoteQualityOptions: [RemoteVideoQualityOption] {
         guard case .remoteStream(let source) = model.currentSource,
-              source.identity.isYouTube,
+              source.identity.supportsQualitySelection,
               source.qualityOptions.count > 1 else { return [] }
         return source.qualityOptions
     }
 
-    private var selectedRemoteQualityID: String? {
+    var selectedRemoteQualityID: String? {
         guard case .remoteStream(let source) = model.currentSource else { return nil }
         return source.qualityOptions.first {
             $0.playbackStream.url == source.playbackStream.url
@@ -1348,332 +1371,13 @@ struct VideoPlayerScreen: View {
         )
     }
 
-    private func handleFileImport(
-        _ result: Result<[URL], any Error>,
-        kind: VideoFileImportKind
-    ) {
-        switch kind {
-        case .video:
-            handleVideoImport(result)
-        case .primarySubtitle:
-            handleSubtitleImport(result)
-        }
-    }
-
-    private func handleVideoImport(
-        _ result: Result<[URL], any Error>
-    ) {
-        if let url = try? result.get().first {
-            openVideo(url)
-        }
-    }
-
-    private func openVideo(
-        _ url: URL,
-        subtitleURL: URL? = nil,
-        startsFromBeginning: Bool = false
-    ) {
-        openVideo(
-            .localFile(url),
-            subtitleURL: subtitleURL,
-            startsFromBeginning: startsFromBeginning
-        )
-    }
-
-    private func openVideo(
-        _ source: VideoPlaybackSource,
-        subtitleURL: URL? = nil,
-        startsFromBeginning: Bool = false
-    ) {
-        cancelPendingRemoteVideoOpen()
-        remoteVideoOpenErrorMessage = nil
-        lookup.closeAll(player: model)
-        invalidatePrimarySubtitleLoad()
-        configureSubtitleRendering(.overlayOnly)
-        subtitles.clear()
-        selectedRemoteSubtitleID = nil
-        selectedJimakuSubtitleID = nil
-        selectedJimakuSubtitleName = nil
-        selectedAJATTSubtitleID = nil
-        selectedAJATTSubtitleName = nil
-        remoteSubtitleGeneration &+= 1
-        remoteSubtitleLoader.cancelAndCleanup()
-        let isRemoteSource: Bool
-        if case .remoteStream = source {
-            isRemoteSource = true
-        } else {
-            isRemoteSource = false
-        }
-        shouldSkipNextAutomaticSubtitleRestore = subtitleURL != nil || isRemoteSource
-        model.open(source, startsFromBeginning: startsFromBeginning)
-        guard model.errorMessage == nil else {
-            shouldSkipNextAutomaticSubtitleRestore = false
-            return
-        }
-        if let subtitleURL {
-            loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
-        } else if case .remoteStream(let remoteSource) = source {
-            let rememberedSelection = model.consumePendingSubtitleSelection()
-            if case .off = rememberedSelection {
-                applySubtitlesOff(clearPrimary: true, rememberSelection: false)
-                return
-            }
-            if case .externalDisabled = rememberedSelection {
-                applySubtitlesOff(clearPrimary: true, rememberSelection: false)
-                return
-            }
-            if case .external(let path) = rememberedSelection {
-                let externalURL = URL(fileURLWithPath: path).standardizedFileURL
-                if FileManager.default.fileExists(atPath: externalURL.path) {
-                    loadPrimarySubtitle(
-                        from: externalURL,
-                        loadIntoMpv: !CatalogSubtitleStore.isManagedURL(externalURL),
-                        rememberSelection: false
-                    )
-                    return
-                }
-            }
-            let subtitle = rememberedSelection
-                .flatMap { remoteSubtitle(selection: $0, in: remoteSource) }
-                ?? preferredRemoteSubtitle(in: remoteSource)
-            if let subtitle {
-                loadRemoteSubtitle(subtitle, rememberSelection: false)
-            }
-        }
-    }
-
     private func openRemoteLink(_ resolvedSource: ResolvedRemoteVideoSource) {
         openVideo(.remoteStream(resolvedSource), subtitleURL: nil)
-    }
-
-    private func loadRemoteSubtitle(
-        _ subtitle: RemoteVideoSubtitleOption,
-        rememberSelection: Bool
-    ) {
-        selectedJimakuSubtitleID = nil
-        selectedJimakuSubtitleName = nil
-        selectedAJATTSubtitleID = nil
-        selectedAJATTSubtitleName = nil
-        invalidatePrimarySubtitleLoad()
-        configureSubtitleRendering(.overlayOnly)
-        subtitles.discardTemporaryASSEffects()
-        subtitles.clearPrimary()
-        model.selectTrack(type: .subtitle, id: nil)
-        lastSelectedSubtitleTrackID = nil
-        remoteSubtitleGeneration &+= 1
-        let generation = remoteSubtitleGeneration
-        Task { @MainActor in
-            do {
-                guard let tempURL = try await remoteSubtitleLoader.load(
-                    option: subtitle,
-                    generation: generation
-                ), generation == remoteSubtitleGeneration else { return }
-                await loadPrimarySubtitle(
-                    from: tempURL,
-                    loadIntoMpv: false,
-                    rememberSelection: false
-                ).value
-                guard generation == remoteSubtitleGeneration,
-                      subtitles.document?.sourceURL.standardizedFileURL
-                        == tempURL.standardizedFileURL else { return }
-                selectedRemoteSubtitleID = subtitle.id
-                if rememberSelection {
-                    model.rememberSubtitleSelection(
-                        .remoteOption(subtitle.selectionIdentity)
-                    )
-                }
-            } catch {
-                guard !Task.isCancelled,
-                      generation == remoteSubtitleGeneration else { return }
-                subtitles.errorMessage = String(localized: "Unable to load the remote subtitle.")
-            }
-        }
-    }
-
-    private func loadJimakuSubtitle(_ file: JimakuSubtitleFile) {
-        loadCatalogSubtitle(
-            option: file.remoteSubtitleOption,
-            id: file.id,
-            name: file.name,
-            source: .jimaku
-        )
-    }
-
-    private func loadAJATTSubtitle(_ file: AJATTSubtitleFile) {
-        loadCatalogSubtitle(
-            option: file.remoteSubtitleOption,
-            id: file.id,
-            name: file.name,
-            source: .ajatt
-        )
-    }
-
-    private func loadCatalogSubtitle(
-        option: RemoteVideoSubtitleOption,
-        id: String,
-        name: String,
-        source: CatalogSubtitleSource
-    ) {
-        invalidatePrimarySubtitleLoad()
-        configureSubtitleRendering(.overlayOnly)
-        subtitles.discardTemporaryASSEffects()
-        subtitles.clearPrimary()
-        model.selectTrack(type: .subtitle, id: nil)
-        lastSelectedSubtitleTrackID = nil
-        selectedRemoteSubtitleID = nil
-        selectedJimakuSubtitleID = nil
-        selectedJimakuSubtitleName = nil
-        selectedAJATTSubtitleID = nil
-        selectedAJATTSubtitleName = nil
-        remoteSubtitleGeneration &+= 1
-        let generation = remoteSubtitleGeneration
-        guard let videoKey = model.currentMediaIdentity?.persistenceKey else { return }
-        Task { @MainActor in
-            do {
-                guard let tempURL = try await remoteSubtitleLoader.load(
-                    option: option,
-                    allowedDownloadHosts: source.allowedDownloadHosts
-                        ?? (source == .openSubtitles ? Set([option.url.host ?? ""]) : nil),
-                    maximumResponseSize: source.maximumResponseSize,
-                    generation: generation
-                ), generation == remoteSubtitleGeneration,
-                   model.currentMediaIdentity?.persistenceKey == videoKey else { return }
-                // Keep a durable copy so the selection survives cleanup of the
-                // remote loader's temporary directory and later sessions.
-                let archivedURL = try CatalogSubtitleStore.archive(
-                    fileAt: tempURL,
-                    videoKey: videoKey,
-                    fileName: name
-                )
-                model.rememberExternalSubtitlePath(archivedURL)
-                await loadPrimarySubtitle(
-                    from: archivedURL,
-                    loadIntoMpv: false,
-                    rememberSelection: false
-                ).value
-                guard generation == remoteSubtitleGeneration,
-                      model.currentMediaIdentity?.persistenceKey == videoKey,
-                      subtitles.document?.sourceURL.standardizedFileURL
-                        == archivedURL.standardizedFileURL else { return }
-                switch source {
-                case .jimaku:
-                    selectedJimakuSubtitleID = id
-                    selectedJimakuSubtitleName = name
-                case .ajatt:
-                    selectedAJATTSubtitleID = id
-                    selectedAJATTSubtitleName = name
-                case .openSubtitles:
-                    break // Restored through the shared durable external-subtitle selection.
-                }
-                model.rememberSubtitleSelection(
-                    .external(path: archivedURL.standardizedFileURL.path)
-                )
-            } catch {
-                guard !Task.isCancelled,
-                      generation == remoteSubtitleGeneration else { return }
-                subtitles.errorMessage = source.errorMessage
-            }
-        }
-    }
-
-    private func preferredRemoteSubtitle(
-        in source: ResolvedRemoteVideoSource
-    ) -> RemoteVideoSubtitleOption? {
-        source.preferredSubtitle(
-            preferredLanguages: [source.selectedSubtitleLanguage].compactMap { $0 },
-            fallbackLanguages: ["ja", "en"]
-        )
-    }
-
-    private func performCatalogSubtitleMaintenance() {
-        let referencedFilePaths = model.rememberedExternalSubtitlePaths()
-        Task.detached(priority: .utility) {
-            CatalogSubtitleStore.performMaintenanceIfNeeded(
-                referencedFilePaths: referencedFilePaths
-            )
-        }
-    }
-
-    private func restoreRememberedExternalSubtitle() {
-        let currentExternalURL = subtitles.document.flatMap {
-            $0.format == .embedded ? nil : $0.sourceURL
-        }
-        guard let subtitleURL = currentExternalURL ?? model.rememberedExternalSubtitleURL,
-              FileManager.default.fileExists(atPath: subtitleURL.path) else {
-            return
-        }
-        loadPrimarySubtitle(
-            from: subtitleURL,
-            loadIntoMpv: !CatalogSubtitleStore.isManagedURL(subtitleURL),
-            rememberSelection: true
-        )
-    }
-
-    private func remoteSubtitle(
-        selection: VideoSubtitleSelection,
-        in source: ResolvedRemoteVideoSource
-    ) -> RemoteVideoSubtitleOption? {
-        switch selection {
-        case .remoteOption(let identity):
-            source.subtitleOption(matching: identity)
-        case .remote(let language):
-            source.preferredSubtitle(language: language)
-        default:
-            nil
-        }
-    }
-
-    private func selectRemoteQuality(_ option: RemoteVideoQualityOption) {
-        guard case .remoteStream(let source) = model.currentSource,
-              source.identity.isYouTube,
-              option.id != selectedRemoteQualityID,
-              let selectedSource = source.selectingQuality(id: option.id) else {
-            return
-        }
-        shouldSkipNextAutomaticSubtitleRestore = true
-        if !model.switchRemoteQuality(to: selectedSource) {
-            shouldSkipNextAutomaticSubtitleRestore = false
-        }
-    }
-
-    private func openPlaylistEpisode(_ url: URL) {
-        lookup.closeAll(player: model)
-        invalidatePrimarySubtitleLoad()
-        configureSubtitleRendering(.overlayOnly)
-        subtitles.clear()
-        selectedRemoteSubtitleID = nil
-        selectedJimakuSubtitleID = nil
-        selectedJimakuSubtitleName = nil
-        selectedAJATTSubtitleID = nil
-        selectedAJATTSubtitleName = nil
-        remoteSubtitleGeneration &+= 1
-        remoteSubtitleLoader.cancelAndCleanup()
-        model.selectPlaylistItem(url)
-    }
-
-    private func handleExternalOpenRequest(_ request: VideoWindowOpenRequest?) {
-        guard let request,
-              let readyRequest = openGate.receive(request) else { return }
-        openExternalRequest(readyRequest)
     }
 
     private func handleRenderReady() {
         guard let request = openGate.renderDidBecomeReady() else { return }
         openExternalRequest(request)
-    }
-
-    private func openExternalRequest(_ request: VideoWindowOpenRequest) {
-        onConsumeOpenRequest(request.id)
-        switch request.source {
-        case .playback(let source):
-            openVideo(
-                source,
-                subtitleURL: request.subtitleURL,
-                startsFromBeginning: request.startsFromBeginning
-            )
-        case .unresolvedRemote(let remoteRequest):
-            openRemoteVideo(remoteRequest)
-        }
     }
 
     private var shouldShowVideoLoadingIndicator: Bool {
@@ -1685,224 +1389,15 @@ struct VideoPlayerScreen: View {
             )
     }
 
-    private func openRemoteVideo(_ request: RemoteVideoWindowOpenRequest) {
-        cancelPendingRemoteVideoOpen()
-        remoteVideoOpenErrorMessage = nil
-        isResolvingRemoteVideo = true
-        remoteVideoOpenGeneration &+= 1
-        let generation = remoteVideoOpenGeneration
-        let resolver = RemoteVideoResolverRegistry()
-        remoteVideoOpenTask = Task { @MainActor in
-            do {
-                let resolvedSource = try await resolver.resolve(
-                    identity: request.identity,
-                    preferredSubtitleLanguages: request.preferredSubtitleLanguages,
-                    forceRefresh: request.forceRefresh
-                )
-                guard generation == remoteVideoOpenGeneration,
-                      !Task.isCancelled else {
-                    return
-                }
-                _ = VideoLibraryStore.shared.addRemoteItem(resolvedSource)
-                isResolvingRemoteVideo = false
-                remoteVideoOpenTask = nil
-                openVideo(
-                    .remoteStream(resolvedSource),
-                    subtitleURL: nil,
-                    startsFromBeginning: request.startsFromBeginning
-                )
-            } catch {
-                guard generation == remoteVideoOpenGeneration else {
-                    return
-                }
-                isResolvingRemoteVideo = false
-                remoteVideoOpenTask = nil
-                guard !Task.isCancelled,
-                      !(error is CancellationError),
-                      !Self.isRemoteResolutionCancellation(error) else {
-                    return
-                }
-                remoteVideoOpenErrorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private func cancelPendingRemoteVideoOpen() {
-        remoteVideoOpenGeneration &+= 1
-        remoteVideoOpenTask?.cancel()
-        remoteVideoOpenTask = nil
-        isResolvingRemoteVideo = false
-    }
-
-    private static func isRemoteResolutionCancellation(_ error: any Error) -> Bool {
-        guard let resolverError = error as? RemoteVideoResolverError else {
-            return false
-        }
-        if case .cancelled = resolverError {
-            return true
-        }
-        return false
-    }
-
-    private func autoloadSubtitleIfAvailable(for mediaURL: URL) {
-        guard let subtitleURL = VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL) else {
-            return
-        }
-        loadPrimarySubtitle(
-            from: subtitleURL,
-            loadIntoMpv: false,
-            useSelectedMpvTrackRenderer: true
-        )
-    }
-
-    private func handleSubtitleImport(
-        _ result: Result<[URL], any Error>
-    ) {
-        if let url = try? result.get().first {
-            lookup.closeAll(player: model)
-            loadPrimarySubtitle(from: url, loadIntoMpv: true)
-        }
-    }
-
-    @discardableResult
-    private func loadPrimarySubtitle(
-        from url: URL,
-        loadIntoMpv: Bool,
-        useSelectedMpvTrackRenderer: Bool = false,
-        rememberSelection: Bool = true
-    ) -> Task<Void, Never> {
-        if rememberSelection {
-            selectedRemoteSubtitleID = nil
-            selectedJimakuSubtitleID = nil
-            selectedJimakuSubtitleName = nil
-            selectedAJATTSubtitleID = nil
-            selectedAJATTSubtitleName = nil
-        }
-        cancelSubtitleTrackExtraction()
-        primarySubtitleLoadGeneration &+= 1
-        let loadGeneration = primarySubtitleLoadGeneration
-        isLoadingPrimarySubtitle = true
-        let selectedTrack = model.snapshot.tracks.first {
-            $0.type == .subtitle && $0.isSelected
-        }
-        let initialMode: VideoSubtitleRenderingMode
-        if loadIntoMpv {
-            initialMode = VideoSubtitleRenderingPolicy.initialMode(forSubtitleURL: url)
-        } else if useSelectedMpvTrackRenderer, let selectedTrack {
-            initialMode = VideoSubtitleRenderingPolicy.initialMode(for: selectedTrack)
-        } else {
-            initialMode = .overlayOnly
-        }
-        configureSubtitleRendering(initialMode)
-        subtitles.clearPrimary()
-        if CatalogSubtitleStore.isManagedURL(url), !loadIntoMpv {
-            model.selectTrack(type: .subtitle, id: nil)
-        }
-        if loadIntoMpv {
-            model.loadExternalSubtitle(url)
-        }
-        let loadTask = subtitles.load(url)
-        return Task { @MainActor in
-            await loadTask.value
-            guard loadGeneration == primarySubtitleLoadGeneration else { return }
-            isLoadingPrimarySubtitle = false
-            if subtitles.document?.sourceURL.standardizedFileURL
-                == url.standardizedFileURL {
-                areSubtitlesVisible = true
-                if CatalogSubtitleStore.isManagedURL(url), !loadIntoMpv {
-                    // Keep the parsed, interactive document authoritative before
-                    // registering the selectable track and ASS effects renderer.
-                    model.loadExternalSubtitle(url)
-                }
-                let logicalTrackID: Int?
-                if loadIntoMpv || CatalogSubtitleStore.isManagedURL(url) {
-                    logicalTrackID = nil
-                } else {
-                    logicalTrackID = model.snapshot.tracks.first {
-                        $0.type == .subtitle && $0.isSelected
-                    }?.id ?? selectedTrack?.id
-                }
-                applyPreparedSubtitleRendering(logicalTrackID: logicalTrackID)
-                if CatalogSubtitleStore.isManagedURL(url) {
-                    model.rememberExternalSubtitlePath(url)
-                }
-                if rememberSelection {
-                    model.rememberSubtitleSelection(
-                        .external(path: url.standardizedFileURL.path)
-                    )
-                }
-            } else if initialMode == .preparingASS {
-                // Preparation owns the transition: keep the original ASS
-                // hidden until parsing completes, then atomically fall back
-                // to libass if no interactive document was produced.
-                configureSubtitleRendering(.nativeOnly)
-            }
-            subtitles.update(
-                time: model.snapshot.currentTime,
-                subtitleDelay: model.snapshot.subtitleDelay
-            )
-        }
-    }
-
-    private func handleDroppedItems(_ providers: [NSItemProvider]) -> Bool {
-        let fileProviders = providers.filter {
-            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
-        }
-        guard !fileProviders.isEmpty else { return false }
-
-        let group = DispatchGroup()
-        let accumulator = DroppedFileURLAccumulator()
-
-        for provider in fileProviders {
-            group.enter()
-            provider.loadItem(
-                forTypeIdentifier: UTType.fileURL.identifier,
-                options: nil
-            ) { item, _ in
-                defer { group.leave() }
-                guard let url = Self.fileURL(from: item) else { return }
-                accumulator.append(url.standardizedFileURL)
-            }
-        }
-
-        group.notify(queue: .main) {
-            Task { @MainActor in
-                handleDroppedFileURLs(accumulator.urls())
-            }
-        }
-        return true
-    }
-
-    private func handleDroppedFileURLs(_ urls: [URL]) {
-        let mediaURL = urls.first(where: isMediaFile)
-        let subtitleURL = urls.first(where: isSubtitleFile)
-
-        if let mediaURL {
-            loadDroppedMedia(mediaURL, subtitleURL: subtitleURL)
-        } else if let subtitleURL {
-            loadDroppedSubtitle(subtitleURL)
-        }
-    }
-
-    private func loadDroppedMedia(_ mediaURL: URL, subtitleURL: URL?) {
+    func loadDroppedMedia(_ mediaURL: URL, subtitleURL: URL?) {
         openVideo(mediaURL, subtitleURL: subtitleURL)
     }
 
-    private func loadDroppedSubtitle(_ subtitleURL: URL) {
-        guard model.currentURL != nil else { return }
-        lookup.closeAll(player: model)
-        loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)
-    }
-
-    private func isMediaFile(_ url: URL) -> Bool {
+    func isMediaFile(_ url: URL) -> Bool {
         VideoMediaTypes.isMediaFile(url)
     }
 
-    private func isSubtitleFile(_ url: URL) -> Bool {
-        Self.subtitleFileExtensions.contains(url.pathExtension.lowercased())
-    }
-
-    nonisolated private static func fileURL(from item: Any?) -> URL? {
+    nonisolated static func fileURL(from item: Any?) -> URL? {
         if let url = item as? URL {
             return url
         }
@@ -1996,182 +1491,6 @@ struct VideoPlayerScreen: View {
         )))
     }
 
-    private func registerKeyboardShortcuts() {
-        guard shortcutRegistrationIDs.isEmpty else { return }
-
-        shortcutRegistrationIDs = [
-            shortcutManager.register(
-                scope: .popup,
-                handlers: [
-                    PopupShortcutActions.dismiss.id: {
-                        guard let popup = lookup.presentation.popups.last else {
-                            return false
-                        }
-                        lookup.dismiss(id: popup.id, player: model)
-                        return true
-                    }
-                ]
-            ),
-            shortcutManager.register(
-                scope: .video,
-                handlers: [
-                    VideoShortcutActions.playPause.id: {
-                        guard model.currentURL != nil else { return false }
-                        model.togglePlayback()
-                        return true
-                    },
-                    VideoShortcutActions.seekBackward.id: {
-                        guard model.currentURL != nil else { return false }
-                        model.skip(by: -userConfig.videoSeekInterval)
-                        return true
-                    },
-                    VideoShortcutActions.seekForward.id: {
-                        guard model.currentURL != nil else { return false }
-                        model.skip(by: userConfig.videoSeekInterval)
-                        return true
-                    },
-                    VideoShortcutActions.previousEpisode.id: {
-                        guard model.playlist.previousURL != nil else { return false }
-                        model.playPrevious()
-                        return true
-                    },
-                    VideoShortcutActions.nextEpisode.id: {
-                        guard model.playlist.nextURL != nil else { return false }
-                        model.playNext()
-                        return true
-                    },
-                    VideoShortcutActions.decreaseSpeed.id: {
-                        setSpeedWithOSD(model.snapshot.speed - VideoPlaybackSpeed.customStep)
-                        return true
-                    },
-                    VideoShortcutActions.increaseSpeed.id: {
-                        setSpeedWithOSD(model.snapshot.speed + VideoPlaybackSpeed.customStep)
-                        return true
-                    },
-                    VideoShortcutActions.resetSpeed.id: {
-                        setSpeedWithOSD(1)
-                        return true
-                    },
-                    VideoShortcutActions.toggleMute.id: {
-                        toggleMuteWithOSD()
-                        return true
-                    },
-                    VideoShortcutActions.volumeDown.id: {
-                        adjustVolume(by: -5)
-                        return true
-                    },
-                    VideoShortcutActions.volumeUp.id: {
-                        adjustVolume(by: 5)
-                        return true
-                    },
-                    VideoShortcutActions.mineCurrentSubtitle.id: {
-                        mineCurrentSubtitle()
-                        return true
-                    },
-                    VideoShortcutActions.previousSubtitleCue.id: {
-                        seekRelativeSubtitleCue(offset: -1)
-                    },
-                    VideoShortcutActions.nextSubtitleCue.id: {
-                        seekRelativeSubtitleCue(offset: 1)
-                    },
-                    VideoShortcutActions.toggleSubtitlesVisible.id: {
-                        toggleSubtitlesVisible()
-                        return true
-                    },
-                    VideoShortcutActions.toggleSubtitleGapFastForward.id: {
-                        toggleSubtitleGapFastForward()
-                        return true
-                    },
-                    VideoShortcutActions.cycleSubtitleTrack.id: {
-                        cycleSubtitleTrack()
-                    },
-                    VideoShortcutActions.subtitleEarlier.id: {
-                        adjustSubtitleDelayWithOSD(by: -0.05)
-                        return true
-                    },
-                    VideoShortcutActions.subtitleLater.id: {
-                        adjustSubtitleDelayWithOSD(by: 0.05)
-                        return true
-                    },
-                    VideoShortcutActions.resetSubtitleTiming.id: {
-                        setSubtitleDelayWithOSD(0)
-                        return true
-                    },
-                    VideoShortcutActions.alignPreviousSubtitleToCurrentTime.id: {
-                        alignAdjacentSubtitleToCurrentTime(.previous)
-                    },
-                    VideoShortcutActions.alignNextSubtitleToCurrentTime.id: {
-                        alignAdjacentSubtitleToCurrentTime(.next)
-                    },
-                    VideoShortcutActions.audioEarlier.id: {
-                        adjustAudioDelayWithOSD(by: -0.5)
-                        return true
-                    },
-                    VideoShortcutActions.audioLater.id: {
-                        adjustAudioDelayWithOSD(by: 0.5)
-                        return true
-                    },
-                    VideoShortcutActions.toggleFileLoop.id: {
-                        model.setLoopMode(
-                            model.snapshot.loopMode == .file ? .none : .file
-                        )
-                        return true
-                    },
-                    VideoShortcutActions.setABLoopStart.id: {
-                        model.setABLoopStart()
-                        return true
-                    },
-                    VideoShortcutActions.setABLoopEnd.id: {
-                        model.setABLoopEnd()
-                        return true
-                    },
-                    VideoShortcutActions.toggleTranscript.id: {
-                        toggleTranscriptSidebar()
-                        return true
-                    },
-                    VideoShortcutActions.rotateClockwise.id: {
-                        model.rotateClockwise()
-                        return true
-                    },
-                    VideoShortcutActions.toggleFullScreen.id: {
-                        guard windowChrome.hasWindow else { return false }
-                        if windowChrome.isFullScreen {
-                            exitFullScreen()
-                            return true
-                        }
-                        dismissVideoPopupsThen {
-                            toggleFullScreen()
-                        }
-                        return true
-                    },
-                    VideoShortcutActions.exitFocusMode.id: {
-                        guard windowChrome.isFullScreen else {
-                            return false
-                        }
-                        exitFullScreen()
-                        return true
-                    }
-                ]
-            ),
-            shortcutManager.register(
-                scope: .global,
-                handlers: [
-                    GlobalShortcutActions.open.id: {
-                        dismissVideoPopupsThen {
-                            presentFileImporter(.video)
-                        }
-                        return true
-                    }
-                ]
-            )
-        ]
-    }
-
-    private func unregisterKeyboardShortcuts() {
-        shortcutRegistrationIDs.forEach(shortcutManager.unregister)
-        shortcutRegistrationIDs.removeAll()
-    }
-
     private func synchronizePlaybackPreferences() {
         model.autoPlayNext = userConfig.videoAutoPlayNext
         model.rememberPlaybackPosition = userConfig.videoRememberPlaybackPosition
@@ -2184,7 +1503,7 @@ struct VideoPlayerScreen: View {
         synchronizeVideoEqualizerPreferences()
     }
 
-    private func toggleSubtitleGapFastForward() {
+    func toggleSubtitleGapFastForward() {
         userConfig.videoSubtitleGapFastForwardEnabled.toggle()
         model.setSubtitleGapFastForwardEnabled(userConfig.videoSubtitleGapFastForwardEnabled)
         updateSubtitleGapPlayback()
@@ -2220,43 +1539,7 @@ struct VideoPlayerScreen: View {
         )
     }
 
-    private func presentFileImporter(_ kind: VideoFileImportKind) {
-        activeFileImportKind = kind
-        pendingFileImportKind = kind
-    }
-
-    private func toggleFullScreen() {
-        if windowChrome.isFullScreen {
-            exitFullScreen()
-            return
-        }
-        windowChrome.toggleFullScreen()
-    }
-
-    private func exitFullScreen() {
-        guard windowChrome.isFullScreen else { return }
-        windowChrome.exitFullScreen()
-    }
-
-    private func toggleFullScreenFromPointer() {
-        guard model.currentURL != nil,
-              lookup.presentation.popups.isEmpty else {
-            return
-        }
-        revealPlaybackChrome(scheduleHide: true)
-        toggleFullScreen()
-    }
-
-    private func togglePlaybackFromPointer() {
-        guard model.currentURL != nil,
-              lookup.presentation.popups.isEmpty else {
-            return
-        }
-        model.togglePlayback()
-        revealPlaybackChrome(scheduleHide: true)
-    }
-
-    private var shouldShowPlaybackChrome: Bool {
+    var shouldShowPlaybackChrome: Bool {
         model.currentURL == nil
             || (
                 isPointerInsidePlayerSurface
@@ -2270,209 +1553,7 @@ struct VideoPlayerScreen: View {
             )
     }
 
-    private func playbackChromeBasePosition(in size: CGSize) -> CGPoint {
-        let chromeSize = playbackChromeSize(in: size)
-        let halfHeight = chromeSize.height / 2
-        let y = max(
-            Self.playbackChromeEdgeInset + halfHeight,
-            size.height - playbackChromeBottomEdgeInset - videoControlsMetrics.bottomInset - halfHeight
-        )
-        return CGPoint(x: size.width / 2, y: y)
-    }
-
-    private var playbackChromeBottomEdgeInset: CGFloat {
-        switch userConfig.videoControlBarLayout {
-        case .floating:
-            Self.playbackChromeEdgeInset
-        case .compactBottom:
-            0
-        }
-    }
-
-    private func playbackChromeCurrentOffset(in size: CGSize) -> CGSize {
-        switch userConfig.videoControlBarLayout {
-        case .floating:
-            clampedPlaybackChromeOffset(
-                CGSize(
-                    width: playbackChromeStoredOffset.width + playbackChromeDragOffset.width,
-                    height: playbackChromeStoredOffset.height + playbackChromeDragOffset.height
-                ),
-                in: size
-            )
-        case .compactBottom:
-            .zero
-        }
-    }
-
-    private func playbackChromeFrame(in size: CGSize) -> CGRect {
-        let center = playbackChromeBasePosition(in: size)
-        let offset = playbackChromeCurrentOffset(in: size)
-        let chromeSize = playbackChromeSize(in: size)
-        return CGRect(
-            x: center.x + offset.width - chromeSize.width / 2,
-            y: center.y + offset.height - chromeSize.height / 2,
-            width: chromeSize.width,
-            height: chromeSize.height
-        )
-    }
-
-    private func playbackChromeSize(in size: CGSize) -> CGSize {
-        VideoControlsView.chromeSize(
-            for: userConfig.videoControlBarLayout,
-            availableWidth: size.width
-        )
-    }
-
-    private func videoSurfaceVolumeScrollExcludedRects(in size: CGSize) -> [CGRect] {
-        var rects: [CGRect] = []
-        if shouldShowPlaybackChrome {
-            rects.append(playbackChromeFrame(in: size))
-        }
-        if isInspectorVisible {
-            let inspectorFrame = inspectorOverlayFrame.isEmpty
-                ? inspectorOverlayFallbackFrame(in: size)
-                : inspectorOverlayFrame
-            let visibleInspectorFrame = inspectorFrame.intersection(
-                CGRect(origin: .zero, size: size)
-            )
-            if !visibleInspectorFrame.isNull,
-               visibleInspectorFrame.width > 0,
-               visibleInspectorFrame.height > 0 {
-                rects.append(visibleInspectorFrame)
-            }
-        }
-        return rects
-    }
-
-    private func inspectorOverlayFallbackFrame(in size: CGSize) -> CGRect {
-        let width = min(
-            size.width,
-            VideoInspectorView.maximumWidth + Self.inspectorOverlayTrailingInset
-        )
-        return CGRect(
-            x: max(0, size.width - width),
-            y: 0,
-            width: width,
-            height: size.height
-        )
-    }
-
-    private func clampedPlaybackChromeOffset(_ offset: CGSize, in size: CGSize) -> CGSize {
-        let base = playbackChromeBasePosition(in: size)
-        let chromeSize = playbackChromeSize(in: size)
-        let halfWidth = chromeSize.width / 2
-        let halfHeight = chromeSize.height / 2
-        let minX = min(Self.playbackChromeEdgeInset + halfWidth, size.width / 2)
-        let maxX = max(size.width - Self.playbackChromeEdgeInset - halfWidth, size.width / 2)
-        let minY = min(Self.playbackChromeEdgeInset + halfHeight, size.height / 2)
-        let maxY = max(size.height - playbackChromeBottomEdgeInset - halfHeight, size.height / 2)
-        let x = min(max(base.x + offset.width, minX), maxX)
-        let y = min(max(base.y + offset.height, minY), maxY)
-        return CGSize(width: x - base.x, height: y - base.y)
-    }
-
-    private func handleVideoPointerMovement(_ phase: HoverPhase) {
-        switch phase {
-        case .active(_):
-            let pointerLocation = NSEvent.mouseLocation
-            guard lastPlaybackChromePointerLocation != pointerLocation else {
-                return
-            }
-            lastPlaybackChromePointerLocation = pointerLocation
-            isPointerInsidePlayerSurface = true
-            revealPlaybackChrome(scheduleHide: true)
-        case .ended:
-            schedulePlaybackChromeAutoHide()
-        }
-    }
-
-    private func revealPlaybackChrome(scheduleHide shouldScheduleAutoHide: Bool) {
-        windowChrome.restorePlaybackCursor()
-        guard model.currentURL != nil else {
-            isPlaybackChromeVisible = true
-            playbackChromeAutoHideTask?.cancel()
-            return
-        }
-        if !isPlaybackChromeVisible {
-            withAnimation(.smooth(duration: 0.18)) {
-                isPlaybackChromeVisible = true
-            }
-        }
-        if shouldScheduleAutoHide {
-            schedulePlaybackChromeAutoHide()
-        } else {
-            playbackChromeAutoHideTask?.cancel()
-        }
-    }
-
-    private func hidePlaybackChromeAndCursor() {
-        playbackChromeAutoHideTask?.cancel()
-        guard model.currentURL != nil,
-              !windowChrome.isWindowGeometryTransitioning,
-              !hasActiveVideoPopup,
-              timelinePreviewRequestedTime == nil,
-              !isInspectorVisible,
-              !isMiningHistoryVisible else {
-            windowChrome.restorePlaybackCursor()
-            return
-        }
-        lastPlaybackChromePointerLocation = NSEvent.mouseLocation
-        withAnimation(.smooth(duration: 0.18)) {
-            isPlaybackChromeVisible = false
-        }
-        windowChrome.hidePlaybackCursorUntilMouseMoves()
-    }
-
-    private func playerSurfaceHoverChanged(_ hovering: Bool) {
-        guard model.currentURL != nil else { return }
-        isPointerInsidePlayerSurface = hovering
-        if hovering {
-            revealPlaybackChrome(scheduleHide: true)
-        } else {
-            hidePlaybackChromeForPointerExit()
-        }
-    }
-
-    private func hidePlaybackChromeForPointerExit() {
-        windowChrome.restorePlaybackCursor()
-        guard model.currentURL != nil else { return }
-        guard !windowChrome.isWindowGeometryTransitioning else { return }
-        guard timelinePreviewRequestedTime == nil else { return }
-        playbackChromeAutoHideTask?.cancel()
-        isPointerInsidePlayerSurface = false
-        withAnimation(.smooth(duration: 0.18)) {
-            isPlaybackChromeVisible = false
-        }
-    }
-
-    private func playbackChromeHoverChanged(_ hovering: Bool) {
-        guard model.currentURL != nil else { return }
-        if hovering {
-            revealPlaybackChrome(scheduleHide: true)
-        } else {
-            schedulePlaybackChromeAutoHide()
-        }
-    }
-
-    private func schedulePlaybackChromeAutoHide() {
-        playbackChromeAutoHideTask?.cancel()
-        guard model.currentURL != nil,
-              !windowChrome.isWindowGeometryTransitioning,
-              isPlaybackChromeVisible,
-              !hasActiveVideoPopup,
-              timelinePreviewRequestedTime == nil,
-              !isInspectorVisible,
-              !isMiningHistoryVisible else {
-            return
-        }
-        playbackChromeAutoHideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            guard !Task.isCancelled else { return }
-            hidePlaybackChromeAndCursor()
-        }
-    }
-
-    private func adjustVolume(by delta: Double) {
+    func adjustVolume(by delta: Double) {
         setVolumeWithOSD(model.snapshot.volume + delta)
     }
 
@@ -2519,368 +1600,11 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private func setSpeedWithOSD(_ speed: Double) {
-        let normalizedSpeed = VideoPlaybackSpeed.normalized(speed)
-        model.setSpeed(normalizedSpeed)
-        showSpeedOSD(normalizedSpeed)
-    }
-
-    private func setVolumeWithOSD(_ volume: Double) {
-        let clampedVolume = min(max(volume, 0), 100)
-        model.setVolume(clampedVolume)
-        showVolumeOSD(clampedVolume)
-    }
-
-    private func toggleMuteWithOSD() {
-        let isMuted = !model.snapshot.isMuted
-        model.toggleMuted()
-        showMuteOSD(isMuted: isMuted)
-    }
-
-    private func setSubtitleDelayWithOSD(_ delay: TimeInterval) {
-        let clampedDelay = VideoSubtitleTiming.clampedDelay(delay)
-        model.setSubtitleDelay(clampedDelay)
-        showSubtitleDelayOSD(clampedDelay)
-    }
-
-    private func adjustSubtitleDelayWithOSD(by delta: TimeInterval) {
-        setSubtitleDelayWithOSD(model.snapshot.subtitleDelay + delta)
-    }
-
-    private func subtitleAlignmentDelay(
-        _ direction: SubtitleOffsetAlignmentDirection
-    ) -> TimeInterval? {
-        subtitles.delayAligningAdjacentCue(
-            atPlaybackTime: model.snapshot.currentTime,
-            subtitleDelay: model.snapshot.subtitleDelay,
-            direction: direction
-        )
-    }
-
-    @discardableResult
-    private func alignAdjacentSubtitleToCurrentTime(
-        _ direction: SubtitleOffsetAlignmentDirection
-    ) -> Bool {
-        guard let delay = subtitleAlignmentDelay(direction) else { return false }
-        dismissVideoPopupsIfNeeded()
-        setSubtitleDelayWithOSD(delay)
-        return true
-    }
-
-    private func setAudioDelayWithOSD(_ delay: TimeInterval) {
-        let clampedDelay = min(
-            max(delay, Self.audioDelayRange.lowerBound),
-            Self.audioDelayRange.upperBound
-        )
-        model.setAudioDelay(clampedDelay)
-        showAudioDelayOSD(clampedDelay)
-    }
-
-    private func adjustAudioDelayWithOSD(by delta: TimeInterval) {
-        setAudioDelayWithOSD(model.snapshot.audioDelay + delta)
-    }
-
-    private func showVideoOSD(_ item: VideoOnScreenDisplayItem) {
-        videoOSDTask?.cancel()
-        withAnimation(.easeOut(duration: 0.12)) {
-            videoOSD = item
-        }
-        videoOSDTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.35))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.18)) {
-                videoOSD = nil
-            }
-            videoOSDTask = nil
-        }
-    }
-
-    private func showSpeedOSD(_ speed: Double) {
-        showVideoOSD(
-            VideoOnScreenDisplayItem(
-                title: "Speed",
-                value: VideoPlaybackSpeed.label(speed)
-            )
-        )
-    }
-
-    private func showVolumeOSD(_ volume: Double) {
-        let clampedVolume = min(max(volume, 0), 100)
-        showVideoOSD(
-            VideoOnScreenDisplayItem(
-                title: "Volume",
-                value: String(Int(clampedVolume.rounded())),
-                meterProgress: clampedVolume / 100
-            )
-        )
-    }
-
-    private func showMuteOSD(isMuted: Bool) {
-        showVideoOSD(
-            VideoOnScreenDisplayItem(
-                title: "Volume",
-                value: isMuted ? String(localized: "Muted") : String(localized: "Unmuted"),
-                meterProgress: isMuted ? 0 : min(max(model.snapshot.volume, 0), 100) / 100
-            )
-        )
-    }
-
-    private func showSubtitleVisibilityOSD(isVisible: Bool) {
-        showVideoOSD(
-            VideoOnScreenDisplayItem(
-                title: "Subtitles",
-                value: isVisible ? String(localized: "On") : String(localized: "Off")
-            )
-        )
-    }
-
-    private func showSubtitleTrackOSD(track: VideoTrack?) {
-        showVideoOSD(
-            VideoOnScreenDisplayItem(
-                title: "Subtitle Track",
-                value: track?.displayName ?? String(localized: "Off"),
-                detail: track?.externalFilename.map {
-                    URL(fileURLWithPath: $0).lastPathComponent
-                }
-            )
-        )
-    }
-
-    private func showSubtitleDelayOSD(_ delay: TimeInterval) {
-        showVideoOSD(
-            VideoOnScreenDisplayItem(
-                title: "Subtitle Delay",
-                value: Self.delayOSDValue(delay)
-            )
-        )
-    }
-
-    private func showAudioDelayOSD(_ delay: TimeInterval) {
-        showVideoOSD(
-            VideoOnScreenDisplayItem(
-                title: "Audio Delay",
-                value: Self.delayOSDValue(delay)
-            )
-        )
-    }
-
-    private static func delayOSDValue(_ delay: TimeInterval) -> String {
-        guard abs(delay) >= 0.005 else { return "0.00s" }
-        return String(format: "%+.2fs", delay)
-    }
-
     private var canMineCurrentSubtitle: Bool {
         userConfig.videoMiningHistoryLimit > 0
             && model.currentURL != nil
             && subtitles.document != nil
             && !subtitles.currentCues.isEmpty
-    }
-
-    private func mineCurrentSubtitle() {
-        guard userConfig.videoMiningHistoryLimit > 0 else {
-            showMiningHistoryNotice(.disabled)
-            return
-        }
-        guard let videoURL = model.currentURL,
-              let document = subtitles.document,
-              !subtitles.currentCues.isEmpty else {
-            showMiningHistoryNotice(.noSubtitle)
-            return
-        }
-
-        let embeddedTrackID = document.format == .embedded
-            ? model.snapshot.tracks.first {
-                $0.type == .subtitle && $0.isSelected
-            }?.id
-            : nil
-        let remoteIdentity: RemoteVideoIdentity? = {
-            guard case .remoteStream(let source) = model.currentSource else { return nil }
-            return source.identity
-        }()
-        guard miningHistory.record(
-            cues: subtitles.currentCues,
-            document: document,
-            videoURL: videoURL,
-            videoTitle: model.currentTitle ?? videoURL.lastPathComponent,
-            mediaIdentity: model.currentMediaIdentity,
-            remoteVideoIdentity: remoteIdentity,
-            embeddedSubtitleTrackID: embeddedTrackID
-        ) != nil else {
-            showMiningHistoryNotice(.disabled)
-            return
-        }
-        showMiningHistoryNotice(.saved)
-    }
-
-    private func navigateToHistoryItem(_ item: VideoMiningHistoryItem) {
-        let resolution = VideoMiningHistoryNavigationResolver.resolve(
-            item: item,
-            currentVideoURL: model.currentURL,
-            subtitleDelay: model.snapshot.subtitleDelay
-        )
-        switch resolution {
-        case .missingVideo:
-            model.errorMessage = String(
-                localized: "The saved video file is no longer available. Open it again to continue."
-            )
-        case .missingSubtitle:
-            model.errorMessage = String(
-                localized: "The saved subtitle file is no longer available. Open it again to continue."
-            )
-        case .legacySourceUnavailable:
-            model.errorMessage = String(
-                localized: "Open the matching video before using this older Mining History item."
-            )
-        case .ready(let destination):
-            restoreHistoryDestination(destination)
-        }
-    }
-
-    private func restoreHistoryDestination(_ destination: VideoMiningHistoryDestination) {
-        let wasPlaying = model.snapshot.isPlaying
-        dismissVideoPopupsIfNeeded()
-        miningHistoryNavigationTask?.cancel()
-        miningHistoryNavigationGeneration &+= 1
-        let generation = miningHistoryNavigationGeneration
-        miningHistoryNavigationTask = Task { @MainActor in
-            let destinationIdentity: VideoMediaIdentity
-            let playbackSource: VideoPlaybackSource?
-            switch destination.media {
-            case .localFile(let url):
-                destinationIdentity = .localFile(path: url.standardizedFileURL.path)
-                playbackSource = .localFile(url)
-            case .remote(let identity):
-                destinationIdentity = identity.mediaIdentity
-                if model.currentMediaIdentity == identity.mediaIdentity {
-                    playbackSource = model.currentSource
-                } else {
-                    do {
-                        let resolved = try await RemoteVideoResolverRegistry().resolve(
-                            identity: identity
-                        )
-                        guard !Task.isCancelled,
-                              generation == miningHistoryNavigationGeneration else { return }
-                        playbackSource = .remoteStream(resolved)
-                    } catch {
-                        guard !Task.isCancelled,
-                              generation == miningHistoryNavigationGeneration else { return }
-                        model.errorMessage = error.localizedDescription
-                        return
-                    }
-                }
-            }
-            let isChangingVideo = model.currentMediaIdentity != destinationIdentity
-            if isChangingVideo {
-                guard let playbackSource else { return }
-                shouldSkipNextAutomaticSubtitleRestore = true
-                openVideo(playbackSource, subtitleURL: destination.subtitleURL)
-                guard model.errorMessage == nil else {
-                    shouldSkipNextAutomaticSubtitleRestore = false
-                    return
-                }
-                for _ in 0..<100 where !model.snapshot.isLoaded {
-                    try? await Task.sleep(for: .milliseconds(10))
-                    guard !Task.isCancelled,
-                          generation == miningHistoryNavigationGeneration else { return }
-                }
-            }
-
-            if let trackID = destination.embeddedSubtitleTrackID {
-                pendingHistoryEmbeddedSubtitleTrackID = trackID
-                restorePendingHistorySubtitleTrackIfAvailable()
-            }
-
-            if let subtitleURL = destination.subtitleURL,
-               subtitles.document?.sourceURL.standardizedFileURL != subtitleURL {
-                await loadPrimarySubtitle(
-                    from: subtitleURL,
-                    loadIntoMpv: true
-                ).value
-            }
-
-            model.seek(to: destination.seekTime)
-            subtitles.update(
-                time: destination.seekTime,
-                subtitleDelay: model.snapshot.subtitleDelay
-            )
-            areSubtitlesVisible = true
-
-            if wasPlaying {
-                model.engine.play()
-            } else {
-                model.engine.pause()
-            }
-        }
-    }
-
-    private func copyMiningHistorySubtitle(_ item: VideoMiningHistoryItem) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(item.subtitleText, forType: .string)
-        showMiningHistoryNotice(.copied)
-    }
-
-    private func restorePendingHistorySubtitleTrackIfAvailable() {
-        guard let trackID = pendingHistoryEmbeddedSubtitleTrackID,
-              model.snapshot.tracks.contains(where: {
-                  $0.type == .subtitle && $0.id == trackID
-              }) else {
-            return
-        }
-        pendingHistoryEmbeddedSubtitleTrackID = nil
-        selectSubtitleTrack(trackID, rememberSelection: true, showOSD: false)
-    }
-
-    private func showMiningHistoryNotice(_ notice: VideoMiningHistoryNotice) {
-        miningHistoryNoticeTask?.cancel()
-        withAnimation(.smooth(duration: 0.18)) {
-            miningHistoryNotice = notice
-        }
-        miningHistoryNoticeTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2.2))
-            guard !Task.isCancelled else { return }
-            withAnimation(.smooth(duration: 0.18)) {
-                miningHistoryNotice = nil
-            }
-        }
-    }
-
-    private func videoMiningHistoryNotice(
-        _ notice: VideoMiningHistoryNotice
-    ) -> some View {
-        Label(notice.title, systemImage: notice.systemImage)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .background(.regularMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(.white.opacity(0.14), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.24), radius: 14, y: 6)
-    }
-
-    private func seekRelativeSubtitleCue(offset: Int) -> Bool {
-        guard let targetIndex = subtitles.transcript.relativeRowIndex(
-            atPlaybackTime: model.snapshot.currentTime,
-            subtitleDelay: model.snapshot.subtitleDelay,
-            offset: offset
-        ) else {
-            return false
-        }
-        model.seek(
-            to: subtitles.transcript.rows[targetIndex].startTime
-                + model.snapshot.subtitleDelay
-        )
-        return true
-    }
-
-    private func restoreRememberedSubtitleSelectionOrAutoload() {
-        guard model.pendingSubtitleSelection != nil,
-              let mediaURL = model.currentURL else {
-            return
-        }
-        restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)
     }
 
     private func handleVideoLoadGeneration() {
@@ -2901,283 +1625,12 @@ struct VideoPlayerScreen: View {
         cancelSubtitleTrackExtraction()
         invalidatePrimarySubtitleLoad()
         subtitles.clear()
+        isAwaitingEmbeddedSubtitleDefault = false
         guard let mediaURL = model.currentURL else { return }
         restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)
     }
 
-    private func restorePreservedSubtitleRenderingAfterMediaReload() {
-        guard let document = subtitles.document else {
-            configureSubtitleRendering(.overlayOnly)
-            return
-        }
-        guard document.assRenderPlan != nil else {
-            configureSubtitleRendering(.overlayOnly)
-            return
-        }
-
-        // A source reload removes mpv's external/internal subtitle tracks.
-        // Keep ASS hit targets disabled until the original logical track is
-        // back, then the next track snapshot reinstalls the filtered effects
-        // track through `synchronizeSelectedSubtitleTrack()`.
-        configureSubtitleRendering(.nativeOnly)
-        if document.format == .ass || document.format == .ssa {
-            model.loadExternalSubtitle(document.sourceURL)
-        }
-    }
-
-    private func restoreRememberedSubtitleSelectionOrAutoload(
-        for mediaURL: URL
-    ) {
-        guard let selection = model.pendingSubtitleSelection else {
-            autoloadSubtitleIfAvailable(for: mediaURL)
-            return
-        }
-        let resolution = VideoSubtitleRestoreResolver.resolve(
-            selection: selection,
-            tracks: model.snapshot.tracks,
-            isLoaded: model.snapshot.isLoaded
-        )
-        switch resolution {
-        case .off:
-            _ = model.consumePendingSubtitleSelection()
-            applySubtitlesOff(clearPrimary: true, rememberSelection: false)
-        case .external(let subtitleURL):
-            _ = model.consumePendingSubtitleSelection()
-            loadPrimarySubtitle(
-                from: subtitleURL,
-                loadIntoMpv: !CatalogSubtitleStore.isManagedURL(subtitleURL),
-                rememberSelection: false
-            )
-        case .externalDisabled:
-            _ = model.consumePendingSubtitleSelection()
-            applySubtitlesOff(clearPrimary: true, rememberSelection: false)
-        case .embeddedTrack(let trackID):
-            _ = model.consumePendingSubtitleSelection()
-            selectSubtitleTrack(trackID, rememberSelection: false, showOSD: false)
-        case .remoteLanguage(let language):
-            _ = model.consumePendingSubtitleSelection()
-            guard case .remoteStream(let source) = model.currentSource,
-                  let subtitle = source.preferredSubtitle(language: language) else {
-                autoloadSubtitleIfAvailable(for: mediaURL)
-                return
-            }
-            loadRemoteSubtitle(subtitle, rememberSelection: false)
-        case .remoteOption(let identity):
-            _ = model.consumePendingSubtitleSelection()
-            guard case .remoteStream(let source) = model.currentSource,
-                  let subtitle = source.subtitleOption(matching: identity) else {
-                autoloadSubtitleIfAvailable(for: mediaURL)
-                return
-            }
-            loadRemoteSubtitle(subtitle, rememberSelection: false)
-        case .waitingForTracks:
-            break
-        case .unavailable:
-            _ = model.consumePendingSubtitleSelection()
-            autoloadSubtitleIfAvailable(for: mediaURL)
-        }
-    }
-
-    private func selectSubtitleTrack(
-        _ trackID: Int,
-        rememberSelection: Bool,
-        showOSD: Bool = true
-    ) {
-        guard let track = model.snapshot.tracks.first(where: {
-            $0.type == .subtitle && $0.id == trackID
-        }) else {
-            return
-        }
-        lastSelectedSubtitleTrackID = trackID
-        if let filename = track.externalFilename, !filename.isEmpty {
-            loadPrimarySubtitle(
-                from: URL(fileURLWithPath: filename),
-                loadIntoMpv: true,
-                rememberSelection: rememberSelection
-            )
-            if showOSD { showSubtitleTrackOSD(track: track) }
-            return
-        }
-        if track.isSelected && areSubtitlesVisible && subtitles.document?.format == .embedded {
-            synchronizeSelectedSubtitleTrack()
-        } else {
-            areSubtitlesVisible = true
-            cancelSubtitleTrackExtraction()
-            invalidatePrimarySubtitleLoad()
-            selectedRemoteSubtitleID = nil
-            selectedJimakuSubtitleID = nil
-            selectedJimakuSubtitleName = nil
-            selectedAJATTSubtitleID = nil
-            selectedAJATTSubtitleName = nil
-            configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
-            subtitles.clearPrimary()
-            model.selectTrack(type: .subtitle, id: trackID)
-        }
-        if showOSD {
-            showSubtitleTrackOSD(track: track)
-        }
-        guard rememberSelection else { return }
-        if let filename = track.externalFilename, !filename.isEmpty {
-            model.rememberSubtitleSelection(
-                .external(path: URL(fileURLWithPath: filename).standardizedFileURL.path)
-            )
-        } else {
-            model.rememberSubtitleSelection(
-                .embedded(VideoSubtitleTrackIdentity(track: track))
-            )
-        }
-    }
-
-    private func applySubtitlesOff(
-        clearPrimary: Bool,
-        rememberSelection: Bool
-    ) {
-        remoteSubtitleGeneration &+= 1
-        if let selectedID = model.snapshot.tracks.first(where: {
-            $0.type == .subtitle && $0.isSelected
-        })?.id {
-            lastSelectedSubtitleTrackID = selectedID
-        }
-        let catalogSubtitlePath = subtitles.document
-            .flatMap { document -> String? in
-                guard document.format != .embedded,
-                      CatalogSubtitleStore.isManagedURL(document.sourceURL) else {
-                    return nil
-                }
-                return document.sourceURL.standardizedFileURL.path
-            }
-        cancelSubtitleTrackExtraction()
-        invalidatePrimarySubtitleLoad()
-        subtitles.cancelPendingPrimaryLoad()
-        configureSubtitleRendering(.overlayOnly)
-        if clearPrimary {
-            subtitles.clearPrimary()
-            selectedRemoteSubtitleID = nil
-            selectedJimakuSubtitleID = nil
-            selectedJimakuSubtitleName = nil
-            selectedAJATTSubtitleID = nil
-            selectedAJATTSubtitleName = nil
-        }
-        subtitles.discardTemporaryASSEffects()
-        model.selectTrack(type: .subtitle, id: nil)
-        areSubtitlesVisible = false
-        if rememberSelection {
-            if let catalogSubtitlePath {
-                model.rememberSubtitleSelection(
-                    .externalDisabled(path: catalogSubtitlePath)
-                )
-            } else {
-                model.rememberSubtitleSelection(.off)
-            }
-        }
-    }
-
-    private func toggleSubtitlesVisible() {
-        if areSubtitlesVisible {
-            lastSelectedSubtitleTrackID = model.snapshot.tracks
-                .first { $0.type == .subtitle && $0.isSelected }?
-                .id
-            applySubtitlesOff(clearPrimary: false, rememberSelection: true)
-            showSubtitleVisibilityOSD(isVisible: areSubtitlesVisible)
-        } else {
-            if subtitles.document == nil,
-               model.rememberedExternalSubtitleURL != nil,
-               lastSelectedSubtitleTrackID == nil {
-                restoreRememberedExternalSubtitle()
-                return
-            }
-            if let document = subtitles.document,
-               document.format != .embedded {
-                areSubtitlesVisible = true
-                if let trackID = lastSelectedSubtitleTrackID,
-                   model.snapshot.tracks.contains(where: {
-                       $0.type == .subtitle && $0.id == trackID
-                   }) {
-                    model.selectTrack(type: .subtitle, id: trackID)
-                }
-                applyPreparedSubtitleRendering(
-                    logicalTrackID: lastSelectedSubtitleTrackID
-                )
-                if let selectedRemoteSubtitleID,
-                   let option = currentRemoteSubtitleOptions.first(where: {
-                       $0.id == selectedRemoteSubtitleID
-                   }) {
-                    model.rememberSubtitleSelection(
-                        .remoteOption(option.selectionIdentity)
-                    )
-                } else {
-                    model.rememberSubtitleSelection(
-                        .external(path: document.sourceURL.standardizedFileURL.path)
-                    )
-                }
-                showSubtitleVisibilityOSD(isVisible: areSubtitlesVisible)
-                return
-            }
-            let subtitleTracks = model.snapshot.tracks.filter { $0.type == .subtitle }
-            let trackID = lastSelectedSubtitleTrackID
-                .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
-                ?? subtitleTracks.first?.id
-            if let trackID {
-                selectSubtitleTrack(trackID, rememberSelection: true, showOSD: false)
-                showSubtitleVisibilityOSD(isVisible: areSubtitlesVisible)
-            }
-        }
-    }
-
-    private func cycleSubtitleTrack() -> Bool {
-        let subtitleTracks = model.snapshot.tracks.filter { $0.type == .subtitle }
-        guard !subtitleTracks.isEmpty else { return false }
-        guard areSubtitlesVisible else {
-            let trackID = lastSelectedSubtitleTrackID
-                .flatMap { id in subtitleTracks.first { $0.id == id }?.id }
-                ?? subtitleTracks.first?.id
-            if let trackID {
-                selectSubtitleTrack(trackID, rememberSelection: true)
-            }
-            return true
-        }
-        if let selectedIndex = subtitleTracks.firstIndex(where: \.isSelected) {
-            let nextIndex = subtitleTracks.index(after: selectedIndex)
-            if nextIndex < subtitleTracks.endIndex {
-                let id = subtitleTracks[nextIndex].id
-                selectSubtitleTrack(id, rememberSelection: true)
-            } else {
-                lastSelectedSubtitleTrackID = subtitleTracks[selectedIndex].id
-                applySubtitlesOff(clearPrimary: false, rememberSelection: true)
-                showSubtitleTrackOSD(track: nil)
-            }
-        } else {
-            let id = subtitleTracks[0].id
-            selectSubtitleTrack(id, rememberSelection: true)
-        }
-        return true
-    }
-
-    private func toggleMiningHistory() {
-        videoScreenLog.info(
-            "Toggling video mining history visible=\(self.isMiningHistoryVisible)"
-        )
-        if isMiningHistoryVisible, selectedStudySidebarTab == .history {
-            isMiningHistoryVisible = false
-        } else {
-            selectedStudySidebarTab = .history
-            isMiningHistoryVisible = true
-        }
-    }
-
-    private func toggleTranscriptSidebar() {
-        dismissVideoPopupsThen {
-            if isMiningHistoryVisible, selectedStudySidebarTab == .transcript {
-                isMiningHistoryVisible = false
-            } else {
-                selectedStudySidebarTab = .transcript
-                isMiningHistoryVisible = true
-                isInspectorVisible = false
-            }
-        }
-    }
-
-    private var hasActiveVideoPopup: Bool {
+    var hasActiveVideoPopup: Bool {
         !lookup.presentation.popups.isEmpty
     }
 
@@ -3194,13 +1647,13 @@ struct VideoPlayerScreen: View {
             && !hasActiveVideoPopup
     }
 
-    private func dismissVideoPopupsIfNeeded() {
+    func dismissVideoPopupsIfNeeded() {
         guard hasActiveVideoPopup else { return }
         videoScreenLog.info("Dismissing active video lookup popups")
         lookup.closeAll(player: model)
     }
 
-    private func dismissVideoPopupsThen(_ action: @escaping () -> Void) {
+    func dismissVideoPopupsThen(_ action: @escaping () -> Void) {
         guard hasActiveVideoPopup else {
             action()
             return
@@ -3241,214 +1694,6 @@ struct VideoPlayerScreen: View {
         isInspectorVisible.toggle()
     }
 
-    private func installEmbeddedSubtitleHandler() {
-        model.engine.onEmbeddedSubtitleCuesChanged = { cues in
-            guard let sourceURL = model.currentURL else { return }
-            subtitles.loadEmbedded(cues, sourceURL: sourceURL)
-            subtitles.update(
-                time: model.snapshot.currentTime,
-                subtitleDelay: model.snapshot.subtitleDelay
-            )
-        }
-    }
-
-    private func synchronizeSelectedSubtitleTrack() {
-        guard !isLoadingPrimarySubtitle else { return }
-        guard let videoURL = model.currentURL else {
-            cancelSubtitleTrackExtraction()
-            return
-        }
-        guard let track = model.snapshot.tracks.first(where: {
-            $0.type == .subtitle && $0.isSelected
-        }) else {
-            cancelSubtitleTrackExtraction()
-            if areSubtitlesVisible, let document = subtitles.document,
-               document.format != .embedded {
-                // Catalog imports own their interactive document independently
-                // of mpv's selected track, as in 1.6.4.
-                applyPreparedSubtitleRendering(logicalTrackID: nil)
-            } else {
-                configureSubtitleRendering(.overlayOnly)
-            }
-            if subtitles.document?.format == .embedded,
-               model.subtitlePreservingLoadGeneration != model.loadGeneration {
-                subtitles.clearPrimary()
-            }
-            return
-        }
-        if let format = subtitles.document?.format, format != .embedded {
-            if subtitles.document?.assRenderPlan != nil {
-                applyPreparedSubtitleRendering(logicalTrackID: track.id)
-            } else {
-                configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
-            }
-            return
-        }
-
-        let key = [
-            videoURL.standardizedFileURL.path,
-            String(track.id),
-            String(track.ffIndex ?? -1),
-            track.externalFilename ?? ""
-        ].joined(separator: "|")
-        guard key != activeSubtitleTrackExtractionKey else {
-            if subtitles.document?.assRenderPlan != nil {
-                applyPreparedSubtitleRendering(logicalTrackID: track.id)
-            } else if VideoSubtitleRenderingPolicy.initialMode(for: track) == .preparingASS,
-                      subtitles.transcriptErrorMessage != nil {
-                // Keep a failed extraction on its native fallback instead of
-                // re-entering the hidden preparation state on track updates.
-                configureSubtitleRendering(.nativeOnly)
-            } else {
-                configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
-            }
-            return
-        }
-
-        // Clear a split effects track before `beginEmbeddedTrack` releases
-        // its temporary file. A changed extraction key belongs to the new
-        // media/track even when mpv reused the same transient track ID.
-        configureSubtitleRendering(VideoSubtitleRenderingPolicy.initialMode(for: track))
-        subtitleTrackExtractionTask?.cancel()
-        activeSubtitleTrackExtractionKey = key
-        subtitles.beginEmbeddedTrack(trackID: track.id, sourceURL: videoURL)
-
-        subtitleTrackExtractionTask = Task { @MainActor in
-            let worker = Task.detached(priority: .userInitiated) {
-                do {
-                    let isCancelled: @Sendable () -> Bool = {
-                        withUnsafeCurrentTask { $0?.isCancelled ?? false }
-                    }
-                    let extractedTrack = try VideoSubtitleTrackExtractor.extract(
-                        videoURL: videoURL,
-                        track: track,
-                        isCancelled: isCancelled
-                    )
-                    guard !isCancelled() else {
-                        return SubtitleTrackExtractionOutcome.cancelled
-                    }
-                    let load = try VideoSubtitleController.prepareEmbeddedTranscript(
-                        extractedTrack,
-                        sourceURL: videoURL,
-                        isCancelled: isCancelled
-                    )
-                    guard !isCancelled() else {
-                        load.discardTemporaryResources()
-                        return SubtitleTrackExtractionOutcome.cancelled
-                    }
-                    return SubtitleTrackExtractionOutcome.success(load)
-                } catch is CancellationError {
-                    return SubtitleTrackExtractionOutcome.cancelled
-                } catch {
-                    return SubtitleTrackExtractionOutcome.failure(
-                        error.localizedDescription
-                    )
-                }
-            }
-            let outcome = await withTaskCancellationHandler {
-                await worker.value
-            } onCancel: {
-                worker.cancel()
-            }
-            guard !Task.isCancelled,
-                  activeSubtitleTrackExtractionKey == key else {
-                if case .success(let load) = outcome {
-                    load.discardTemporaryResources()
-                }
-                return
-            }
-            switch outcome {
-            case .success(let load):
-                subtitles.replaceEmbeddedTranscript(
-                    load,
-                    trackID: track.id
-                )
-                applyPreparedSubtitleRendering(logicalTrackID: track.id)
-                subtitles.update(
-                    time: model.snapshot.currentTime,
-                    subtitleDelay: model.snapshot.subtitleDelay
-                )
-            case .failure(let message):
-                subtitles.failEmbeddedTranscript(message, trackID: track.id)
-                if let codec = track.codec?.lowercased(),
-                   codec == "ass" || codec == "ssa" {
-                    configureSubtitleRendering(.nativeOnly)
-                    subtitles.errorMessage = String(
-                        localized: "Unable to prepare interactive ASS subtitles. The original subtitle will be shown instead."
-                    )
-                }
-            case .cancelled:
-                break
-            }
-        }
-    }
-
-    private func cancelSubtitleTrackExtraction() {
-        subtitleTrackExtractionTask?.cancel()
-        subtitleTrackExtractionTask = nil
-        activeSubtitleTrackExtractionKey = nil
-    }
-
-    private func invalidatePrimarySubtitleLoad() {
-        primarySubtitleLoadGeneration &+= 1
-        isLoadingPrimarySubtitle = false
-    }
-
-    private func applyPreparedSubtitleRendering(logicalTrackID: Int?) {
-        guard areSubtitlesVisible else {
-            configureSubtitleRendering(.overlayOnly)
-            return
-        }
-        guard let document = subtitles.document else {
-            configureSubtitleRendering(.overlayOnly)
-            return
-        }
-        guard let renderPlan = document.assRenderPlan else {
-            let mode: VideoSubtitleRenderingMode
-            switch document.format {
-            case .ass, .ssa:
-                mode = .nativeOnly
-            case .srt, .webVTT, .embedded:
-                mode = .overlayOnly
-            }
-            configureSubtitleRendering(mode)
-            return
-        }
-        // As in Fushi, every parsed ASS text event is drawn by the same layer
-        // that owns glyph hit testing, including positioned/lyric/KFX text.
-        // Never replace it with an unselectable libass primary track.
-        if userConfig.videoRespectASSStyle,
-           renderPlan.interactiveEffectsOnlyData != nil,
-           subtitles.prepareTemporaryASSEffectsIfNeeded(),
-           let effectsURL = subtitles.assEffectsURL {
-            if !model.configureSubtitleRendering(.splitASS(effectsURL: effectsURL, logicalTrackID: logicalTrackID)) {
-                // Non-text effects are best effort; a renderer failure must
-                // never take away the visible, selectable text.
-                configureSubtitleRendering(.overlayOnly)
-            } else {
-                subtitleRenderingMode = .splitASS(effectsURL: effectsURL, logicalTrackID: logicalTrackID)
-            }
-            return
-        }
-        configureSubtitleRendering(.overlayOnly)
-    }
-
-    @discardableResult
-    private func configureSubtitleRendering(_ mode: VideoSubtitleRenderingMode) -> Bool {
-        guard model.configureSubtitleRendering(mode) else {
-            if case .splitASS = mode {
-                subtitles.markASSEffectsInstallationFailed()
-            }
-            subtitleRenderingMode = .nativeOnly
-            _ = model.configureSubtitleRendering(.nativeOnly)
-            subtitles.errorMessage = String(
-                localized: "Unable to prepare interactive ASS subtitles. The original subtitle will be shown instead."
-            )
-            return false
-        }
-        subtitleRenderingMode = mode
-        return true
-    }
 }
 
 private struct VideoTitlebarBackdrop: NSViewRepresentable {
@@ -3573,13 +1818,13 @@ private struct VideoInspectorOverlayFramePreferenceKey: PreferenceKey {
     }
 }
 
-private enum SubtitleTrackExtractionOutcome: Sendable {
+enum SubtitleTrackExtractionOutcome: Sendable {
     case success(PreparedSubtitleLoad)
     case failure(String)
     case cancelled
 }
 
-private enum VideoFileImportKind {
+enum VideoFileImportKind {
     case video
     case primarySubtitle
 
@@ -3596,7 +1841,7 @@ private enum VideoFileImportKind {
     }
 }
 
-private enum VideoMiningHistoryNotice: String, Identifiable {
+enum VideoMiningHistoryNotice: String, Identifiable {
     case saved
     case copied
     case noSubtitle

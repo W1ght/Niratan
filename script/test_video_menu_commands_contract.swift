@@ -28,6 +28,12 @@ let app = try source("NativeMac/HoshiNativeMacApp.swift")
 let nativeRoot = try source("NativeMac/NativeMacRootView.swift")
 let presenter = try source("NativeMac/VideoWindowPresenter.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
+    + source("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + source("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + source("Features/Video/VideoPlayerScreen+OSD.swift")
+    + source("Features/Video/VideoPlayerScreen+Mining.swift")
+    + source("Features/Video/VideoPlayerScreen+Opening.swift")
+    + source("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let commands = (try? source("Features/Video/VideoPlaybackCommands.swift")) ?? ""
 let project = try source("Niratan.xcodeproj/project.pbxproj")
 
@@ -64,7 +70,7 @@ require(
     "video playback menus should be hidden outside the actual Video key window"
 )
 if let windowCheckRange = commands.range(of: "private func isVideoPlaybackWindow"),
-   let windowCheckEnd = commands[windowCheckRange.lowerBound...].range(of: "\n    }\n}\n#endif")?.lowerBound {
+   let windowCheckEnd = commands[windowCheckRange.lowerBound...].range(of: "\n    }\n}")?.lowerBound {
     let windowCheck = commands[windowCheckRange.lowerBound..<windowCheckEnd]
     require(
         windowCheck.contains("return window.identifier?.rawValue == VideoWindowCoordinator.windowID")
@@ -95,7 +101,7 @@ require(
 )
 require(
     screen.contains(".focusedSceneValue(\\.videoPlaybackCommandContext, videoPlaybackCommandContext)")
-        && screen.contains("private var videoPlaybackCommandContext: VideoPlaybackCommandContext"),
+        && screen.contains("var videoPlaybackCommandContext: VideoPlaybackCommandContext"),
     "video player screen should publish its current playback command context from the Video window"
 )
 require(

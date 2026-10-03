@@ -1,3 +1,4 @@
+// test-sources: Core/Shortcuts/KeyboardShortcutBinding.swift Core/Shortcuts/ShortcutAction.swift Core/Shortcuts/ShortcutDispatchResolver.swift
 import Foundation
 
 private func expectEqual<T: Equatable>(_ actual: T, _ expected: T, _ message: String) {

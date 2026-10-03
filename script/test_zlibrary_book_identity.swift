@@ -1,3 +1,4 @@
+// test-sources: Models/Book.swift
 import Foundation
 
 @main

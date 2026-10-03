@@ -1,3 +1,4 @@
+// test-sources:
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -30,7 +31,7 @@ private enum CrossAppSelectionLookupContractTests {
         expect(panel.contains("PopupPanelEntry"), "quick lookup must track one transient panel per popup stack entry")
         expect(panel.contains("presentChild"), "quick lookup nested selections must open a separate transient panel")
         expect(panel.contains("QuickLookupPanelGeometry.screenRect("), "quick lookup child popups must anchor to selected text inside the parent panel")
-        expect(panel.contains("private func handleMouseDown(at point: CGPoint)"), "quick lookup should centralize mouse-down dismissal behavior")
+        expect(panel.contains("func handleMouseDown(at point: CGPoint)"), "quick lookup should centralize mouse-down dismissal behavior")
         expect(panel.contains("popupID(containing: point)"), "quick lookup should identify which popup panel was clicked")
         expect(panel.contains("closePanels(after: popupID)"), "clicking a parent quick lookup popup should remove only its child popup stack")
         expect(panel.contains("coordinator?.handleTapInsidePopup(id: popupID)"), "parent-panel clicks should also trim the shared popup coordinator stack")

@@ -28,6 +28,12 @@ private func read(_ path: String) -> String {
 
 let controls = read("Features/Video/VideoControlsView.swift")
 let screen = read("Features/Video/VideoPlayerScreen.swift")
+    + read("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + read("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + read("Features/Video/VideoPlayerScreen+OSD.swift")
+    + read("Features/Video/VideoPlayerScreen+Mining.swift")
+    + read("Features/Video/VideoPlayerScreen+Opening.swift")
+    + read("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let windowChrome = read("Features/Video/VideoWindowChromeController.swift")
 let shortcutActions = read("Features/Video/VideoShortcutActions.swift")
 let mpvEngine = read("Features/Video/Playback/MpvPlayerEngine.swift")
@@ -64,7 +70,7 @@ require(
 )
 require(
     screen,
-    contains: "private func toggleFullScreen()",
+    contains: "func toggleFullScreen()",
     "fullscreen UI and shortcuts should share one implementation"
 )
 require(
@@ -86,7 +92,7 @@ require(
     "Video fullscreen should default to the single-key F shortcut"
 )
 require(
-    controls.contains("private var fullScreenButton: some View")
+    controls.contains("var fullScreenButton: some View")
         && controls.contains("Button(action: onToggleFullScreen)")
         && controls.contains("Image(systemName: isFullScreen")
         && controls.contains("\"arrow.down.right.and.arrow.up.left\"")
@@ -157,10 +163,10 @@ require(
     "Video windows should not disable system fullscreen or replace the green traffic-light action"
 )
 require(
-    windowChrome.contains("private enum FullScreenState")
+    windowChrome.contains("enum FullScreenState")
         && windowChrome.contains("case entering")
         && windowChrome.contains("case exiting")
-        && windowChrome.contains("private var isFullScreenTransitioning: Bool")
+        && windowChrome.contains("var isFullScreenTransitioning: Bool")
         && windowChrome.contains("guard let window, !isFullScreenTransitioning else { return }")
         && windowChrome.contains("func fullScreenTransitionDidFail()")
         && presenter.contains("func windowDidFailToEnterFullScreen(_ window: NSWindow)")

@@ -1,88 +1,6 @@
 import AppKit
 import Foundation
 
-nonisolated enum VideoTrackType: String, Codable, CaseIterable, Hashable, Sendable {
-    case video
-    case audio
-    case subtitle
-}
-
-nonisolated struct VideoTrack: Identifiable, Equatable, Hashable, Sendable {
-    let id: Int
-    let type: VideoTrackType
-    let title: String
-    let language: String?
-    let codec: String?
-    let ffIndex: Int?
-    let externalFilename: String?
-    let isImage: Bool
-    let isSelected: Bool
-
-    var displayName: String {
-        if let language, !language.isEmpty {
-            return "\(title) · \(language)"
-        }
-        return title
-    }
-}
-
-nonisolated struct VideoEmbeddedSubtitleCue: Identifiable, Equatable, Hashable, Sendable {
-    let id: String
-    let startTime: TimeInterval
-    let endTime: TimeInterval
-    let text: String
-}
-
-nonisolated enum VideoSubtitleRenderingMode: Equatable, Sendable {
-    case overlayOnly
-    case preparingASS
-    case nativeOnly
-    case splitASS(effectsURL: URL, logicalTrackID: Int?)
-
-    var usesInteractiveOverlay: Bool {
-        switch self {
-        case .overlayOnly, .splitASS:
-            true
-        case .preparingASS, .nativeOnly:
-            false
-        }
-    }
-
-    var usesNativeRenderer: Bool {
-        switch self {
-        case .nativeOnly, .splitASS:
-            true
-        case .overlayOnly, .preparingASS:
-            false
-        }
-    }
-}
-
-nonisolated enum VideoSubtitleRenderingPolicy {
-    static func usesNativeRenderer(for track: VideoTrack) -> Bool {
-        guard track.type == .subtitle else { return false }
-        if track.isImage { return true }
-        guard let codec = track.codec?.lowercased() else { return false }
-        return codec == "ass" || codec == "ssa"
-    }
-
-    static func usesNativeRenderer(forSubtitleURL url: URL) -> Bool {
-        let fileExtension = url.pathExtension.lowercased()
-        return fileExtension == "ass" || fileExtension == "ssa"
-    }
-
-    static func initialMode(for track: VideoTrack) -> VideoSubtitleRenderingMode {
-        guard track.type == .subtitle else { return .overlayOnly }
-        if track.isImage { return .nativeOnly }
-        guard let codec = track.codec?.lowercased() else { return .overlayOnly }
-        return codec == "ass" || codec == "ssa" ? .preparingASS : .overlayOnly
-    }
-
-    static func initialMode(forSubtitleURL url: URL) -> VideoSubtitleRenderingMode {
-        usesNativeRenderer(forSubtitleURL: url) ? .preparingASS : .overlayOnly
-    }
-}
-
 struct VideoChapter: Identifiable, Equatable, Hashable {
     let id: Int
     let title: String
@@ -116,7 +34,7 @@ enum VideoAspectRatio: String, CaseIterable, Codable {
 
     var title: String {
         switch self {
-        case .automatic: "Automatic"
+        case .automatic: String(localized: "Automatic")
         case .ratio16x9: "16:9"
         case .ratio4x3: "4:3"
         case .ratio1x1: "1:1"

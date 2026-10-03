@@ -170,7 +170,7 @@ struct ProfileDictionaryBackup {
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         )
-        if contents.contains(where: { ["Term", "Frequency", "Pitch", "config.json"].contains($0.lastPathComponent) })
+        if contents.contains(where: { ["Term", "Frequency", "Pitch", "Kanji", "config.json"].contains($0.lastPathComponent) })
             || fileManager.fileExists(atPath: extractedDirectory.appendingPathComponent(Self.metadataDirectoryName).path) {
             return extractedDirectory
         }
@@ -247,5 +247,5 @@ struct ProfileDictionaryBackup {
 }
 
 private extension DictionaryType {
-    static let allCasesForBackup: [DictionaryType] = [.term, .frequency, .pitch]
+    static let allCasesForBackup: [DictionaryType] = [.term, .frequency, .pitch, .kanji]
 }

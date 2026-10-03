@@ -437,18 +437,41 @@ class SasayakiPlayer {
         let range = expandCue(cue, sentence: sentence)
         let start = max(0, range.start + delay)
         let end = max(start, range.end + delay)
+        // Mined audio follows the current playback speed so the card sounds like what the user heard.
+        let playbackRate = Double(rate)
         let cacheKey = [
             url.standardizedFileURL.path(percentEncoded: false),
             String(Int((start * 1000).rounded())),
             String(Int((end * 1000).rounded())),
             format.rawValue,
-            String(bitrateKbps)
+            String(bitrateKbps),
+            String(Int((playbackRate * 100).rounded()))
         ].joined(separator: "\n")
         if let cached = miningAudioCache[cacheKey] {
             return cached
         }
 
-        let asset = AVURLAsset(url: url)
+        let sourceAsset = AVURLAsset(url: url)
+        let sourceRange = CMTimeRange(
+            start: CMTime(seconds: start, preferredTimescale: 600),
+            end: CMTime(seconds: end, preferredTimescale: 600)
+        )
+        let asset: AVAsset
+        let exportRange: CMTimeRange
+        if abs(playbackRate - 1) < 0.001 {
+            asset = sourceAsset
+            exportRange = sourceRange
+        } else {
+            guard let composition = try? await Self.rateAdjustedComposition(
+                of: sourceAsset,
+                timeRange: sourceRange,
+                rate: playbackRate
+            ) else {
+                return nil
+            }
+            asset = composition
+            exportRange = CMTimeRange(start: .zero, duration: composition.duration)
+        }
         let identifier = UUID().uuidString
         let m4aURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("sasayaki-audio-\(identifier).m4a")
@@ -463,11 +486,9 @@ class SasayakiPlayer {
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
             return nil
         }
-        
-        session.timeRange = CMTimeRange(
-            start: CMTime(seconds: start, preferredTimescale: 600),
-            end: CMTime(seconds: end, preferredTimescale: 600)
-        )
+
+        session.timeRange = exportRange
+        session.audioTimePitchAlgorithm = .spectral
         do {
             try await session.export(to: m4aURL, as: .m4a)
             let data = try await AnkiAudioCompressor.data(
@@ -483,6 +504,33 @@ class SasayakiPlayer {
         }
     }
     
+    private static func rateAdjustedComposition(
+        of asset: AVURLAsset,
+        timeRange: CMTimeRange,
+        rate: Double
+    ) async throws -> AVMutableComposition? {
+        guard let sourceTrack = try await asset.loadTracks(withMediaType: .audio).first else {
+            return nil
+        }
+        let clippedRange = timeRange.intersection(try await sourceTrack.load(.timeRange))
+        guard clippedRange.duration > .zero else {
+            return nil
+        }
+        let composition = AVMutableComposition()
+        guard let track = composition.addMutableTrack(
+            withMediaType: .audio,
+            preferredTrackID: kCMPersistentTrackID_Invalid
+        ) else {
+            return nil
+        }
+        try track.insertTimeRange(clippedRange, of: sourceTrack, at: .zero)
+        track.scaleTimeRange(
+            CMTimeRange(start: .zero, duration: clippedRange.duration),
+            toDuration: CMTimeMultiplyByFloat64(clippedRange.duration, multiplier: 1 / rate)
+        )
+        return composition
+    }
+
     private func expandCue(_ cue: SasayakiMatch, sentence: String) -> (start: Double, end: Double) {
         guard let cues = matchData?.matches.filter({ $0.chapterIndex == cue.chapterIndex }),
               let index = cues.firstIndex(where: { $0.id == cue.id }) else {

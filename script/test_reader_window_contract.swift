@@ -107,7 +107,7 @@ if let modelAssignment = coordinator.range(of: "currentModel = model"),
 }
 
 require(
-    app.contains("@State private var readerWindowCoordinator = ReaderWindowCoordinator()")
+    app.contains("var readerWindowCoordinator = ReaderWindowCoordinator()")
         && app.contains(".environment(readerWindowCoordinator)")
         && app.contains("func applicationWillTerminate(_ notification: Notification)")
         && app.contains("ReaderWindowPresenter.shared.persistFrameForApplicationTermination()")
@@ -119,21 +119,21 @@ require(
 require(
     presenter.contains("final class ReaderWindowPresenter: NSObject, NSWindowDelegate")
         && presenter.contains("static let shared = ReaderWindowPresenter()")
-        && presenter.contains("private weak var coordinator: ReaderWindowCoordinator?")
+        && presenter.contains("weak var coordinator: ReaderWindowCoordinator?")
         && presenter.contains("NSWindow(")
         && presenter.contains("styleMask: [.titled, .closable, .miniaturizable, .resizable]")
         && presenter.contains("window.identifier = NSUserInterfaceItemIdentifier(ReaderWindowCoordinator.windowID)")
         && presenter.contains("window.minSize = ReaderWindowGeometry.minimumSize")
         && presenter.contains("window.isReleasedWhenClosed = false")
-        && presenter.contains("private static let frameAutosaveName")
-        && presenter.contains("private static let frameAutosaveMigrationKey")
+        && presenter.contains("static let frameAutosaveName")
+        && presenter.contains("static let frameAutosaveMigrationKey")
         && presenter.contains("restoreSavedFrameOrApplyDefault(to: window)")
         && presenter.contains("window.setFrameUsingName(Self.frameAutosaveName)")
         && presenter.contains("ReaderWindowGeometry.shouldUseSavedFrame(")
         && !presenter.contains("window.setFrameAutosaveName")
         && presenter.contains("window.saveFrame(usingName: Self.frameAutosaveName)")
         && presenter.contains("func persistFrameForApplicationTermination()")
-        && presenter.contains("private func persistWindowedFrameIfNeeded(_ window: NSWindow)")
+        && presenter.contains("func persistWindowedFrameIfNeeded(_ window: NSWindow)")
         && presenter.contains("guard !window.styleMask.contains(.fullScreen) else { return }")
         && presenter.contains("reader.windowFrame.save")
         && presenter.contains("persistWindowedFrameIfNeeded(closingWindow)")
@@ -164,7 +164,7 @@ require(
 )
 
 require(
-    presenter.contains("private func scheduleWindowRelease(_ closingWindow: NSWindow)")
+    presenter.contains("func scheduleWindowRelease(_ closingWindow: NSWindow)")
         && presenter.contains("let closingWindowID = ObjectIdentifier(closingWindow)")
         && presenter.contains("DispatchQueue.main.async { [weak self] in")
         && !presenter.contains("[weak self, closingWindow]")
@@ -188,7 +188,7 @@ require(
 )
 
 require(
-    presenter.contains("private final class ReaderWindowChromeController")
+    presenter.contains("final class ReaderWindowChromeController")
         && presenter.contains("func setFocusModeEnabled(_ enabled: Bool)")
         && presenter.contains("button.isHidden = focusModeEnabled")
         && presenter.contains("window.standardWindowButton(.closeButton)")
@@ -198,10 +198,10 @@ require(
 )
 
 require(
-    presenter.contains("private struct ReaderWindowRootView: View")
+    presenter.contains("struct ReaderWindowRootView: View")
         && presenter.contains("@Environment(ReaderWindowCoordinator.self) private var readerWindowCoordinator")
-        && presenter.contains("@State private var shortcutManager = ShortcutManager(registry: .application)")
-        && presenter.contains("@State private var isKeyWindow = false")
+        && presenter.contains("var shortcutManager = ShortcutManager(registry: .application)")
+        && presenter.contains("var isKeyWindow = false")
         && presenter.contains("NativeWindowActivityReader { window, isKey in")
         && presenter.contains("shortcutManager.manageEvents(for: window)")
         && presenter.contains("readerWindowCoordinator.windowDidAppear()")
@@ -277,7 +277,7 @@ require(
         && reader.contains(".onChange(of: isActive")
         && reader.contains(".onChange(of: focusMode, initial: true)")
         && reader.contains("updateKeyboardShortcutRegistration(isActive: isActive)")
-        && reader.contains("private func updateKeyboardShortcutRegistration(isActive: Bool)")
+        && reader.contains("func updateKeyboardShortcutRegistration(isActive: Bool)")
         && reader.contains("NotificationCenter.default.post(name: .readerWindowProgressDidChange"),
     "NativeReaderView should register shortcut handlers only while active, drive window traffic lights from focus mode and post an explicit progress refresh signal on teardown"
 )

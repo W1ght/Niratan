@@ -1,3 +1,4 @@
+// test-sources: Models/Book.swift Util/ReaderCharacterNormalizer.swift Features/Reader/Gallery/ReaderImageGalleryIndex.swift
 import Foundation
 
 @main

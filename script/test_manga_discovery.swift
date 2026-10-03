@@ -1,3 +1,4 @@
+// test-sources: Features/Manga/MangaDiscoveryService.swift
 import Foundation
 
 private final class MangaDiscoveryMockProtocol: URLProtocol, @unchecked Sendable {

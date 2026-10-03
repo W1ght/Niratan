@@ -9,6 +9,8 @@
 import SwiftUI
 
 struct AboutView: View {
+    @State private var updateChecker = UpdateChecker.shared
+
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
     }
@@ -31,18 +33,25 @@ struct AboutView: View {
                 }
             }
 
-            NativeSettingsSectionCard("Links") {
-                NativeSettingsButtonRow {
-                    Link(destination: URL(string: "https://github.com/W1ght/Niratan")!) {
-                        Label("GitHub", systemImage: "link")
-                    }
-                }
+            NativeSettingsSectionCard("Software Update") {
+                NativeSettingsToggle(
+                    "Automatically Check for Updates",
+                    isOn: $updateChecker.automaticChecksEnabled
+                )
                 NativeSettingsSeparator()
-                NativeSettingsButtonRow {
-                    Link(destination: URL(string: "https://github.com/W1ght/Niratan/blob/main/PRIVACY.md")!) {
-                        Label("Privacy Policy", systemImage: "hand.raised")
-                    }
+                NativeSettingsRow {
+                    updateStatus
+                } accessory: {
+                    updateAction
                 }
+            } footer: {
+                Text("Niratan checks the latest GitHub release once a day.")
+            }
+
+            NativeSettingsSectionCard("Links") {
+                linkRow("GitHub", systemImage: "link", url: "https://github.com/W1ght/Niratan")
+                NativeSettingsSeparator()
+                linkRow("Privacy Policy", systemImage: "hand.raised", url: "https://github.com/W1ght/Niratan/blob/main/PRIVACY.md")
             }
 
             NativeSettingsSectionCard("Dependencies") {
@@ -53,6 +62,75 @@ struct AboutView: View {
                 nativeLicenseRows(attributionItems)
             }
         }
+    }
+
+    private var updateStatus: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(updateStatusTitle)
+            if let lastCheckedAt = updateChecker.lastCheckedAt {
+                Text("Last checked: \(lastCheckedAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption)
+                    .fontWeight(.regular)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var updateStatusTitle: String {
+        if updateChecker.isDownloading {
+            return updateChecker.downloadStatusText
+        }
+        if updateChecker.isChecking {
+            return String(localized: "Checking for Updates...")
+        }
+        if let release = updateChecker.availableRelease {
+            return String(format: String(localized: "Version %@ is available."), release.version)
+        }
+        if updateChecker.lastCheckFailed {
+            return String(localized: "Unable to check for updates. Please try again later.")
+        }
+        if updateChecker.lastCheckedAt != nil {
+            return String(format: String(localized: "Niratan %@ is the latest version."), updateChecker.currentVersion)
+        }
+        return String(localized: "Not checked yet")
+    }
+
+    @ViewBuilder
+    private var updateAction: some View {
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                if updateChecker.availableRelease != nil {
+                    Button("Download and Install") {
+                        Task {
+                            await updateChecker.downloadAndOpenAvailableUpdate()
+                        }
+                    }
+                }
+                Button("Check Now") {
+                    Task {
+                        await updateChecker.check(manual: true)
+                    }
+                }
+            }
+        }
+        .buttonStyle(NativeSettingsActionButtonStyle())
+        .disabled(updateChecker.isBusy)
+    }
+
+    private func linkRow(_ title: LocalizedStringKey, systemImage: String, url: String) -> some View {
+        Link(destination: URL(string: url)!) {
+            NativeSettingsRow {
+                Label(title, systemImage: systemImage)
+            } accessory: {
+                Image(systemName: "arrow.up.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
     }
 
     @ViewBuilder
@@ -134,6 +212,36 @@ struct AboutView: View {
         """
     }
     
+    private var bsdLicenseKanjiStrokeOrders: String {
+        """
+        Copyright (C) 2004-2020 Ulrich Apel, the AAAA project and the Wadoku project
+        All rights reserved.
+
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions
+        are met:
+
+        1. Redistributions of source code must retain the above copyright
+           notice, this list of conditions and the following disclaimer.
+        2. Redistributions in binary form must reproduce the above copyright
+           notice, this list of conditions and the following disclaimer in the
+           documentation and/or other materials provided with the distribution.
+        3. Neither the name of the author may be used to endorse or promote products
+           derived from this software without specific prior written permission.
+
+        THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+        IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+        OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+        IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+        INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+        NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+        DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+        THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+        (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+        THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        """
+    }
+
     private var bsdLicensexxHash: String {
         """
         xxHash Library
@@ -344,6 +452,12 @@ struct AboutView: View {
                 license: "CC-BY-SA-4.0",
                 url: "https://github.com/tofugu/japanese-vocabulary-pronunciation-audio",
                 text: nil
+            ),
+            LicenseItem(
+                name: "Kanji Stroke Order Font",
+                license: "BSD-3",
+                url: "https://www.nihilist.org.uk",
+                text: bsdLicenseKanjiStrokeOrders
             )
         ]
     }

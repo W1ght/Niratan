@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Subtitles/ASSInteractiveTextStyle.swift Models/Subtitle.swift Features/Video/Subtitles/SubtitleParser.swift Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift
 import AppKit
 
 @main

@@ -1,3 +1,4 @@
+// test-sources: Models/Sasayaki.swift Features/Sasayaki/SasayakiTranscriptionProgress.swift Features/Sasayaki/SasayakiSRT.swift
 // Runs entirely in a disposable directory and never reads the user's books.
 import Foundation
 

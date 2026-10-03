@@ -392,9 +392,9 @@ enum SubtitleParserError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupportedFormat:
-            "Unsupported subtitle format."
+            String(localized: "Unsupported subtitle format.")
         case .noValidCues:
-            "No valid subtitle cues were found."
+            String(localized: "No valid subtitle cues were found.")
         }
     }
 }

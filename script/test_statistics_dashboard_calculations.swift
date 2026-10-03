@@ -1,3 +1,4 @@
+// test-sources: Models/Book.swift Models/Statistics.swift Core/StatisticsStorage.swift Features/Bookshelf/StatisticsDashboardModels.swift
 import Foundation
 
 func assertEqual<T: Equatable>(_ actual: T, _ expected: T, _ message: String) {

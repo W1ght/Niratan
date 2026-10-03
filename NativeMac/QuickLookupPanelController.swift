@@ -20,11 +20,7 @@ private struct QuickLookupStatusView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.16), lineWidth: 1)
-        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }
 

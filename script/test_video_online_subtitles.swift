@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Subtitles/JimakuAPIClient.swift Features/Video/Subtitles/OnlineSubtitleBrowserModel.swift Features/Video/Subtitles/OnlineSubtitleGrouping.swift Features/Video/Subtitles/OnlineSubtitleClients.swift Features/Video/Remote/RemoteVideoSource.swift Models/Subtitle.swift Features/Video/Subtitles/AJATTSubtitleCatalogClient.swift Features/Video/Subtitles/JimakuCredentialStore.swift Features/Video/Remote/BoundedURLSessionData.swift Features/Video/Remote/YouTubeURLParser.swift NativeMac/DevelopmentDataIsolation.swift
 import Foundation
 
 private final class Stub: URLProtocol, @unchecked Sendable {

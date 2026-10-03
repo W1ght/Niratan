@@ -16,7 +16,7 @@ struct GoogleDriveCredentials: Codable, Equatable {
 }
 
 class TokenStorage {
-    private static let credentialsAccount = "googleDriveCredentials"
+    private static let credentialsAccount = DevelopmentDataIsolation.keychainName("googleDriveCredentials")
     private static let credentialsPresenceKey = "GoogleDriveCredentialsStored"
     private static let legacyCredentialAccounts = ["accessToken", "refreshToken", "clientId"]
 

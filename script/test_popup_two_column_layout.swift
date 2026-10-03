@@ -80,7 +80,7 @@ require(
     "PopupWebView should update the live WebView when the two-column preference changes"
 )
 require(
-    popupView.contains("private var effectiveTwoColumnLayout: Bool")
+    popupView.contains("var effectiveTwoColumnLayout: Bool")
         && popupView.contains("userConfig.dictionaryProfileSettings()")
         && !popupView.contains("ProfileSettingsStore.shared.dictionarySettings(")
         && popupView.contains("twoColumnLayout: effectiveTwoColumnLayout")
@@ -171,13 +171,13 @@ require(
 )
 require(
     compactWhitespace(popupScript).contains(
-        "if(suppressNextPopupClick){suppressNextPopupClick=false;return;}if(hasPopupSelection()){cachePopupSelection();return;}handlePopupLookupAtPoint(target,e.clientX,e.clientY);"
+        "if(suppressNextPopupClick){suppressNextPopupClick=false;return;}if(hasPopupSelection()){cachePopupSelection();return;}constkanjiTarget=window.kanjiLookupEnabled?target?.closest('.kanji-char'):null;if(kanjiTarget){lookupKanji(kanjiTarget.textContent);return;}handlePopupLookupAtPoint(target,e.clientX,e.clientY);"
     ),
     "popup click fallback should preserve native text selection before starting lookup"
 )
 require(
     dictionarySearch.contains("querySource: lastQuery")
-        && dictionarySearch.contains("private static let contentTopSpacing = 12")
+        && dictionarySearch.contains("static let contentTopSpacing = 12")
         && dictionarySearch.contains("topSpacerHeight: Self.contentTopSpacing")
         && dictionarySearch.contains("height: \\(topSpacerHeight)px")
         && dictionarySearch.contains("let querySourceJSON = querySource")
@@ -198,7 +198,7 @@ require(
         && popupWebView.contains("name: \"queryTextSelected\"")
         && dictionarySearch.contains("handleInlineQuerySelection(")
         && dictionarySearch.contains("entries: Self.buildLookupEntries(lookupResults: lookupResults)")
-        && selectionScript.contains("closest('p, .glossary-content, .expr-tag, .dictionary-query-source')")
+        && selectionScript.contains("closest('p, .kanji-entry li, .glossary-content, .expr-tag, .dictionary-query-source')")
         && selectionScript.contains("toggleOnSameSelection = true, onSelection = null")
         && popupStyles.contains(".dictionary-query-source {")
         && popupStyles.contains("-webkit-user-select: text;")

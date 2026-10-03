@@ -1273,6 +1273,9 @@ final class AidokuSourceViewModel {
         if selectedSourceRequiresAuthentication, isAuthenticationMessage(message) {
             return String(localized: "Log in to this source before browsing or reading manga.")
         }
+        if let runtimeError = error as? AidokuRuntimeError {
+            return runtimeError.localizedMessage
+        }
         return message
     }
 
@@ -1282,6 +1285,58 @@ final class AidokuSourceViewModel {
             || normalized.contains("log in")
             || normalized.contains("unauthorized")
             || normalized.contains("authentication")
+    }
+}
+
+extension AidokuRuntimeError {
+    /// App-side translation of the runtime package's English error descriptions.
+    var localizedMessage: String {
+        switch self {
+        case .invalidArchive:
+            String(localized: "The file is not a valid Aidoku source package.")
+        case .archiveTooLarge:
+            String(localized: "The Aidoku source package exceeds 64 MiB.")
+        case .expandedArchiveTooLarge:
+            String(localized: "The expanded Aidoku source package exceeds 256 MiB.")
+        case .tooManyArchiveEntries:
+            String(localized: "The Aidoku source package contains too many files.")
+        case .unsafeArchivePath(let path):
+            String(localized: "The source package contains an unsafe path: \(path)")
+        case .symbolicLink(let path):
+            String(localized: "The source package contains a symbolic link: \(path)")
+        case .missingPayload(let name):
+            String(localized: "The source package is missing Payload/\(name).")
+        case .invalidManifest:
+            String(localized: "The source package manifest is invalid.")
+        case .altStoreAppCatalog:
+            String(localized: "This URL is an AltStore app catalog for installing Aidoku, not an Aidoku source list containing .aix sources.")
+        case .invalidSourceID:
+            String(localized: "The source package has an unsafe source identifier.")
+        case .sourceIDMismatch(let expected, let actual):
+            String(localized: "The source identifier does not match (expected \(expected), found \(actual)).")
+        case .invalidWasm:
+            String(localized: "The source package does not contain a valid WebAssembly module.")
+        case .incompatibleSource(let reason):
+            String(localized: "The Aidoku source is incompatible: \(reason)")
+        case .unsupportedURL:
+            String(localized: "Only HTTP and HTTPS source URLs are supported.")
+        case .insecureTransportRequiresConfirmation:
+            String(localized: "This source uses HTTP or a local-network address and requires confirmation.")
+        case .responseTooLarge:
+            String(localized: "The source response is too large.")
+        case .timedOut:
+            String(localized: "The Aidoku source timed out.")
+        case .cancelled:
+            String(localized: "The Aidoku source operation was cancelled.")
+        case .sourceUnavailable:
+            String(localized: "The Aidoku source is not installed.")
+        case .malformedPostcard:
+            String(localized: "The Aidoku source returned malformed Postcard data.")
+        case .websiteVerificationRequired:
+            String(localized: "Website verification is required before this Aidoku source can continue.")
+        case .runtimeFailure(let message):
+            message
+        }
     }
 }
 
@@ -1968,7 +2023,7 @@ struct AidokuSourceSettingsSheet: View {
                 } label: {
                     Text(viewModel.sourceSettingListValues[id]?.isEmpty == false
                          ? viewModel.sourceSettingListValues[id]!.joined(separator: ", ")
-                         : "None")
+                         : String(localized: "None"))
                         .lineLimit(1)
                 }
                 .buttonStyle(.glass)
@@ -2056,7 +2111,7 @@ struct AidokuSourceSettingsSheet: View {
                 }
             }
         case .login(let configuration):
-            Button(configuration.title.isEmpty ? "Login" : configuration.title) { viewModel.login(configuration, source: source) }.buttonStyle(.glass)
+            Button(configuration.title.isEmpty ? String(localized: "Login") : configuration.title) { viewModel.login(configuration, source: source) }.buttonStyle(.glass)
         }
     }
 }
@@ -2115,7 +2170,7 @@ struct AidokuWebLoginSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(request.configuration.title.isEmpty ? "Web Login" : request.configuration.title).font(.title2.bold())
+                Text(request.configuration.title.isEmpty ? String(localized: "Web Login") : request.configuration.title).font(.title2.bold())
                 Spacer()
                 Button("Cancel") { viewModel.webLoginRequest = nil }.buttonStyle(.glass)
                 Button("Finish Login") { finish() }.buttonStyle(.glassProminent)
@@ -2846,7 +2901,7 @@ struct AidokuCoverView: View {
                 )
                 try Task.checkCancellation()
                 guard let loaded = NSImage(data: data) else {
-                    throw AidokuRuntimeError.runtimeFailure("Cached cover could not be decoded")
+                    throw AidokuRuntimeError.runtimeFailure(String(localized: "Cached cover could not be decoded"))
                 }
                 image = loaded
                 didFail = false
@@ -2921,7 +2976,7 @@ private struct AidokuMangaDetailView: View {
                                 onOpen(viewModel.prepareReading(source: source, manga: manga, initialChapterKey: chapter.key, profileID: activeProfileID))
                             } label: {
                                 HStack {
-                                    Text(chapter.title ?? chapter.chapterNumber.map { "Chapter \($0)" } ?? chapter.key)
+                                    Text(chapter.title ?? chapter.chapterNumber.map { String(localized: "Chapter \($0.formatted())") } ?? chapter.key)
                                     Spacer()
                                     if chapter.locked {
                                         Image(systemName: "lock.fill")

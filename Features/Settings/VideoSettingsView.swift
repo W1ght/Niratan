@@ -33,7 +33,13 @@ struct VideoSettingsView: View {
                     "Fast-forward Subtitle Gaps",
                     isOn: $userConfig.videoSubtitleGapFastForwardEnabled
                 )
-                NativeSettingsRow("Fast-forward Speed") {
+                NativeSettingsSeparator()
+                NativeSettingsRow {
+                    NativeSettingsSubtitledLabel(
+                        "Fast-forward Speed",
+                        subtitle: "Temporarily speeds through gaps between subtitle lines."
+                    )
+                } accessory: {
                     Text(String(format: "%.1fx", userConfig.videoSubtitleGapFastForwardSpeed))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -45,9 +51,7 @@ struct VideoSettingsView: View {
                     )
                     .labelsHidden()
                 }
-                Text("Temporarily speeds through gaps between subtitle lines.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .disabled(!userConfig.videoSubtitleGapFastForwardEnabled)
                 NativeSettingsSeparator()
                 NativeSettingsRow("Control Bar Layout") {
                     NativeGlassSegmentedPicker(
@@ -99,9 +103,17 @@ struct VideoSettingsView: View {
                 Text("Set to 0 to disable and clear Mining History.")
             }
 
+            NativeSettingsSectionCard("Media Servers") {
+                MediaServerAccountsList()
+            } footer: {
+                Text("Browse and play Jellyfin, Emby and Plex libraries from the video library. Access tokens are stored in macOS Keychain; playback progress is reported back to the server.")
+            }
+
             jimakuSection
             NativeSettingsSectionCard("OpenSubtitles") {
-                SubtitleSourceCredentialView(provider: .openSubtitles)
+                SubtitleSourceCredentialView(provider: .openSubtitles, style: .settingsRows)
+            } footer: {
+                Text("Use your own OpenSubtitles API key. It is stored in macOS Keychain and sent only to the official API. Downloads are subject to the service quota.")
             }
 
             subtitleAppearanceSection
@@ -179,21 +191,26 @@ struct VideoSettingsView: View {
                     .frame(maxWidth: 320)
                     .onSubmit(saveJimakuAPIKey)
 
-                Button("Save", action: saveJimakuAPIKey)
-                    .disabled(
-                        jimakuAPIKeyDraft
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                            .isEmpty
-                            || isJimakuCredentialOperationInProgress
-                    )
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button("Save", action: saveJimakuAPIKey)
+                            .disabled(
+                                jimakuAPIKeyDraft
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                    .isEmpty
+                                    || isJimakuCredentialOperationInProgress
+                            )
 
-                Button("Remove") {
-                    isShowingJimakuRemovalConfirmation = true
+                        Button("Remove", role: .destructive) {
+                            isShowingJimakuRemovalConfirmation = true
+                        }
+                        .disabled(
+                            !isJimakuAPIKeyStored
+                                || isJimakuCredentialOperationInProgress
+                        )
+                    }
                 }
-                .disabled(
-                    !isJimakuAPIKeyStored
-                        || isJimakuCredentialOperationInProgress
-                )
+                .buttonStyle(NativeSettingsActionButtonStyle())
             }
             NativeSettingsSeparator()
             NativeSettingsRow {

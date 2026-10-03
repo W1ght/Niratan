@@ -1,3 +1,4 @@
+// test-sources: Models/Sasayaki.swift Features/Sasayaki/SasayakiParser.swift Features/Sasayaki/SasayakiSRT.swift
 import Foundation
 
 @main

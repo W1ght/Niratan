@@ -10,6 +10,7 @@ import SwiftUI
 
 struct ShelfView: View {
     @Environment(UserConfig.self) var userConfig
+    @Environment(\.shelfCoverWidth) private var coverWidth
     @State private var isCollapsed: Bool
     @State private var compactRowCount = 4
     var viewModel: BookshelfViewModel
@@ -31,8 +32,8 @@ struct ShelfView: View {
     private var columns: [GridItem] {
         [GridItem(
             .adaptive(
-                minimum: BookshelfLayout.v050CoverWidth,
-                maximum: BookshelfLayout.v050CoverWidth
+                minimum: coverWidth,
+                maximum: coverWidth
             ),
             spacing: BookshelfLayout.columnSpacing
         )]
@@ -54,6 +55,7 @@ struct ShelfView: View {
         section: ShelfSection,
         showTitle: Bool = true,
         isSelecting: Bool = false,
+        allowsCollapse: Bool = true,
         selectedBooks: Binding<Set<BookMetadata>>,
         pendingLookup: Binding<String?>,
         pendingTab: Binding<Int?>,
@@ -67,7 +69,7 @@ struct ShelfView: View {
         self._pendingLookup = pendingLookup
         self._pendingTab = pendingTab
         self.onOpenBook = onOpenBook
-        self._isCollapsed = State(initialValue: !section.isReading)
+        self._isCollapsed = State(initialValue: allowsCollapse && !section.isReading)
     }
 
     var body: some View {
@@ -122,10 +124,13 @@ struct ShelfView: View {
                         let cell = BookCell(
                             book: book,
                             viewModel: viewModel,
-                            currentShelf: section.shelf?.name,
-                            hideMove: section.isReading,
+                            currentShelf: viewModel.shelfName(containing: book.id),
                             onSelect: {
-                                onOpenBook(book)
+                                if book.epub == nil {
+                                    viewModel.downloadBook(book, onOpen: onOpenBook)
+                                } else {
+                                    onOpenBook(book)
+                                }
                             },
                             onExport: { url in
                                 pendingExport = BookExportPresentation(bookID: book.id, fileURL: url)
@@ -133,16 +138,16 @@ struct ShelfView: View {
                             isSelecting: isSelecting,
                             selectedBooks: $selectedBooks,
                             presentedExportURL: exportBinding(for: book.id),
-                            dragCoordinateSpaceName: section.isReading ? nil : coordinateSpaceName,
-                            onDragChanged: section.isReading ? nil : { location in
+                            dragCoordinateSpaceName: section.allowsReordering ? coordinateSpaceName : nil,
+                            onDragChanged: section.allowsReordering ? { location in
                                 reorderBook(book.id, draggedTo: location)
-                            },
-                            onDragEnded: section.isReading ? nil : { location in
+                            } : nil,
+                            onDragEnded: section.allowsReordering ? { location in
                                 reorderBook(book.id, draggedTo: location)
                                 endDrag()
-                            }
+                            } : nil
                         )
-                        if section.isReading {
+                        if !section.allowsReordering {
                             cell
                         } else {
                             let visualState = bookDragVisualState(for: book.id)
@@ -216,7 +221,7 @@ struct ShelfView: View {
     }
 
     private func reorderBook(_ sourceID: UUID, draggedTo location: CGPoint) {
-        guard !section.isReading, !section.isGoogleDrive else { return }
+        guard section.allowsReordering else { return }
         beginDragIfNeeded(sourceID)
 
         guard let targetID = bookFrames.first(where: { id, frame in
@@ -276,6 +281,7 @@ private struct BookshelfBookFramePreferenceKey: PreferenceKey {
 }
 
 private struct DriveBookCell: View {
+    @Environment(\.shelfCoverWidth) private var coverWidth
     @State private var showDeleteConfirmation = false
     let book: BookMetadata
     let progress: Double
@@ -307,7 +313,7 @@ private struct DriveBookCell: View {
                 .frame(height: 40, alignment: .top)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: BookshelfLayout.v050CoverWidth)
+            .frame(width: coverWidth)
         }
         .buttonStyle(.plain)
         .contextMenu {

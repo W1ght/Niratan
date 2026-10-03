@@ -232,7 +232,15 @@ struct OnlineSubtitleBrowserView: View {
 }
 
 struct SubtitleSourceCredentialView: View {
+    enum Style {
+        /// Compact stack used inside the online subtitle browser.
+        case compact
+        /// Rows for a `NativeSettingsSectionCard` in Video Settings.
+        case settingsRows
+    }
+
     let provider: OnlineSubtitleProvider
+    var style: Style = .compact
     @State private var draft = ""
     @State private var stored = false
     @State private var busy = false
@@ -243,6 +251,65 @@ struct SubtitleSourceCredentialView: View {
     }
 
     var body: some View {
+        content
+            .task {
+                do { stored = try await store.hasAPIKey() }
+                catch { status = String(localized: "Unable to read subtitle credentials from Keychain.") }
+            }
+            .confirmationDialog("Remove Subtitle API Key?", isPresented: $confirmingRemoval) {
+                Button("Remove", role: .destructive) { remove() }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch style {
+        case .compact:
+            compactContent
+        case .settingsRows:
+            settingsRows
+        }
+    }
+
+    private var statusText: String {
+        status ?? (stored ? String(localized: "Saved in Keychain") : String(localized: "Not configured"))
+    }
+
+    private var apiKeyURL: URL {
+        URL(string: provider == .jimaku ? "https://jimaku.cc/account" : "https://www.opensubtitles.com/consumers")!
+    }
+
+    @ViewBuilder
+    private var settingsRows: some View {
+        NativeSettingsRow("API Key") {
+            SecureField("Enter a new API key", text: $draft)
+                .nativeSettingsTextField()
+                .frame(maxWidth: 320)
+                .onSubmit { if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { save() } }
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    Button("Save") { save() }
+                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || busy)
+                    Button("Remove", role: .destructive) { confirmingRemoval = true }
+                        .disabled(!stored || busy)
+                }
+            }
+            .buttonStyle(NativeSettingsActionButtonStyle())
+        }
+        NativeSettingsSeparator()
+        NativeSettingsRow {
+            Link("Get API Key", destination: apiKeyURL)
+        } accessory: {
+            if busy {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Text(statusText)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var compactContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(provider.rawValue).font(.headline)
             HStack {
@@ -251,20 +318,13 @@ struct SubtitleSourceCredentialView: View {
                 Button("Save") { save() }.disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || busy)
                 Button("Remove", role: .destructive) { confirmingRemoval = true }.disabled(!stored || busy)
             }
-            Text(status ?? (stored ? String(localized: "Saved in Keychain") : String(localized: "Not configured")))
+            Text(statusText)
                 .font(.caption).foregroundStyle(.secondary)
-            Link("Get API Key", destination: URL(string: provider == .jimaku ? "https://jimaku.cc/account" : "https://www.opensubtitles.com/consumers")!)
+            Link("Get API Key", destination: apiKeyURL)
             if provider == .openSubtitles {
                 Text("Use your own OpenSubtitles API key. It is stored in macOS Keychain and sent only to the official API. Downloads are subject to the service quota.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-        }
-        .task {
-            do { stored = try await store.hasAPIKey() }
-            catch { status = String(localized: "Unable to read subtitle credentials from Keychain.") }
-        }
-        .confirmationDialog("Remove Subtitle API Key?", isPresented: $confirmingRemoval) {
-            Button("Remove", role: .destructive) { remove() }
         }
     }
 

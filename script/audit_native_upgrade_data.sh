@@ -67,6 +67,7 @@ sidecar_names = {
     "bookmark.json",
     "bookinfo.json",
     "statistics.json",
+    "statistics_sessions.json",
     "sasayaki_match.json",
     "sasayaki_playback.json",
     "highlights.json",

@@ -1,3 +1,4 @@
+// test-sources: Core/Shortcuts/KeyboardShortcutBinding.swift Core/Shortcuts/SystemHotKeyRegistrar.swift
 import Carbon
 import Foundation
 import SwiftUI

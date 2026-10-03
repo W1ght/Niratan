@@ -1,3 +1,4 @@
+// test-sources: Features/Video/Subtitles/CatalogSubtitleStore.swift
 import Foundation
 
 private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

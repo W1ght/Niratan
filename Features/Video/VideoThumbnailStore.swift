@@ -69,7 +69,7 @@ nonisolated enum VideoThumbnailStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .mpvUnavailable(let message):
-            message ?? "The bundled video thumbnailer did not return an image."
+            message ?? String(localized: "The bundled video thumbnailer did not return an image.")
         }
     }
 }

@@ -1,6 +1,1602 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Enter the address shown in Fushi's interconnect settings, for example 192.168.1.10:38765.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enter the address shown in Fushi's interconnect settings, for example 192.168.1.10:38765."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请输入 Fushi 互联设置中显示的地址，例如 192.168.1.10:38765。"
+        }
+      }
+    }
+  },
+  "The address did not answer like a Fushi interconnect host.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The address did not answer like a Fushi interconnect host."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "该地址的响应不像 Fushi 互联主机。"
+        }
+      }
+    }
+  },
+  "Could not reach Fushi: %@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Could not reach Fushi: %@"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法连接 Fushi：%@"
+        }
+      }
+    }
+  },
+  "Fushi uses TLS but did not report its certificate fingerprint.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi uses TLS but did not report its certificate fingerprint."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 启用了 TLS，但没有提供证书指纹。"
+        }
+      }
+    }
+  },
+  "Fushi's certificate does not match the paired fingerprint. Pair again if the host certificate was regenerated.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi's certificate does not match the paired fingerprint. Pair again if the host certificate was regenerated."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 的证书与配对时记录的指纹不一致。如果主机证书已重新生成，请重新配对。"
+        }
+      }
+    }
+  },
+  "Pairing was declined on the Fushi device.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Pairing was declined on the Fushi device."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 设备拒绝了配对请求。"
+        }
+      }
+    }
+  },
+  "The pairing request expired. Try again.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The pairing request expired. Try again."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "配对请求已过期，请重试。"
+        }
+      }
+    }
+  },
+  "Fushi is not accepting pairing requests. Turn on hosting in Fushi's interconnect settings.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi is not accepting pairing requests. Turn on hosting in Fushi's interconnect settings."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 当前不接受配对请求。请在 Fushi 的互联设置中开启主机服务。"
+        }
+      }
+    }
+  },
+  "This Fushi version requires a newer pairing method.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This Fushi version requires a newer pairing method."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此版本的 Fushi 需要更新的配对方式。"
+        }
+      }
+    }
+  },
+  "The PIN was not accepted.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The PIN was not accepted."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "PIN 码不正确。"
+        }
+      }
+    }
+  },
+  "Too many wrong PINs. Wait 15 minutes before pairing again.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Too many wrong PINs. Wait 15 minutes before pairing again."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "PIN 码错误次数过多，请等待 15 分钟后再配对。"
+        }
+      }
+    }
+  },
+  "Fushi rejected Niratan's pairing. Pair again.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi rejected Niratan's pairing. Pair again."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 拒绝了 Niratan 的配对凭据，请重新配对。"
+        }
+      }
+    }
+  },
+  "Fushi returned HTTP %lld.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi returned HTTP %lld."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 返回了 HTTP %lld。"
+        }
+      }
+    }
+  },
+  "Fushi returned an unexpected response.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi returned an unexpected response."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 返回了无法识别的响应。"
+        }
+      }
+    }
+  },
+  "Could not save the pairing to the Keychain.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Could not save the pairing to the Keychain."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法将配对凭据保存到钥匙串。"
+        }
+      }
+    }
+  },
+  "Reading Progress Conflict": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Reading Progress Conflict"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "阅读进度冲突"
+        }
+      }
+    }
+  },
+  "Niratan and Fushi both moved since they last synced. Choose the position to keep; the other side is updated to match. Until you choose, neither side is changed.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Niratan and Fushi both moved since they last synced. Choose the position to keep; the other side is updated to match. Until you choose, neither side is changed."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "自上次同步以来，Niratan 和 Fushi 上的阅读位置都发生了变化。请选择要保留的位置，另一端会随之更新；在你做出选择之前，两端都不会被修改。"
+        }
+      }
+    }
+  },
+  "Decide Later": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Decide Later"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "稍后决定"
+        }
+      }
+    }
+  },
+  "This Mac": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This Mac"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "本机"
+        }
+      }
+    }
+  },
+  "Keep This Mac's Position": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Keep This Mac's Position"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "保留本机进度"
+        }
+      }
+    }
+  },
+  "Use Fushi's Position": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Use Fushi's Position"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "使用 Fushi 进度"
+        }
+      }
+    }
+  },
+  "%@ of the book": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@ of the book"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全书 %@"
+        }
+      }
+    }
+  },
+  "Updated %@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Updated %@"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "更新于 %@"
+        }
+      }
+    }
+  },
+  "Fushi Interconnect": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi Interconnect"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 互联"
+        }
+      }
+    }
+  },
+  "Syncs novel reading positions with a Fushi device on your network that has interconnect hosting turned on. Books are matched by title, so both sides need the same EPUB.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Syncs novel reading positions with a Fushi device on your network that has interconnect hosting turned on. Books are matched by title, so both sides need the same EPUB."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "与局域网中开启了互联主机服务的 Fushi 设备同步小说阅读位置。书籍按标题匹配，两端需要导入同一个 EPUB。"
+        }
+      }
+    }
+  },
+  "When both devices moved since the last sync, Niratan asks which position to keep instead of overwriting either one.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "When both devices moved since the last sync, Niratan asks which position to keep instead of overwriting either one."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "如果自上次同步后两台设备的阅读位置都有变化，Niratan 会询问保留哪一边，而不会直接覆盖任何一方。"
+        }
+      }
+    }
+  },
+  "Disconnect from Fushi?": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Disconnect from Fushi?"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "断开与 Fushi 的连接？"
+        }
+      }
+    }
+  },
+  "Disconnect": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Disconnect"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "断开连接"
+        }
+      }
+    }
+  },
+  "Niratan forgets the pairing. Reading positions on both devices stay as they are.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Niratan forgets the pairing. Reading positions on both devices stay as they are."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Niratan 会删除配对信息，两台设备上的阅读位置保持不变。"
+        }
+      }
+    }
+  },
+  "Unresolved Conflicts": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unresolved Conflicts"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "待解决的冲突"
+        }
+      }
+    }
+  },
+  "Postponed": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Postponed"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已推迟"
+        }
+      }
+    }
+  },
+  "Resolve…": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Resolve…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "解决…"
+        }
+      }
+    }
+  },
+  "Host": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Host"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "主机"
+        }
+      }
+    }
+  },
+  "Auto Sync Reading Progress": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Auto Sync Reading Progress"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "自动同步阅读进度"
+        }
+      }
+    }
+  },
+  "Syncs when a book opens and closes, while reading, and once at launch.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Syncs when a book opens and closes, while reading, and once at launch."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "打开或关闭书籍时、阅读过程中同步，并在启动时同步一次。"
+        }
+      }
+    }
+  },
+  "Sync All Books Now": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Sync All Books Now"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "立即同步所有书籍"
+        }
+      }
+    }
+  },
+  "Use": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Use"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "使用"
+        }
+      }
+    }
+  },
+  "Pair with Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Pair with Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "与 Fushi 配对"
+        }
+      }
+    }
+  },
+  "Connecting to Fushi…": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Connecting to Fushi…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在连接 Fushi…"
+        }
+      }
+    }
+  },
+  "Waiting for approval on %@… Accept the request in Fushi.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Waiting for approval on %@… Accept the request in Fushi."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在等待 %@ 确认…请在 Fushi 上接受配对请求。"
+        }
+      }
+    }
+  },
+  "PIN": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "PIN"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "PIN 码"
+        }
+      }
+    }
+  },
+  "Enter the 6-digit PIN shown on the Fushi device.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enter the 6-digit PIN shown on the Fushi device."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "输入 Fushi 设备上显示的 6 位 PIN 码。"
+        }
+      }
+    }
+  },
+  "Certificate": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Certificate"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "证书"
+        }
+      }
+    }
+  },
+  "Check that it matches the fingerprint shown in Fushi.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Check that it matches the fingerprint shown in Fushi."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请确认它与 Fushi 中显示的指纹一致。"
+        }
+      }
+    }
+  },
+  "%lld books matched on Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld books matched on Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 上匹配到 %lld 本书"
+        }
+      }
+    }
+  },
+  "%lld updated from Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld updated from Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 本从 Fushi 更新"
+        }
+      }
+    }
+  },
+  "%lld sent to Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld sent to Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 本已发送到 Fushi"
+        }
+      }
+    }
+  },
+  "%lld need a decision": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld need a decision"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 本需要你选择"
+        }
+      }
+    }
+  },
+  ", ": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": ", "
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "，"
+        }
+      }
+    }
+  },
+  "Updated %@ from Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Updated %@ from Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已从 Fushi 更新 %@ 的阅读进度"
+        }
+      }
+    }
+  },
+  "Sent %@'s position to Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Sent %@'s position to Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已将 %@ 的阅读进度发送到 Fushi"
+        }
+      }
+    }
+  },
+  "%@ is already synced with Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@ is already synced with Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@ 已与 Fushi 同步"
+        }
+      }
+    }
+  },
+  "Fushi has no novel titled %@. Add the same EPUB to Fushi to sync it.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi has no novel titled %@. Add the same EPUB to Fushi to sync it."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Fushi 中没有名为 %@ 的小说。请先把同一个 EPUB 导入 Fushi。"
+        }
+      }
+    }
+  },
+  "Pair with Fushi in Settings > Syncing first.": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Pair with Fushi in Settings > Syncing first."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请先在“设置 > 同步”中与 Fushi 配对。"
+        }
+      }
+    }
+  },
+  "Sync with Fushi failed: %@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Sync with Fushi failed: %@"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "与 Fushi 同步失败：%@"
+        }
+      }
+    }
+  },
+  "Sync with Fushi": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Sync with Fushi"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "与 Fushi 同步"
+        }
+      }
+    }
+  },
+    "Search Mining History" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search Mining History"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索挖卡历史"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋挖卡歷史"
+          }
+        }
+      }
+    },
+    "Search Transcript" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search Transcript"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索字幕列表"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋字幕列表"
+          }
+        }
+      }
+    },
+    "Align to Current Time" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Align to Current Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对齐到当前时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對齊到目前時間"
+          }
+        }
+      }
+    },
+    "Back to Current Line" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to Current Line"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到当前字幕"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到目前字幕"
+          }
+        }
+      }
+    },
+    "%lld Matches" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Match"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Matches"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 条结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 條結果"
+          }
+        }
+      }
+    },
+    "Chapter %lld of %lld" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chapter %1$lld of %2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 章，共 %2$lld 章"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 章，共 %2$lld 章"
+          }
+        }
+      }
+    },
+    "%lld Chapters" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Chapter"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Chapters"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个章节"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個章節"
+          }
+        }
+      }
+    },
+    "Chapter %lld" : {
+      "comment" : "Context: Video player study sidebar (Mining History, Transcript, Chapters).",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chapter %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 章"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 章"
+          }
+        }
+      }
+    },
+  "Cover Size": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Cover Size"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "封面大小"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "封面大小"
+        }
+      }
+    }
+  },
+  "Search Books": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Search Books"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "搜索书籍"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "搜尋書籍"
+        }
+      }
+    }
+  },
+  "Software Update": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Software Update"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "软件更新"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "軟體更新"
+        }
+      }
+    }
+  },
+  "Automatically Check for Updates": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Automatically Check for Updates"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "自动检查更新"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "自動檢查更新"
+        }
+      }
+    }
+  },
+  "Niratan checks the latest GitHub release once a day.": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Niratan checks the latest GitHub release once a day."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Niratan 每天检查一次 GitHub 上的最新版本。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Niratan 每天檢查一次 GitHub 上的最新版本。"
+        }
+      }
+    }
+  },
+  "Last checked: %@": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Last checked: %@"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "上次检查：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "上次檢查：%@"
+        }
+      }
+    }
+  },
+  "Checking for Updates...": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Checking for Updates..."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在检查更新…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在檢查更新…"
+        }
+      }
+    }
+  },
+  "Version %@ is available.": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Version %@ is available."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "有新版本 %@ 可用。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "有新版本 %@ 可用。"
+        }
+      }
+    }
+  },
+  "Not checked yet": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Not checked yet"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "尚未检查"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "尚未檢查"
+        }
+      }
+    }
+  },
+  "Check Now": {
+    "comment": "Context: Bookshelf toolbar (search, cover size) and Settings > About software update section.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Check Now"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "立即检查"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "立即檢查"
+        }
+      }
+    }
+  },
+  "All Books": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "All Books"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全部书籍"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全部書籍"
+        }
+      }
+    }
+  },
+  "All Manga": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "All Manga"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全部漫画"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全部漫畫"
+        }
+      }
+    }
+  },
+  "Currently Reading": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Currently Reading"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在阅读"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在閱讀"
+        }
+      }
+    }
+  },
+  "New Shelf": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "New Shelf"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "新建书架"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "新增書架"
+        }
+      }
+    }
+  },
+  "Delete shelf “%@”?": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Delete shelf “%@”?"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "删除书架“%@”？"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "刪除書架「%@」？"
+        }
+      }
+    }
+  },
+  "Everything on this shelf stays in the library.": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Everything on this shelf stays in the library."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "书架上的内容会保留在库中。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "書架上的內容會保留在庫中。"
+        }
+      }
+    }
+  },
+  "This Shelf Is Empty": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This Shelf Is Empty"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此书架为空"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此書架為空"
+        }
+      }
+    }
+  },
+  "Titles you've started but not finished appear here.": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Titles you've started but not finished appear here."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已开始但尚未读完的作品会显示在这里。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已開始但尚未讀完的作品會顯示在這裡。"
+        }
+      }
+    }
+  },
+  "Everything in the library is on a shelf.": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Everything in the library is on a shelf."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "库中的所有内容都已放入书架。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "庫中的所有內容都已放入書架。"
+        }
+      }
+    }
+  },
+  "Right-click a cover and choose Move, or use Select to move several at once.": {
+    "comment": "Context: Bookshelf and manga library shelf column. Shelves are created, renamed and deleted from the left column.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Right-click a cover and choose Move, or use Select to move several at once."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右键点按封面并选择“移动”，或使用“选择”一次移动多项。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "按右鍵點按封面並選擇「移動」，或使用「選擇」一次移動多項。"
+        }
+      }
+    }
+  },
+  "Grade": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "年级"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "年級"
+        }
+      }
+    }
+  },
+  "Strokes": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "笔画"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "筆畫"
+        }
+      }
+    }
+  },
   "All": {
     "localizations": {
       "en": {
@@ -1310,8 +2906,18 @@
     },
     "Continuous": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "连续滚动" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "連續捲動" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连续滚动"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "連續"
+          }
+        }
       }
     },
     "Double Page": {
@@ -1419,8 +3025,18 @@
     },
     "Next Page": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下一页" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "下一頁" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一页"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一頁"
+          }
+        }
       }
     },
     "Page Number": {
@@ -1461,8 +3077,18 @@
     },
     "Previous Page": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "上一页" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "上一頁" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一页"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一頁"
+          }
+        }
       }
     },
     "Reading Direction": {
@@ -1978,12 +3604,6 @@
         "zh-Hant": { "stringUnit": { "state": "translated", "value": "Niratan 只會將伺服器回傳的工作階段權杖存入鑰匙圈。密碼僅直接傳送至 HTTPS 伺服器，絕不儲存。" } }
       }
     },
-    "Page %lld": {
-      "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "第 %lld 页" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "第 %lld 頁" } }
-      }
-    },
     "Pages": {
       "localizations": {
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "页数" } },
@@ -2010,8 +3630,18 @@
     },
     "Series": {
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "系列" } },
-        "zh-Hant": { "stringUnit": { "state": "translated", "value": "系列" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Series"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系列"
+          }
+        }
       }
     },
     "Show Details": {
@@ -4902,6 +6532,108 @@
         }
       }
     },
+    "A-B Loop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AB 循环"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AB 循環"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動"
+          }
+        }
+      }
+    },
+    "Now Playing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在播放"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在播放"
+          }
+        }
+      }
+    },
+    "Picture": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "畫面"
+          }
+        }
+      }
+    },
+    "Picture Adjustments": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面调节"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "畫面調節"
+          }
+        }
+      }
+    },
+    "Playback Position": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback Position"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放位置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放位置"
+          }
+        }
+      }
+    },
     "Playback Speed": {
       "localizations": {
         "zh-Hans": {
@@ -6490,22 +8222,6 @@
         }
       }
     },
-    "Continuous": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连续滚动"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "連續"
-          }
-        }
-      }
-    },
     "Current: %lld / %lld": {
       "localizations": {
         "en": {
@@ -7474,22 +9190,38 @@
         }
       }
     },
-    "Light": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "轻量版"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "輕量版"
-          }
+  "Light": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "浅色"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "淺色"
         }
       }
-    },
+    }
+  },
+  "Links": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "链接"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "連結"
+        }
+      }
+    }
+  },
     "Line Height": {
       "localizations": {
         "zh-Hans": {
@@ -7874,6 +9606,184 @@
           "stringUnit": {
             "state": "translated",
             "value": "未連線"
+          }
+        }
+      }
+    },
+    "%lld of %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld 页"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld 頁"
+          }
+        }
+      }
+    },
+    "%lld sessions": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld session"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 次阅读"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 次閱讀"
+          }
+        }
+      }
+    },
+    "Count": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计数"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "計數"
+          }
+        }
+      }
+    },
+    "Delete Session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除此次阅读"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除此次閱讀"
+          }
+        }
+      }
+    },
+    "Delete This Session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除此次阅读"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除此次閱讀"
+          }
+        }
+      }
+    },
+    "Delete the selected reading session? This cannot be undone.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要删除所选的这次阅读记录吗？此操作无法撤销。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要刪除所選的這次閱讀記錄嗎？此操作無法復原。"
+          }
+        }
+      }
+    },
+    "Pages are counted for the current layout and window size, and are unavailable in continuous mode.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "页数按当前排版和窗口大小计算，连续滚动模式下不可用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "頁數依目前排版與視窗大小計算，連續捲動模式下無法使用。"
+          }
+        }
+      }
+    },
+    "Select a day to edit its reading sessions.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一天以编辑当天的阅读记录。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇一天以編輯當天的閱讀記錄。"
+          }
+        }
+      }
+    },
+    "Show Chapter Progress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示章节进度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示章節進度"
+          }
+        }
+      }
+    },
+    "Show Progress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示阅读进度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示閱讀進度"
           }
         }
       }
@@ -9586,38 +11496,6 @@
         }
       }
     },
-    "Previous Page": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "上一页"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "上一頁"
-          }
-        }
-      }
-    },
-    "Next Page": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下一页"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下一頁"
-          }
-        }
-      }
-    },
     "Click a shortcut, then press a single key or a key combination.": {
       "localizations": {
         "zh-Hans": {
@@ -9636,6 +11514,12 @@
     },
     "Previous Cue": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous Cue"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
@@ -9668,6 +11552,12 @@
     },
     "Next Cue": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Cue"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
@@ -9810,22 +11700,7 @@
         }
       }
     },
-    "Check for Updates": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "检查更新"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "檢查更新"
-          }
-        }
-      }
-    },
+    "Check for Updates": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Check for Updates"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"检查更新"}}}},
     "Update Available": {
       "localizations": {
         "zh-Hans": {
@@ -14876,22 +16751,6 @@
         }
       }
     },
-    "Series": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Series"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "系列"
-          }
-        }
-      }
-    },
     "Rule Field": {
       "localizations": {
         "en": {
@@ -15963,7 +17822,6 @@
     "Aidoku Library": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku Library"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 书库"}}}},
     "Aidoku Library Is Empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Aidoku Library Is Empty"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Aidoku 书库为空"}}}},
     "Source Unavailable": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Source Unavailable"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源不可用"}}}},
-    "Check for Updates": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Check for Updates"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"检查更新"}}}},
     "Uninstall": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Uninstall"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"卸载"}}}},
     "Remote Connector": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Remote Connector"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"远程连接器"}}}},
     "Allow Insecure Source Download?": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Allow Insecure Source Download?"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"允许不安全的图源下载？"}}}},
@@ -15984,7 +17842,28 @@
     "The website did not provide a new verification cookie.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The website did not provide a new verification cookie."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"网站未提供新的验证 Cookie。"}}}},
     "Website verification could not be saved. Try again.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Website verification could not be saved. Try again."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无法保存网站验证结果。请重试。"}}}},
     "Niratan could not determine the website user agent.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Niratan could not determine the website user agent."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Niratan 无法确定网站 User-Agent。"}}}},
-    "Website verification is required before this Aidoku source can continue.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Website verification is required before this Aidoku source can continue."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此 Aidoku 图源需要先完成网站验证才能继续。"}}}},
+    "Website verification is required before this Aidoku source can continue.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Website verification is required before this Aidoku source can continue."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 Aidoku 图源需要先完成网站验证才能继续。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要先完成網站驗證，此 Aidoku 來源才能繼續。"
+          }
+        }
+      }
+    },
     "The source did not provide a valid login URL.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"The source did not provide a valid login URL."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"图源未提供有效的登录地址。"}}}},
     "Range filters are sent when configured by the source.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Range filters are sent when configured by the source."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"范围筛选会按图源配置发送。"}}}},
     "Add List": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Add List"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"添加列表"}}}},
@@ -16083,7 +17962,4545 @@
     "No Jimaku Results": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Jimaku Results"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未找到 Jimaku 结果"}}}},
     "Try another title or content type.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Try another title or content type."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请尝试其他标题或内容类型。"}}}},
     "Search results will appear here.": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Search results will appear here."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"搜索结果会显示在这里。"}}}},
-    "No Supported Subtitles": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Supported Subtitles"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有受支持的字幕"}}}}
+    "No Supported Subtitles": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Supported Subtitles"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有受支持的字幕"}}}},
+  "Dismiss": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "关闭"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "關閉"
+        }
+      }
+    }
+  },
+  "Import EPUB": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "导入 EPUB"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "匯入 EPUB"
+        }
+      }
+    }
+  },
+  "Import an EPUB using the toolbar button to start reading.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "使用工具栏按钮导入 EPUB 后即可开始阅读。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "使用工具列按鈕匯入 EPUB 後即可開始閱讀。"
+        }
+      }
+    }
+  },
+  "Move to Shelf": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "移到书架"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "移到書架"
+        }
+      }
+    }
+  },
+  "Select Books": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "选择书籍"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "選擇書籍"
+        }
+      }
+    }
+  },
+  "Sort Books": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "书籍排序"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "書籍排序"
+        }
+      }
+    }
+  },
+  "Reading Speed": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "阅读速度"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "閱讀速度"
+        }
+      }
+    }
+  },
+  "Reading Time": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "阅读时间"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "閱讀時間"
+        }
+      }
+    }
+  },
+  "Characters Read": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已读字数"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已讀字數"
+        }
+      }
+    }
+  },
+  "Approximate Words Read": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已读词数（约）"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已讀詞數（約）"
+        }
+      }
+    }
+  },
+  "Time to finish Book": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "读完本书还需"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "讀完本書還需"
+        }
+      }
+    }
+  },
+  "Time to finish Chapter": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "读完本章还需"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "讀完本章還需"
+        }
+      }
+    }
+  },
+  "Start Tracking": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "开始计时"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "開始計時"
+        }
+      }
+    }
+  },
+  "Pause Tracking": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "暂停计时"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "暫停計時"
+        }
+      }
+    }
+  },
+  "Tracking": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "计时中"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "計時中"
+        }
+      }
+    }
+  },
+  "Paused": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已暂停"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已暫停"
+        }
+      }
+    }
+  },
+  "Book Progress": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "本书进度"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "本書進度"
+        }
+      }
+    }
+  },
+  "History": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "历史"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "歷史"
+        }
+      }
+    }
+  },
+  "Play": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "播放"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "播放"
+        }
+      }
+    }
+  },
+  "Pause": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "暂停"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "暫停"
+        }
+      }
+    }
+  },
+  "%d images": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%d 张图片"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%d 張圖片"
+        }
+      }
+    }
+  },
+  "Paragraph Mode": {
+    "comment": "Context: Settings > Appearance > Layout, paragraph (visual novel) reading mode.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Paragraph Mode"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "段落模式"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "段落模式"
+        }
+      }
+    }
+  },
+  "Text Animation": {
+    "comment": "Context: Settings > Appearance > Layout, paragraph (visual novel) reading mode.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Text Animation"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文字动画"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文字動畫"
+        }
+      }
+    }
+  },
+  "Text Speed": {
+    "comment": "Context: Settings > Appearance > Layout, paragraph (visual novel) reading mode.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Text Speed"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文字速度"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文字速度"
+        }
+      }
+    }
+  },
+  "%lld/s": {
+    "comment": "Context: Settings > Appearance > Layout, paragraph (visual novel) reading mode. Characters revealed per second.",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld/s"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 字/秒"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 字/秒"
+        }
+      }
+    }
+  },
+    "Advance": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Advance" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "前进" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "前進" } }
+      }
+    },
+    "Animate Double-Click Zoom": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Animate Double-Click Zoom" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "双击缩放时使用动画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "雙擊縮放時使用動畫" } }
+      }
+    },
+    "Apple Vision": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apple Vision" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Apple Vision" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Apple Vision" } }
+      }
+    },
+    "Apple text recognition is unavailable on this Mac.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apple text recognition is unavailable on this Mac." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此 Mac 无法使用 Apple 文字识别。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "此 Mac 無法使用 Apple 文字辨識。" } }
+      }
+    },
+    "Apply Changes To": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Apply Changes To" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "更改应用于" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "變更套用於" } }
+      }
+    },
+    "Auto-Scroll Speed": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Auto-Scroll Speed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动滚动速度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "自動捲動速度" } }
+      }
+    },
+    "Background": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Background" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "背景" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "背景" } }
+      }
+    },
+    "Black": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Black" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "黑色" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "黑色" } }
+      }
+    },
+    "Click Zones": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Click Zones" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "点击区域" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "點按區域" } }
+      }
+    },
+    "Color": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Color" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "颜色" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "顏色" } }
+      }
+    },
+    "Crop Borders": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Crop Borders" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "裁剪页边" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "裁切頁邊" } }
+      }
+    },
+    "Current Engine": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Current Engine" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前引擎" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "目前引擎" } }
+      }
+    },
+    "Custom Color Filter": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Custom Color Filter" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自定颜色滤镜" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "自訂顏色濾鏡" } }
+      }
+    },
+    "Customized for this manga. Click to use the global default.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Customized for this manga. Click to use the global default." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已为此漫画单独设置。点按以改用全局默认值。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已為此漫畫單獨設定。點按以改用全域預設值。" } }
+      }
+    },
+    "Default Zoom": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Default Zoom" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "默认缩放" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "預設縮放" } }
+      }
+    },
+    "Detect Long Strips Automatically": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Detect Long Strips Automatically" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动识别条漫" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "自動辨識條漫" } }
+      }
+    },
+    "Disable Zoom Out": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Disable Zoom Out" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "禁止缩小" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "禁止縮小" } }
+      }
+    },
+    "Disabled": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Disabled" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "停用" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "停用" } }
+      }
+    },
+    "Double-Click to Zoom": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Double-Click to Zoom" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "双击缩放" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "雙擊縮放" } }
+      }
+    },
+    "Download the OCR model in Reader Settings to recognize text.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Download the OCR model in Reader Settings to recognize text." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先在阅读器设置中下载 OCR 模型，再识别文字。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "請先在閱讀器設定中下載 OCR 模型，再辨識文字。" } }
+      }
+    },
+    "E-Ink Mode": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "E-Ink Mode" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "墨水屏模式" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "電子紙模式" } }
+      }
+    },
+    "Edge": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edge" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "边缘" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "邊緣" } }
+      }
+    },
+    "Engine": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Engine" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "引擎" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "引擎" } }
+      }
+    },
+    "Every setting customized for this manga will follow the global value again.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Every setting customized for this manga will follow the global value again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此漫画的所有单独设置都将恢复为跟随全局设置。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "此漫畫的所有單獨設定都將恢復為跟隨全域設定。" } }
+      }
+    },
+    "Fade": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fade" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "淡入淡出" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "淡入淡出" } }
+      }
+    },
+    "Filter Color": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Filter Color" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "滤镜颜色" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "濾鏡顏色" } }
+      }
+    },
+    "Filter Opacity": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Filter Opacity" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "滤镜不透明度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "濾鏡不透明度" } }
+      }
+    },
+    "Fit Height": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fit Height" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "适合高度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "符合高度" } }
+      }
+    },
+    "Fit Screen": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fit Screen" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "适合屏幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "符合螢幕" } }
+      }
+    },
+    "Fit Width": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fit Width" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "适合宽度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "符合寬度" } }
+      }
+    },
+    "Flash on Page Change": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Flash on Page Change" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "翻页时闪白" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "翻頁時閃白" } }
+      }
+    },
+    "Follow Appearance": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Follow Appearance" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跟随外观" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "跟隨外觀" } }
+      }
+    },
+    "Fushi's manga-tuned CTC recognizer. Fast and accurate for vertical and horizontal text.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fushi's manga-tuned CTC recognizer. Fast and accurate for vertical and horizontal text." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Fushi 使用的漫画专用 CTC 识别模型，横排、竖排文字都识别得快而准。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Fushi 使用的漫畫專用 CTC 辨識模型，橫排、直排文字都辨識得快而準。" } }
+      }
+    },
+    "General": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "General" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "通用" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "一般" } }
+      }
+    },
+    "Google Lens": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Google Lens" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Google Lens" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Google Lens" } }
+      }
+    },
+    "Gray": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Gray" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "灰色" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "灰色" } }
+      }
+    },
+    "Grayscale": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Grayscale" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "灰度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "灰階" } }
+      }
+    },
+    "Hide Interface": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hide Interface" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "隐藏界面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "隱藏介面" } }
+      }
+    },
+    "Hide Interface While Scrolling": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hide Interface While Scrolling" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "滚动时隐藏界面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "捲動時隱藏介面" } }
+      }
+    },
+    "Hold Shift while hovering to look up text at any time.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hold Shift while hovering to look up text at any time." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "悬停时按住 Shift 键可随时查词。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "懸停時按住 Shift 鍵可隨時查詞。" } }
+      }
+    },
+    "Installed · %@": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Installed · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已安装 · %@" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已安裝 · %@" } }
+      }
+    },
+    "Invert Colors": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Invert Colors" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "反转颜色" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "反轉顏色" } }
+      }
+    },
+    "Invert Horizontally": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Invert Horizontally" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "左右反转" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "左右反轉" } }
+      }
+    },
+    "Invert Vertically": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Invert Vertically" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "上下反转" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "上下反轉" } }
+      }
+    },
+    "Jump to Page…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Jump to Page…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跳转到页面…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "跳至頁面…" } }
+      }
+    },
+    "Keep Display Awake": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keep Display Awake" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保持屏幕常亮" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "保持螢幕常亮" } }
+      }
+    },
+    "Kindle-ish": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Kindle-ish" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Kindle 式" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Kindle 式" } }
+      }
+    },
+    "L-Shaped": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "L-Shaped" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "L 形" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "L 形" } }
+      }
+    },
+    "Left and Right": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Left and Right" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "左右" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "左右" } }
+      }
+    },
+    "Lets Apple Vision read each speech bubble separately for better accuracy.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Lets Apple Vision read each speech bubble separately for better accuracy." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "让 Apple Vision 逐个对白框识别，准确度更高。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "讓 Apple Vision 逐個對白框辨識，準確度更高。" } }
+      }
+    },
+    "Local text recognition failed.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Local text recognition failed." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本地文字识别失败。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "本機文字辨識失敗。" } }
+      }
+    },
+    "Long Strip": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Long Strip" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "长条" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "長條" } }
+      }
+    },
+    "Look Up on Hover": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Look Up on Hover" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "悬停查词" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "懸停查詞" } }
+      }
+    },
+    "Manga CTC (Fast)": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manga CTC (Fast)" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "漫画 CTC（快速）" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "漫畫 CTC（快速）" } }
+      }
+    },
+    "Manually": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manually" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "手动" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "手動" } }
+      }
+    },
+    "Match Page Background": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Match Page Background" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "匹配页面底色" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "配合頁面底色" } }
+      }
+    },
+    "Models are downloaded once from their pinned public sources and verified before use. Page images never leave this Mac with on-device engines.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Models are downloaded once from their pinned public sources and verified before use. Page images never leave this Mac with on-device engines." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "模型只需从固定版本的公开来源下载一次，使用前会校验。使用本地引擎时，页面图像不会离开这台 Mac。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "模型只需從固定版本的公開來源下載一次，使用前會校驗。使用本機引擎時，頁面影像不會離開這台 Mac。" } }
+      }
+    },
+    "No panels detected": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No panels detected" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未检测到分镜" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "未偵測到分鏡" } }
+      }
+    },
+    "Not downloaded · %@": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Not downloaded · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未下载 · %@" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "未下載 · %@" } }
+      }
+    },
+    "OCR": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "OCR" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "OCR" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "OCR" } }
+      }
+    },
+    "On-Device Models": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "On-Device Models" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本地模型" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "本機模型" } }
+      }
+    },
+    "Original Size": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Original Size" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "原始尺寸" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "原始尺寸" } }
+      }
+    },
+    "Page Animation": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Animation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "翻页动画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "翻頁動畫" } }
+      }
+    },
+    "Page Down": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Down" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向下翻页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向下翻頁" } }
+      }
+    },
+    "Page Gaps": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Gaps" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页面间距" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁面間距" } }
+      }
+    },
+    "Page Layout": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Layout" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页面布局" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁面佈局" } }
+      }
+    },
+    "Page Scaling": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Scaling" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "页面缩放方式" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "頁面縮放方式" } }
+      }
+    },
+    "Page Turning": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Turning" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "翻页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "翻頁" } }
+      }
+    },
+    "Page Up": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Page Up" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向上翻页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向上翻頁" } }
+      }
+    },
+    "Paged": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Paged" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分頁" } }
+      }
+    },
+    "Pages recognized by the current engine are recognized again. Embedded Mokuro text is not affected.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pages recognized by the current engine are recognized again. Embedded Mokuro text is not affected." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前引擎已识别的页面会重新识别。内嵌的 Mokuro 文字不受影响。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "目前引擎已辨識的頁面會重新辨識。內嵌的 Mokuro 文字不受影響。" } }
+      }
+    },
+    "Pan Down": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pan Down" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向下平移" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向下平移" } }
+      }
+    },
+    "Pan Left": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pan Left" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向左平移" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向左平移" } }
+      }
+    },
+    "Pan Right": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pan Right" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向右平移" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向右平移" } }
+      }
+    },
+    "Pan Up": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pan Up" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向上平移" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向上平移" } }
+      }
+    },
+    "Panel %lld / %lld": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Panel %lld / %lld" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分镜 %lld / %lld" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分鏡 %lld / %lld" } }
+      }
+    },
+    "Panel Detection Model": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Panel Detection Model" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分镜检测模型" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分鏡偵測模型" } }
+      }
+    },
+    "Panel Navigation": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Panel Navigation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分镜导航" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分鏡導覽" } }
+      }
+    },
+    "Panel detection failed": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Panel detection failed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分镜检测失败" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分鏡偵測失敗" } }
+      }
+    },
+    "Panel model unavailable": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Panel model unavailable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "分镜模型不可用" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "分鏡模型無法使用" } }
+      }
+    },
+    "Panel-by-Panel Navigation": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Panel-by-Panel Navigation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "逐格阅读" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "逐格閱讀" } }
+      }
+    },
+    "Re-run OCR": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Re-run OCR" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重新识别" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重新辨識" } }
+      }
+    },
+    "Re-run OCR on This Manga?": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Re-run OCR on This Manga?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "要重新识别这部漫画吗？" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "要重新辨識這部漫畫嗎？" } }
+      }
+    },
+    "Re-run OCR on This Manga…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Re-run OCR on This Manga…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重新识别这部漫画…" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "重新辨識這部漫畫…" } }
+      }
+    },
+    "Reader Settings": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reader Settings" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "阅读器设置" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "閱讀器設定" } }
+      }
+    },
+    "Reading Mode": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reading Mode" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "阅读模式" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "閱讀模式" } }
+      }
+    },
+    "Recognition": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recognition" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "识别" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "辨識" } }
+      }
+    },
+    "Recognize Pages": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recognize Pages" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "识别页面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "辨識頁面" } }
+      }
+    },
+    "Recognizes text on this Mac with Apple Vision. No download is required.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recognizes text on this Mac with Apple Vision. No download is required." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在这台 Mac 上用 Apple Vision 识别文字，无需下载。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "在這台 Mac 上用 Apple Vision 辨識文字，無需下載。" } }
+      }
+    },
+    "Recognizes text on this Mac with the downloaded model.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recognizes text on this Mac with the downloaded model." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在这台 Mac 上用已下载的模型识别文字。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "在這台 Mac 上用已下載的模型辨識文字。" } }
+      }
+    },
+    "Restore Global Defaults": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Restore Global Defaults" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "恢复全局默认" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "恢復全域預設" } }
+      }
+    },
+    "Restore Global Defaults?": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Restore Global Defaults?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "要恢复全局默认吗？" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "要恢復全域預設嗎？" } }
+      }
+    },
+    "Right and Left": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Right and Left" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "右左" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "右左" } }
+      }
+    },
+    "Rotate Wide Pages to Fit": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Rotate Wide Pages to Fit" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "旋转宽页以适合屏幕" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "旋轉寬頁以符合螢幕" } }
+      }
+    },
+    "Sends a reduced copy of each page to Google. Requires an internet connection and your confirmation.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sends a reduced copy of each page to Google. Requires an internet connection and your confirmation." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "会把每页的缩小副本发送给 Google。需要联网，并需要你确认。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "會把每頁的縮小副本傳送給 Google。需要連網，並需要你確認。" } }
+      }
+    },
+    "Settings Section": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Settings Section" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置分区" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "設定分區" } }
+      }
+    },
+    "Show Click Zones When Opening": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Click Zones When Opening" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开时显示点击区域" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟時顯示點按區域" } }
+      }
+    },
+    "Show Cover Alone": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Cover Alone" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "封面单独显示" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "封面單獨顯示" } }
+      }
+    },
+    "Show Interface": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Interface" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示界面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "顯示介面" } }
+      }
+    },
+    "Show Page Number When Interface Is Hidden": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Page Number When Interface Is Hidden" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "隐藏界面时显示页码" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "隱藏介面時顯示頁碼" } }
+      }
+    },
+    "Show Reading Mode When Opening": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Reading Mode When Opening" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开时显示阅读模式" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟時顯示閱讀模式" } }
+      }
+    },
+    "Show Recognized Text Regions": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Recognized Text Regions" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示识别出的文字区域" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "顯示辨識出的文字區域" } }
+      }
+    },
+    "Show Wide Pages Alone": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Wide Pages Alone" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "宽页单独显示" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "寬頁單獨顯示" } }
+      }
+    },
+    "Side Padding": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Side Padding" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "两侧留白" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "兩側留白" } }
+      }
+    },
+    "Slide": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Slide" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "滑动" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "滑動" } }
+      }
+    },
+    "Stretch": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stretch" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "拉伸" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "拉伸" } }
+      }
+    },
+    "Switch Reading Direction": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Switch Reading Direction" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "切换阅读方向" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "切換閱讀方向" } }
+      }
+    },
+    "Text Detector for Apple Vision": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text Detector for Apple Vision" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Apple Vision 文字检测器" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "Apple Vision 文字偵測器" } }
+      }
+    },
+    "Text Regions": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text Regions" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文字区域" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "文字區域" } }
+      }
+    },
+    "The OCR model download failed. Check your internet connection and try again.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The OCR model download failed. Check your internet connection and try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "OCR 模型下载失败。请检查网络连接后重试。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "OCR 模型下載失敗。請檢查網路連線後重試。" } }
+      }
+    },
+    "The classic manga-ocr model. Larger and slower; reads whole speech bubbles.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The classic manga-ocr model. Larger and slower; reads whole speech bubbles." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "经典的 manga-ocr 模型。体积更大、速度更慢，按整个对白框识别。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "經典的 manga-ocr 模型。體積更大、速度更慢，按整個對白框辨識。" } }
+      }
+    },
+    "The downloaded OCR model could not be verified (%@).": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The downloaded OCR model could not be verified (%@)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下载的 OCR 模型未通过校验（%@）。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "下載的 OCR 模型未通過校驗（%@）。" } }
+      }
+    },
+    "The local OCR models have not been downloaded.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The local OCR models have not been downloaded." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "尚未下载本地 OCR 模型。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "尚未下載本機 OCR 模型。" } }
+      }
+    },
+    "This Manga": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This Manga" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这部漫画" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "這部漫畫" } }
+      }
+    },
+    "This is the first page.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This is the first page." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已经是第一页。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已經是第一頁。" } }
+      }
+    },
+    "This is the last page.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This is the last page." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已经是最后一页。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已經是最後一頁。" } }
+      }
+    },
+    "Toggle Interface": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Toggle Interface" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示/隐藏界面" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "顯示/隱藏介面" } }
+      }
+    },
+    "Trained on the Manga109-s dataset (Matsui et al. 2017; Aizawa et al. 2020).": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Trained on the Manga109-s dataset (Matsui et al. 2017; Aizawa et al. 2020)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "使用 Manga109-s 数据集训练（Matsui et al. 2017；Aizawa et al. 2020）。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "使用 Manga109-s 資料集訓練（Matsui et al. 2017；Aizawa et al. 2020）。" } }
+      }
+    },
+    "Turn Page Left": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turn Page Left" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向左翻页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向左翻頁" } }
+      }
+    },
+    "Turn Page Right": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turn Page Right" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "向右翻页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "向右翻頁" } }
+      }
+    },
+    "Use Global Default": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Use Global Default" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "使用全局默认值" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "使用全域預設值" } }
+      }
+    },
+    "Uses a downloaded on-device model when available, otherwise Apple Vision. Never uploads pages.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Uses a downloaded on-device model when available, otherwise Apple Vision. Never uploads pages." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "有已下载的本地模型时使用本地模型，否则使用 Apple Vision。不会上传页面。" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "有已下載的本機模型時使用本機模型，否則使用 Apple Vision。不會上傳頁面。" } }
+      }
+    },
+    "Vertical Pages": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Vertical Pages" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "纵向分页" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "縱向分頁" } }
+      }
+    },
+    "When Opening": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "When Opening" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开时" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "開啟時" } }
+      }
+    },
+    "White": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "White" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "白色" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "白色" } }
+      }
+    },
+    "Zoom": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Zoom" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缩放" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "縮放" } }
+      }
+    },
+    "Zoom In": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Zoom In" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "放大" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "放大" } }
+      }
+    },
+    "Zoom Out": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Zoom Out" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缩小" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "縮小" } }
+      }
+    },
+    "Zoom Sensitivity": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Zoom Sensitivity" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缩放灵敏度" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "縮放靈敏度" } }
+      }
+    },
+    "manga-ocr": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "manga-ocr" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "manga-ocr" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "manga-ocr" } }
+      }
+    },
+  "Furigana": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "振假名"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "振假名"
+        }
+      }
+    }
+  },
+  "Show": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "显示"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "顯示"
+        }
+      }
+    }
+  },
+  "Dimmed": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "变淡"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "淡化"
+        }
+      }
+    }
+  },
+  "Tap to Reveal": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "点按显示"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "點按顯示"
+        }
+      }
+    }
+  },
+  "Hidden": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "隐藏"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "隱藏"
+        }
+      }
+    }
+  },
+  "AnkiConnect is not connected. Please start Anki and try again.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "AnkiConnect 未连接。请启动 Anki 后重试。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "AnkiConnect 未連線。請啟動 Anki 後重試。"
+        }
+      }
+    }
+  },
+  "No decks or models were returned from Anki.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Anki 没有返回任何牌组或笔记类型。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Anki 沒有傳回任何牌組或筆記類型。"
+        }
+      }
+    }
+  },
+  "Space": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "空格"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "空白鍵"
+        }
+      }
+    }
+  },
+  "A / Cross / B": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "A / 叉 / B"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "A / 叉 / B"
+        }
+      }
+    }
+  },
+  "B / Circle / A": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "B / 圆圈 / A"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "B / 圓圈 / A"
+        }
+      }
+    }
+  },
+  "X / Square / Y": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "X / 方块 / Y"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "X / 方塊 / Y"
+        }
+      }
+    }
+  },
+  "Y / Triangle / X": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Y / 三角 / X"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Y / 三角 / X"
+        }
+      }
+    }
+  },
+  "D-Pad ↑": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向键 ↑"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向鍵 ↑"
+        }
+      }
+    }
+  },
+  "D-Pad ↓": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向键 ↓"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向鍵 ↓"
+        }
+      }
+    }
+  },
+  "D-Pad ←": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向键 ←"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向鍵 ←"
+        }
+      }
+    }
+  },
+  "D-Pad →": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向键 →"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方向鍵 →"
+        }
+      }
+    }
+  },
+  "Menu / Options / +": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "菜单 / OPTIONS / +"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "選單 / OPTIONS / +"
+        }
+      }
+    }
+  },
+  "View / Share / -": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "视图 / 分享 / -"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "檢視 / 分享 / -"
+        }
+      }
+    }
+  },
+  "Share / Create / Capture": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分享 / CREATE / 截图"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分享 / CREATE / 擷取"
+        }
+      }
+    }
+  },
+  "Touchpad": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "触控板"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "觸控板"
+        }
+      }
+    }
+  },
+  "Paddle 1": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背键 1"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背鍵 1"
+        }
+      }
+    }
+  },
+  "Paddle 2": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背键 2"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背鍵 2"
+        }
+      }
+    }
+  },
+  "Paddle 3": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背键 3"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背鍵 3"
+        }
+      }
+    }
+  },
+  "Paddle 4": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背键 4"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "背鍵 4"
+        }
+      }
+    }
+  },
+  "Left Stick ↑": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左摇杆 ↑"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左搖桿 ↑"
+        }
+      }
+    }
+  },
+  "Left Stick ↓": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左摇杆 ↓"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左搖桿 ↓"
+        }
+      }
+    }
+  },
+  "Left Stick ←": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左摇杆 ←"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左搖桿 ←"
+        }
+      }
+    }
+  },
+  "Left Stick →": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左摇杆 →"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "左搖桿 →"
+        }
+      }
+    }
+  },
+  "Right Stick ↑": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右摇杆 ↑"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右搖桿 ↑"
+        }
+      }
+    }
+  },
+  "Right Stick ↓": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右摇杆 ↓"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右搖桿 ↓"
+        }
+      }
+    }
+  },
+  "Right Stick ←": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右摇杆 ←"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右搖桿 ←"
+        }
+      }
+    }
+  },
+  "Right Stick →": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右摇杆 →"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "右搖桿 →"
+        }
+      }
+    }
+  },
+  "View": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "视图"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "檢視"
+        }
+      }
+    }
+  },
+  "Menu": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "菜单"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "選單"
+        }
+      }
+    }
+  },
+  "Share": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分享"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分享"
+        }
+      }
+    }
+  },
+  "Cross": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "叉"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "叉"
+        }
+      }
+    }
+  },
+  "Circle": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "圆圈"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "圓圈"
+        }
+      }
+    }
+  },
+  "Square": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方块"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "方塊"
+        }
+      }
+    }
+  },
+  "Triangle": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "三角"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "三角"
+        }
+      }
+    }
+  },
+  "Share/Create": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分享/CREATE"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分享/CREATE"
+        }
+      }
+    }
+  },
+  "Capture": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "截图"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "擷取"
+        }
+      }
+    }
+  },
+  "Importing 1 / %lld...": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在导入 1 / %lld…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在匯入 1 / %lld…"
+        }
+      }
+    }
+  },
+  "Importing %lld / %lld...": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在导入 %1$lld / %2$lld…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在匯入 %1$lld / %2$lld…"
+        }
+      }
+    }
+  },
+  "Failed to import:\n%@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "导入失败：\n%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "匯入失敗：\n%@"
+        }
+      }
+    }
+  },
+  "Failed to fetch books from Google Drive: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法从 Google Drive 获取书籍：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法從 Google Drive 取得書籍：%@"
+        }
+      }
+    }
+  },
+  "Failed to import book from Google Drive: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法从 Google Drive 导入书籍：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法從 Google Drive 匯入書籍：%@"
+        }
+      }
+    }
+  },
+  "Failed to delete book from Google Drive: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法从 Google Drive 删除书籍：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法從 Google Drive 刪除書籍：%@"
+        }
+      }
+    }
+  },
+  "The download could not be completed.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "下载未能完成。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "下載未能完成。"
+        }
+      }
+    }
+  },
+  "Pull down to show keyboard": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "下拉以显示键盘"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "下拉以顯示鍵盤"
+        }
+      }
+    }
+  },
+  "Pull down to clear": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "下拉以清除"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "下拉以清除"
+        }
+      }
+    }
+  },
+  "Release to show keyboard": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "松开以显示键盘"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "放開以顯示鍵盤"
+        }
+      }
+    }
+  },
+  "Release to clear": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "松开以清除"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "放開以清除"
+        }
+      }
+    }
+  },
+  "Unable to save Aidoku credential": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法保存 Aidoku 凭据"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法儲存 Aidoku 憑證"
+        }
+      }
+    }
+  },
+  "Unable to remove Aidoku credentials": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法移除 Aidoku 凭据"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法移除 Aidoku 憑證"
+        }
+      }
+    }
+  },
+  "Enter a valid source list URL.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请输入有效的源列表 URL。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "請輸入有效的來源列表 URL。"
+        }
+      }
+    }
+  },
+  "The source rejected the login.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "该源拒绝了登录。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "該來源拒絕了登入。"
+        }
+      }
+    }
+  },
+  "The file is not a valid Aidoku source package.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "该文件不是有效的 Aidoku 源包。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "該檔案不是有效的 Aidoku 來源套件。"
+        }
+      }
+    }
+  },
+  "The Aidoku source package exceeds 64 MiB.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 源包超过 64 MiB。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 來源套件超過 64 MiB。"
+        }
+      }
+    }
+  },
+  "The expanded Aidoku source package exceeds 256 MiB.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "解压后的 Aidoku 源包超过 256 MiB。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "解壓縮後的 Aidoku 來源套件超過 256 MiB。"
+        }
+      }
+    }
+  },
+  "The Aidoku source package contains too many files.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 源包包含的文件过多。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 來源套件包含的檔案過多。"
+        }
+      }
+    }
+  },
+  "The source package contains an unsafe path: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源包包含不安全的路径：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源套件包含不安全的路徑：%@"
+        }
+      }
+    }
+  },
+  "The source package contains a symbolic link: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源包包含符号链接：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源套件包含符號連結：%@"
+        }
+      }
+    }
+  },
+  "The source package is missing Payload/%@.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源包缺少 Payload/%@。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源套件缺少 Payload/%@。"
+        }
+      }
+    }
+  },
+  "The source package manifest is invalid.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源包清单无效。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源套件資訊清單無效。"
+        }
+      }
+    }
+  },
+  "The source package has an unsafe source identifier.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源包的源标识符不安全。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源套件的來源識別碼不安全。"
+        }
+      }
+    }
+  },
+  "The source identifier does not match (expected %@, found %@).": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源标识符不匹配（应为 %1$@，实际为 %2$@）。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源識別碼不相符（應為 %1$@，實際為 %2$@）。"
+        }
+      }
+    }
+  },
+  "The source package does not contain a valid WebAssembly module.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源包不包含有效的 WebAssembly 模块。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源套件不包含有效的 WebAssembly 模組。"
+        }
+      }
+    }
+  },
+  "The Aidoku source is incompatible: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 源不兼容：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 來源不相容：%@"
+        }
+      }
+    }
+  },
+  "Only HTTP and HTTPS source URLs are supported.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "仅支持 HTTP 和 HTTPS 源 URL。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "僅支援 HTTP 與 HTTPS 來源 URL。"
+        }
+      }
+    }
+  },
+  "This source uses HTTP or a local-network address and requires confirmation.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "该源使用 HTTP 或局域网地址，需要确认。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "該來源使用 HTTP 或區域網路位址，需要確認。"
+        }
+      }
+    }
+  },
+  "The source response is too large.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "源返回的数据过大。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "來源回應的資料過大。"
+        }
+      }
+    }
+  },
+  "The Aidoku source timed out.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 源超时。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 來源逾時。"
+        }
+      }
+    }
+  },
+  "The Aidoku source operation was cancelled.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 源操作已取消。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 來源操作已取消。"
+        }
+      }
+    }
+  },
+  "The Aidoku source is not installed.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未安装该 Aidoku 源。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未安裝該 Aidoku 來源。"
+        }
+      }
+    }
+  },
+  "The Aidoku source returned malformed Postcard data.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 源返回了格式错误的 Postcard 数据。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Aidoku 來源傳回了格式錯誤的 Postcard 資料。"
+        }
+      }
+    }
+  },
+  "Choose an Aidoku .aix source package.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "选择 Aidoku .aix 源包。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "選擇 Aidoku .aix 來源套件。"
+        }
+      }
+    }
+  },
+  "Home": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "首页"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "首頁"
+        }
+      }
+    }
+  },
+  "Cached cover could not be decoded": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法解码缓存的封面"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法解碼快取的封面"
+        }
+      }
+    }
+  },
+  "Added to Anki.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已添加到 Anki。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已加入 Anki。"
+        }
+      }
+    }
+  },
+  "Already exists in Anki.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Anki 中已存在。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Anki 中已存在。"
+        }
+      }
+    }
+  },
+  "Configure Anki deck and model first.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请先配置 Anki 牌组和笔记类型。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "請先設定 Anki 牌組與筆記類型。"
+        }
+      }
+    }
+  },
+  "Failed to add card.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "添加卡片失败。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "加入卡片失敗。"
+        }
+      }
+    }
+  },
+  "Card Added": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已添加卡片"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已加入卡片"
+        }
+      }
+    }
+  },
+  "Duplicate Found": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "发现重复"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "發現重複"
+        }
+      }
+    }
+  },
+  "Add Failed": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "添加失败"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "加入失敗"
+        }
+      }
+    }
+  },
+  "Sent to Anki": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已发送到 Anki"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已傳送到 Anki"
+        }
+      }
+    }
+  },
+  "Play Audio": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "播放音频"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "播放音訊"
+        }
+      }
+    }
+  },
+  "Add to Anki": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "添加到 Anki"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "加入 Anki"
+        }
+      }
+    }
+  },
+  "No audio found": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未找到音频"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "找不到音訊"
+        }
+      }
+    }
+  },
+  "Average": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "平均"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "平均"
+        }
+      }
+    }
+  },
+  "Preparing card…": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在准备卡片…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在準備卡片…"
+        }
+      }
+    }
+  },
+  "Unknown error": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未知错误"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未知錯誤"
+        }
+      }
+    }
+  },
+  "Unable to prepare the card: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法准备卡片：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法準備卡片：%@"
+        }
+      }
+    }
+  },
+  "Unable to add card.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法添加卡片。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法加入卡片。"
+        }
+      }
+    }
+  },
+  "Importing...": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在导入…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在匯入…"
+        }
+      }
+    }
+  },
+  "Exporting...": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在导出…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在匯出…"
+        }
+      }
+    }
+  },
+  "Exporting %lld/%lld": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在导出 %1$lld/%2$lld"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在匯出 %1$lld/%2$lld"
+        }
+      }
+    }
+  },
+  "Google did not return a refresh token\nPlease try connecting again": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Google 没有返回刷新令牌\n请重新连接"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Google 沒有傳回重新整理權杖\n請重新連線"
+        }
+      }
+    }
+  },
+  "No Internet connection.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "没有网络连接。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "沒有網路連線。"
+        }
+      }
+    }
+  },
+  "Request failed with status %lld": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请求失败，状态码 %lld"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "請求失敗，狀態碼 %lld"
+        }
+      }
+    }
+  },
+  "Unable to initialize video playback.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法初始化视频播放。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法初始化影片播放。"
+        }
+      }
+    }
+  },
+  "Unable to capture the video frame.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法截取视频帧。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法擷取影片影格。"
+        }
+      }
+    }
+  },
+  "Unable to determine the video source for animated AVIF capture.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法确定用于动态 AVIF 截取的视频源。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法確定用於動態 AVIF 擷取的影片來源。"
+        }
+      }
+    }
+  },
+  "The bundled animated AVIF encoder could not export this subtitle range.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "内置的动态 AVIF 编码器无法导出此字幕区间。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "內建的動態 AVIF 編碼器無法匯出此字幕區間。"
+        }
+      }
+    }
+  },
+  "Unable to determine the video audio range.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法确定视频的音频区间。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法確定影片的音訊區間。"
+        }
+      }
+    }
+  },
+  "The bundled audio encoder could not export this subtitle range.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "内置的音频编码器无法导出此字幕区间。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "內建的音訊編碼器無法匯出此字幕區間。"
+        }
+      }
+    }
+  },
+  "%lld px": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld px"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld px"
+        }
+      }
+    }
+  },
+  "The bundled video thumbnailer did not return an image.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "内置的视频缩略图生成器没有返回图像。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "內建的影片縮圖產生器沒有傳回影像。"
+        }
+      }
+    }
+  },
+  "Unsupported subtitle format.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "不支持的字幕格式。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "不支援的字幕格式。"
+        }
+      }
+    }
+  },
+  "No valid subtitle cues were found.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未找到有效的字幕条目。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "找不到有效的字幕條目。"
+        }
+      }
+    }
+  },
+  "Loading Google Drive Books...": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在加载 Google Drive 书籍…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在載入 Google Drive 書籍…"
+        }
+      }
+    }
+  },
+  "App": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "应用"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "App"
+        }
+      }
+    }
+  },
+  "Create": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "创建"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "建立"
+        }
+      }
+    }
+  },
+  "Two-Column Layout": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "双栏布局"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "雙欄版面"
+        }
+      }
+    }
+  },
+  "Mute": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "静音"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "靜音"
+        }
+      }
+    }
+  },
+  "Unmute": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "取消静音"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "取消靜音"
+        }
+      }
+    }
+  },
+  "Word count": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "单词数"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "單字數"
+        }
+      }
+    }
+  },
+  "Please enter a valid word count": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请输入有效的单词数"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "請輸入有效的單字數"
+        }
+      }
+    }
+  },
+  "Delete Local Copy": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "删除本地副本"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "刪除本機副本"
+        }
+      }
+    }
+  },
+  "Delete Everywhere": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在所有设备上删除"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在所有裝置上刪除"
+        }
+      }
+    }
+  },
+  "Deleting everywhere removes the book from Google Drive and your other devices. Reading statistics are kept.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在所有设备上删除会将这本书从 Google Drive 和你的其他设备中移除，阅读统计会保留。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在所有裝置上刪除會將這本書從 Google Drive 和你的其他裝置中移除，閱讀統計會保留。"
+        }
+      }
+    }
+  },
+  "Stored on Google Drive. Open to download.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "存储在 Google Drive 中，打开时下载。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "儲存在 Google Drive 中，開啟時下載。"
+        }
+      }
+    }
+  },
+  "Turn on Google Drive sync in Settings to download this book.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请在设置中开启 Google Drive 同步后再下载这本书。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "請在設定中開啟 Google Drive 同步後再下載這本書。"
+        }
+      }
+    }
+  },
+  "Syncs your whole library between Niratan devices: books, covers, reading positions, statistics, highlights, shelves and Sasayaki data.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在多台 Niratan 设备之间同步整个书库：书籍、封面、阅读位置、统计、高亮、书架和 Sasayaki 数据。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在多台 Niratan 裝置之間同步整個書庫：書籍、封面、閱讀位置、統計、螢光標記、書架與 Sasayaki 資料。"
+        }
+      }
+    }
+  },
+  "Sync bookmarks and statistics with ッツ Reader per book via Google Drive.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "通过 Google Drive 按书与 ッツ Reader 同步书签和统计。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "透過 Google Drive 逐本與 ッツ Reader 同步書籤與統計。"
+        }
+      }
+    }
+  },
+  "Syncing…": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在同步…"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在同步…"
+        }
+      }
+    }
+  },
+  "Queue": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "队列"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "佇列"
+        }
+      }
+    }
+  },
+  "%lld failed": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 项失败"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%lld 項失敗"
+        }
+      }
+    }
+  },
+  "Empty": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "空"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "空"
+        }
+      }
+    }
+  },
+  "Sync Now": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "立即同步"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "立即同步"
+        }
+      }
+    }
+  },
+  "Books stored only on Google Drive appear on the shelf with a cloud badge and download when opened. Syncs every two minutes while Niratan is active.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "仅存储在 Google Drive 中的书会带云朵标记显示在书架上，打开时下载。Niratan 处于活跃状态时每两分钟同步一次。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "僅儲存在 Google Drive 中的書會帶雲朵標記顯示在書架上，開啟時下載。Niratan 處於使用中時每兩分鐘同步一次。"
+        }
+      }
+    }
+  },
+  "All Books Synced": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "所有书籍均已同步"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "所有書籍皆已同步"
+        }
+      }
+    }
+  },
+  "This book was deleted.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "这本书已被删除。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "這本書已被刪除。"
+        }
+      }
+    }
+  },
+  "This book has not been uploaded yet.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "这本书尚未上传。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "這本書尚未上傳。"
+        }
+      }
+    }
+  },
+  "%@ is missing from Google Drive.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Google Drive 中缺少 %@。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Google Drive 中缺少 %@。"
+        }
+      }
+    }
+  },
+  "Unsupported sync format.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "不支持的同步格式。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "不支援的同步格式。"
+        }
+      }
+    }
+  },
+  "Provider": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "同步方式"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "同步方式"
+        }
+      }
+    }
+  },
+  "Last Sync": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "上次同步"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "上次同步"
+        }
+      }
+    }
+  },
+    "Enter a valid server address, such as http://192.168.1.10:8096." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入有效的服务器地址，例如 http://192.168.1.10:8096。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請輸入有效的伺服器位址，例如 http://192.168.1.10:8096。"
+          }
+        }
+      }
+    },
+    "Unable to reach the server: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接服务器：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法連線伺服器：%@"
+          }
+        }
+      }
+    },
+    "The username or password is incorrect." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名或密码不正确。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用者名稱或密碼不正確。"
+          }
+        }
+      }
+    },
+    "This Plex account uses two-step verification. Sign in with the browser instead." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Plex 账号开启了两步验证，请改用浏览器登录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Plex 帳號啟用了兩步驟驗證，請改用瀏覽器登入。"
+          }
+        }
+      }
+    },
+    "The server rejected the saved sign-in. Sign in to this server again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器拒绝了已保存的登录信息，请重新登录此服务器。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器拒絕了已儲存的登入資訊，請重新登入此伺服器。"
+          }
+        }
+      }
+    },
+    "The sign-in for this server is missing. Sign in to this server again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到此服务器的登录信息，请重新登录此服务器。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到此伺服器的登入資訊，請重新登入此伺服器。"
+          }
+        }
+      }
+    },
+    "This media server is no longer signed in." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此媒体服务器已退出登录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此媒體伺服器已登出。"
+          }
+        }
+      }
+    },
+    "The server returned HTTP %lld." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器返回了 HTTP %lld。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器傳回了 HTTP %lld。"
+          }
+        }
+      }
+    },
+    "The server returned an unexpected response." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器返回了无法识别的响应。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器傳回了無法辨識的回應。"
+          }
+        }
+      }
+    },
+    "This item has no playable video." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此条目没有可播放的视频。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此項目沒有可播放的影片。"
+          }
+        }
+      }
+    },
+    "No Plex Media Server was found for this account." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此账号下没有找到 Plex Media Server。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此帳號下找不到 Plex Media Server。"
+          }
+        }
+      }
+    },
+    "Sign-in was cancelled." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录已取消。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入已取消。"
+          }
+        }
+      }
+    },
+    "Sign-in timed out. Try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录超时，请重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入逾時，請重試。"
+          }
+        }
+      }
+    },
+    "Date Added" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加日期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入日期"
+          }
+        }
+      }
+    },
+    "Release Date" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发行日期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "發行日期"
+          }
+        }
+      }
+    },
+    "Rating" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "评分"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "評分"
+          }
+        }
+      }
+    },
+    "Original (%@p)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原画（%@p）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原畫（%@p）"
+          }
+        }
+      }
+    },
+    "Original" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原画"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原畫"
+          }
+        }
+      }
+    },
+    "Media Server" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒体服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒體伺服器"
+          }
+        }
+      }
+    },
+    "Streaming Quality" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "串流画质"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "串流畫質"
+          }
+        }
+      }
+    },
+    "Add Media Server" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加媒体服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入媒體伺服器"
+          }
+        }
+      }
+    },
+    "Add Media Server…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加媒体服务器…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入媒體伺服器…"
+          }
+        }
+      }
+    },
+    "Sign In Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登入"
+          }
+        }
+      }
+    },
+    "Sign In Again…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登录…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登入…"
+          }
+        }
+      }
+    },
+    "Server Type" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器类型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伺服器類型"
+          }
+        }
+      }
+    },
+    "Jellyfin / Emby" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jellyfin / Emby"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jellyfin / Emby"
+          }
+        }
+      }
+    },
+    "Sign In With" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录方式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入方式"
+          }
+        }
+      }
+    },
+    "Plex Account" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plex 账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plex 帳號"
+          }
+        }
+      }
+    },
+    "Plex Token" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plex 令牌"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plex 權杖"
+          }
+        }
+      }
+    },
+    "Access Token" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "访问令牌"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存取權杖"
+          }
+        }
+      }
+    },
+    "Email or Username" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "邮箱或用户名"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "電子郵件或使用者名稱"
+          }
+        }
+      }
+    },
+    "Sign In with Browser…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在浏览器中登录…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在瀏覽器中登入…"
+          }
+        }
+      }
+    },
+    "Waiting for Browser…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待浏览器…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待瀏覽器…"
+          }
+        }
+      }
+    },
+    "Signing In…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在登录…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在登入…"
+          }
+        }
+      }
+    },
+    "Sign In" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入"
+          }
+        }
+      }
+    },
+    "Signs in with your plex.tv account. Leave the address empty to use the first server of the account." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 plex.tv 账号登录。地址留空时使用该账号下的第一台服务器。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 plex.tv 帳號登入。位址留空時使用該帳號下的第一台伺服器。"
+          }
+        }
+      }
+    },
+    "A Plex token can be left empty for servers that allow access without sign-in on the local network." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果服务器允许局域网内免登录访问，可以不填 Plex 令牌。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果伺服器允許區域網路內免登入存取，可以不填 Plex 權杖。"
+          }
+        }
+      }
+    },
+    "The password is sent only to this server. Niratan keeps the returned access token in macOS Keychain." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码只会发送给这台服务器。Niratan 会把服务器返回的访问令牌保存在 macOS 钥匙串中。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密碼只會傳送給這台伺服器。Niratan 會把伺服器傳回的存取權杖儲存在 macOS 鑰匙圈中。"
+          }
+        }
+      }
+    },
+    "Use a user access token. Server API keys are not tied to a user and cannot list libraries." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请使用用户访问令牌。服务器 API 密钥不属于任何用户，无法列出媒体库。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請使用使用者存取權杖。伺服器 API 金鑰不屬於任何使用者，無法列出媒體庫。"
+          }
+        }
+      }
+    },
+    "No media servers" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有媒体服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有媒體伺服器"
+          }
+        }
+      }
+    },
+    "Remove Media Server?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除媒体服务器？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除媒體伺服器？"
+          }
+        }
+      }
+    },
+    "Niratan signs out of %@. Media on the server is not changed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niratan 将退出 %@ 的登录，服务器上的媒体不会有任何改动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niratan 將登出 %@，伺服器上的媒體不會有任何變動。"
+          }
+        }
+      }
+    },
+    "Unable to Load Server" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法載入伺服器"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重試"
+          }
+        }
+      }
+    },
+    "Search Results" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋結果"
+          }
+        }
+      }
+    },
+    "Libraries" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒体库"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒體庫"
+          }
+        }
+      }
+    },
+    "No Video Libraries" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有视频媒体库"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有影片媒體庫"
+          }
+        }
+      }
+    },
+    "This account has no movie or TV libraries." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此账号没有电影或剧集媒体库。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此帳號沒有電影或影集媒體庫。"
+          }
+        }
+      }
+    },
+    "Recently Added in %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 最近添加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 最近加入"
+          }
+        }
+      }
+    },
+    "Show All" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示全部"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示全部"
+          }
+        }
+      }
+    },
+    "Nothing Here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这里没有内容"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這裡沒有內容"
+          }
+        }
+      }
+    },
+    "Search Failed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋失敗"
+          }
+        }
+      }
+    },
+    "Season" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "季"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "季"
+          }
+        }
+      }
+    },
+    "%lld episodes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 集"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 集"
+          }
+        }
+      }
+    },
+    "Resume %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续播放 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續播放 %@"
+          }
+        }
+      }
+    },
+    "Play %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放 %@"
+          }
+        }
+      }
+    },
+    "%lld items" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 项"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項"
+          }
+        }
+      }
+    },
+    "Mark as Unwatched" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为未看"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為未看"
+          }
+        }
+      }
+    },
+    "Open in Browser" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在浏览器中打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在瀏覽器中打開"
+          }
+        }
+      }
+    },
+    "Search Server" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋伺服器"
+          }
+        }
+      }
+    },
+    "Media Servers" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒体服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒體伺服器"
+          }
+        }
+      }
+    },
+    "Browse and play Jellyfin, Emby and Plex libraries from the video library. Access tokens are stored in macOS Keychain; playback progress is reported back to the server." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在视频库中浏览并播放 Jellyfin、Emby 和 Plex 媒体库。访问令牌保存在 macOS 钥匙串中，播放进度会同步回服务器。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在影片庫中瀏覽並播放 Jellyfin、Emby 和 Plex 媒體庫。存取權杖儲存在 macOS 鑰匙圈中，播放進度會同步回伺服器。"
+          }
+        }
+      }
+    }
   },
   "version": "1.0"
 }

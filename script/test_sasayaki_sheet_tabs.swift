@@ -18,7 +18,7 @@ let model = try read("Models/Sasayaki.swift")
 let metadata = try read("Features/Sasayaki/SasayakiAudiobookMetadata.swift")
 
 require(
-    goTo.contains("@State private var selectedTab: ReaderGoToTab = .chapters"),
+    goTo.contains("var selectedTab: ReaderGoToTab = .chapters"),
     "Reader Go To should default to Chapters"
 )
 require(
@@ -26,8 +26,8 @@ require(
     "Sasayaki should expose Resources, Chapters and Settings tabs"
 )
 require(
-    sheet.contains("NativeGlassSegmentedPicker("),
-    "Sasayaki should use the shared Liquid Glass segmented picker"
+    sheet.contains("NativeReaderInspectorTabBar("),
+    "Sasayaki should switch tabs with the shared side-panel tab bar"
 )
 require(
     sheet.contains("player.seekToAudiobookChapter(chapter)"),

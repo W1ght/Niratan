@@ -1,3 +1,4 @@
+// test-sources: Models/Anki.swift Features/Video/VideoMiningMediaStore.swift Core/AnkiMediaProcessor.swift
 import AppKit
 import Foundation
 import ImageIO

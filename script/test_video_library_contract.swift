@@ -23,6 +23,12 @@ private let remoteSource = try source("Features/Video/Remote/RemoteVideoSource.s
 private let thumbnailStore = try? source("Features/Video/VideoThumbnailStore.swift")
 private let viewModel = try source("Features/Video/VideoLibraryViewModel.swift")
 private let playerScreen = try source("Features/Video/VideoPlayerScreen.swift")
+    + source("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + source("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + source("Features/Video/VideoPlayerScreen+OSD.swift")
+    + source("Features/Video/VideoPlayerScreen+Mining.swift")
+    + source("Features/Video/VideoPlayerScreen+Opening.swift")
+    + source("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 private let buildScript = try source("script/build_and_run_native.sh")
 private let manualFixtureScript = try? source("script/verify_video_library_manual_fixture.sh")
 
@@ -62,7 +68,7 @@ require(
     detailView.contains("let onOpenVideo: (VideoPlaybackSource, URL?, Bool) -> Void")
         && detailView.contains("let onOpenRemoteVideo: (RemoteVideoWindowOpenRequest) -> Void")
         && rootView.contains("startsFromBeginning: Bool")
-        && rootView.contains("private func openRemoteVideoWindow(_ request: RemoteVideoWindowOpenRequest)")
+        && rootView.contains("func openRemoteVideoWindow(_ request: RemoteVideoWindowOpenRequest)")
         && rootView.contains("VideoWindowPresenter.shared.open(")
         && rootView.contains("subtitleURL: subtitleURL")
         && rootView.contains("startsFromBeginning: startsFromBeginning")
@@ -197,44 +203,45 @@ for key in [
 
 let libraryView = try source("Features/Video/VideoLibraryView.swift")
 require(
-    libraryView.contains("@State private var pendingResolvedRemoteSource: ResolvedRemoteVideoSource?")
+    libraryView.contains("var pendingResolvedRemoteSource: ResolvedRemoteVideoSource?")
         && libraryView.contains("isPresented: $isAddingLink,")
         && libraryView.contains("onDismiss: openResolvedRemoteSourceAfterSheetDismissal")
         && libraryView.contains("pendingResolvedRemoteSource = resolvedSource")
-        && libraryView.contains("private func openResolvedRemoteSourceAfterSheetDismissal()")
+        && libraryView.contains("func openResolvedRemoteSourceAfterSheetDismissal()")
         && libraryView.contains("onOpenVideo(.remoteStream(resolvedSource), nil, false)"),
     "Add Link should finish dismissing its sheet before ordering the dedicated player window"
 )
 if let contentRange = libraryView.range(of: "private var content: some View"),
-   let contentEnd = libraryView[contentRange.lowerBound...].range(of: "private var libraryContent: some View")?.lowerBound {
+   let contentEnd = libraryView[contentRange.lowerBound...].range(of: "private func libraryContent(sections: [VideoLibrarySection]) -> some View")?.lowerBound {
     let contentBlock = libraryView[contentRange.lowerBound..<contentEnd]
     require(
-        contentBlock.contains("VideoLibrarySidebarView(")
-            && contentBlock.contains("viewModel: viewModel")
-            && contentBlock.contains("VideoLibraryContentTitleBar(viewModel: viewModel)")
-            && contentBlock.contains(".frame(width: 240)")
+        contentBlock.contains("let sections = viewModel.sections()")
+            && contentBlock.contains("VideoLibrarySidebarView(")
+            && contentBlock.contains("viewModel: viewModel,")
+            && contentBlock.contains("mediaServers: mediaServers.accounts,")
+            && contentBlock.contains("MediaServerBrowserView(")
+            && contentBlock.contains(".frame(width: LibraryShelfLayout.sidebarWidth(for: availableContentWidth))")
+            && contentBlock.contains("VideoLibraryContentHeader(")
+            && contentBlock.contains("libraryContent(sections: sections)")
             && contentBlock.contains("NativeGlassPageBackground()")
-            && !contentBlock.contains("VideoLibraryToolbarControls(viewModel: viewModel)")
-            && !contentBlock.contains("VideoLibraryContentToolbar(viewModel: viewModel)")
+            && !contentBlock.contains("VideoLibraryContentTitleBar")
+            && !contentBlock.contains(".frame(width: 240)")
             && !contentBlock.contains("onAddFolder: presentFolderImporter")
-            && !contentBlock.contains("isReadyForSourceActions: isReadyForSourceActions")
             && !contentBlock.contains("ContentUnavailableView")
             && !contentBlock.contains("viewModel.isSelectingFolder = true"),
-        "Video library shell should render a Settings-style secondary sidebar without a hard divider or top-level import prompt"
+        "Video library shell should share the Bookshelf shelf-column width and compute sections once for the header and content"
     )
 } else {
     require(false, "Video library content shell should be present before libraryContent")
 }
 require(
-    libraryView.contains("VideoLibrarySidebarView(")
-        && libraryView.contains("viewModel: viewModel")
-        && libraryView.contains("@State private var isReadyForSourceActions = false")
-        && libraryView.contains("@State private var isManagingSources = false")
+    libraryView.contains("var isReadyForSourceActions = false")
+        && libraryView.contains("var isManagingSources = false")
         && libraryView.contains("armSourceActions()")
         && libraryView.contains("onAddFolder: presentFolderImporter")
         && libraryView.contains("onManageSources: { isManagingSources = true }")
         && libraryView.contains(".sheet(isPresented: $isManagingSources)")
-        && libraryView.contains("private func presentFolderImporter()")
+        && libraryView.contains("func presentFolderImporter()")
         && libraryView.contains("guard isReadyForSourceActions else { return }")
         && libraryView.contains("NSOpenPanel()")
         && libraryView.contains("panel.canChooseDirectories = true")
@@ -243,65 +250,60 @@ require(
         && libraryView.contains("viewModel.addFolders(.success(panel.urls))")
         && !libraryView.contains("isPresented: $viewModel.isSelectingFolder")
         && !libraryView.contains("allowedContentTypes: [.folder]")
-        && !viewModel.contains("var isSelectingFolder")
-        && libraryView.contains("private struct VideoLibrarySidebarView")
-        && libraryView.contains("List(selection: modeSelection)")
-        && libraryView.contains(".listStyle(.sidebar)\n        .scrollContentBackground(.hidden)\n        .background(.clear)")
-        && libraryView.contains("Section(\"Video Library\")")
-        && libraryView.contains("Section(\"Organization\")")
-        && libraryView.contains("VideoLibrarySourceToolbarButtons(")
-        && !libraryView.contains("VideoLibrarySidebarSourceActions(")
-        && !libraryView.contains(".safeAreaInset(edge: .bottom)")
-        && !libraryView.contains("Text(\"Video Sources\")")
-        && !libraryView.contains("Section(\"Video Sources\")")
-        && libraryView.contains("sidebarRow(.continueWatching")
-        && !libraryView.contains("VideoLibrarySidebarFilterToggle")
-        && !libraryView.contains("Toggle(isOn: $viewModel.showUnfinishedOnly)")
-        && !libraryView.contains("Label(\"Unfinished\"")
-        && libraryView.contains("sidebarRow(.favorites")
-        && libraryView.contains("sidebarRow(.series")
-        && libraryView.contains("sidebarRow(.folders"),
-    "Video library should keep browsing modes in a native secondary sidebar without the extra unfinished toggle row"
+        && !viewModel.contains("var isSelectingFolder"),
+    "Video folder import should go through one guarded NSOpenPanel path"
+)
+if let sidebarRange = libraryView.range(of: "private struct VideoLibrarySidebarView"),
+   let sidebarEnd = libraryView[sidebarRange.lowerBound...].range(of: "private extension VideoLibraryDisplayMode")?.lowerBound {
+    let sidebar = libraryView[sidebarRange.lowerBound..<sidebarEnd]
+    require(
+        sidebar.contains("let counts = viewModel.modeCounts()")
+            && sidebar.contains("List(selection: sidebarSelection)")
+            && sidebar.contains("Section(\"Media Servers\")")
+            && sidebar.contains(".listStyle(.sidebar)\n        .scrollContentBackground(.hidden)\n        .background(.clear)")
+            && sidebar.contains("ForEach(VideoLibraryDisplayMode.libraryModes)")
+            && sidebar.contains("Section(\"Organization\")")
+            && sidebar.contains("ForEach(VideoLibraryDisplayMode.organizationModes)")
+            && sidebar.contains("(counts[.missing] ?? 0) > 0 || viewModel.displayMode == .missing")
+            && sidebar.contains(".badge(count ?? 0)")
+            && !sidebar.contains("Toggle(isOn: $viewModel.showUnfinishedOnly)")
+            && !sidebar.contains(".safeAreaInset(edge: .bottom)")
+            && !sidebar.contains("Section(\"Video Sources\")"),
+        "Video library modes should use a shelf-style column with counts and only surface Missing when it has videos"
+    )
+} else {
+    require(false, "Video library sidebar should be present before its display mode helpers")
+}
+require(
+    libraryView.contains(".continueWatching, .recent, .all, .unwatched, .finished, .favorites,")
+        && libraryView.contains(".series, .folders, .collections, .needsReview,")
+        && viewModel.contains("func modeCounts() -> [VideoLibraryDisplayMode: Int]")
+        && viewModel.contains("counts[.collections] = catalog.collections.count"),
+    "Video library mode column should order playback modes before organization modes and read counts from the view model"
 )
 if let sourceActionsRange = libraryView.range(of: "private struct VideoLibrarySourceToolbarButtons"),
-   let sourceActionsEnd = libraryView[sourceActionsRange.lowerBound...].range(of: "private struct VideoLibraryContentTitleBar")?.lowerBound {
+   let sourceActionsEnd = libraryView[sourceActionsRange.lowerBound...].range(of: "private struct VideoLibraryContentHeader")?.lowerBound {
     let sourceActions = libraryView[sourceActionsRange.lowerBound..<sourceActionsEnd]
     require(
-        sourceActions.contains("HStack(spacing: 6)")
-            && sourceActions.contains("Label(\"Refresh\"")
-            && sourceActions.contains("Label(\"Add Video Folder\"")
-            && sourceActions.contains("Label(\"Manage Sources\"")
+        sourceActions.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")")
+            && sourceActions.contains("Label(\"Manage Sources\", systemImage: \"folder.badge.gearshape\")")
+            && sourceActions.contains("Label(\"Add Video Folder\", systemImage: \"folder.badge.plus\")")
+            && sourceActions.contains("Label(\"Add Link\", systemImage: \"link.badge.plus\")")
+            && sourceActions.contains("Label(\"Add\", systemImage: \"plus\")")
             && sourceActions.contains("viewModel.refreshAllSources()")
             && sourceActions.contains("onAddFolder()")
+            && sourceActions.contains("onAddLink()")
             && sourceActions.contains("onManageSources()")
-            && sourceActions.contains(".labelStyle(.iconOnly)")
-            && sourceActions.contains(".buttonBorderShape(.circle)")
             && sourceActions.contains(".disabled(!viewModel.hasSources || viewModel.isScanning)")
             && sourceActions.contains(".disabled(!isReadyForSourceActions)")
             && sourceActions.contains(".disabled(!viewModel.hasSources)")
-            && !sourceActions.contains(".buttonStyle(.borderless)")
+            && !sourceActions.contains(".buttonBorderShape(.circle)")
             && !sourceActions.contains(".background(.thinMaterial)"),
-        "Video source actions should be icon-only circular toolbar buttons without a custom material band"
+        "Video source actions should be plain system toolbar items, with folder and link imports behind the Add menu"
     )
 } else {
-    require(false, "Video library source toolbar buttons should be present before the content title bar")
+    require(false, "Video library source toolbar buttons should be present before the content header")
 }
-require(
-    libraryView.contains("private struct VideoLibrarySourceToolbarButtons")
-        && !libraryView.contains("private struct VideoLibrarySidebarSourceActions")
-        && libraryView.contains("let onAddFolder: () -> Void")
-        && libraryView.contains("let onManageSources: () -> Void")
-        && libraryView.contains("let isReadyForSourceActions: Bool")
-        && libraryView.contains("viewModel.refreshAllSources()")
-        && libraryView.contains("Label(\"Refresh\"")
-        && libraryView.contains("Label(\"Add Video Folder\"")
-        && libraryView.contains("Label(\"Manage Sources\"")
-        && libraryView.contains("onAddFolder()")
-        && libraryView.contains("onManageSources()")
-        && libraryView.contains(".disabled(!isReadyForSourceActions)")
-        && !libraryView.contains("viewModel.isSelectingFolder = true"),
-    "Video library source actions should live in native toolbar circular buttons instead of the secondary sidebar footer"
-)
 require(
     store.contains("enum VideoLibraryCollectionKind")
         && store.contains("struct VideoLibrarySmartRule")
@@ -312,8 +314,7 @@ require(
     "Video library should include a lightweight smart collection model and Needs Review view-model support"
 )
 require(
-    libraryView.contains("sidebarRow(.needsReview")
-        && libraryView.contains("smartCollectionsSection")
+    libraryView.contains("smartCollectionsSection")
         && libraryView.contains("Label(\"New Smart Collection\"")
         && libraryView.contains("Label(\"Add Smart Collection\"")
         && libraryView.contains("Text(\"Preview Matches\")")
@@ -324,12 +325,14 @@ require(
     viewModel.contains("var usesCollapsibleSections")
         && viewModel.contains("case .series, .folders, .collections:")
         && viewModel.contains("organization.folderPath")
-        && libraryView.contains("@State private var expandedSectionIDs: Set<String> = []")
+        && libraryView.contains("var collapsedSectionIDs: Set<String> = []")
+        && !libraryView.contains("expandedSectionIDs")
         && libraryView.contains("VideoLibraryCollapsibleSectionHeader(")
         && libraryView.contains("isExpanded: sectionExpansionBinding(for: section)")
-        && libraryView.contains("if expandedSectionIDs.contains(section.id)")
+        && libraryView.contains("get: { !collapsedSectionIDs.contains(section.id) }")
+        && libraryView.contains("if !collapsedSectionIDs.contains(section.id)")
         && libraryView.contains("count: section.rows.count"),
-    "Video library grouped organization modes should support collapsible collection, series, and folder sections"
+    "Grouped Series, Folders, and Collections sections should start expanded and stay individually collapsible"
 )
 if let listRange = libraryView.range(of: "else if viewModel.layoutMode == .list"),
    let listEnd = libraryView[listRange.lowerBound...].range(of: "} else {\n            VideoLibraryPosterGridView(")?.lowerBound {
@@ -355,7 +358,8 @@ if let collapsibleHeaderRange = libraryView.range(of: "private struct VideoLibra
             && collapsibleHeader.contains("isExpanded.toggle()")
             && collapsibleHeader.contains("Image(systemName: \"chevron.right\")")
             && collapsibleHeader.contains(".rotationEffect(.degrees(isExpanded ? 90 : 0))")
-            && collapsibleHeader.contains(".frame(maxWidth: .infinity, minHeight: 24")
+            && collapsibleHeader.contains(".font(.title3.weight(.semibold))")
+            && collapsibleHeader.contains(".frame(maxWidth: .infinity, minHeight: 28")
             && collapsibleHeader.contains(".contentShape(Rectangle())")
             && collapsibleHeader.contains(".buttonStyle(.plain)"),
         "Collapsible video section titles should use one full-width button in both list and poster layouts"
@@ -383,141 +387,87 @@ require(
     libraryView.contains(".toolbar {")
         && libraryView.contains("videoToolbarContent")
         && libraryView.contains("@ToolbarContentBuilder")
-        && libraryView.contains("private var videoToolbarContent: some ToolbarContent")
+        && libraryView.contains("var videoToolbarContent: some ToolbarContent")
         && libraryView.components(separatedBy: "ToolbarItemGroup(placement: .primaryAction)").count == 2
-        && libraryView.contains("@State private var availableContentWidth: CGFloat = .infinity")
+        && libraryView.contains("text: searchTextBinding,\n                placement: .toolbar,")
+        && libraryView.contains("prompt: selectedMediaServerBrowser == nil ? Text(\"Search Videos\") : Text(\"Search Server\")")
+        && libraryView.contains("return $viewModel.searchText")
+        && libraryView.contains("var availableContentWidth: CGFloat = .infinity")
         && libraryView.contains(".onGeometryChange(for: CGFloat.self)")
-        && libraryView.contains("if availableContentWidth >= 1_000")
-        && libraryView.contains("if availableContentWidth >= 720")
-        && libraryView.contains("VideoLibrarySortToolbarControl(viewModel: viewModel)")
-        && libraryView.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)")
-        && libraryView.contains("VideoLibrarySearchAndSourceToolbarControl(")
-        && libraryView.contains("VideoLibraryCompactToolbarMenu(")
-        && libraryView.contains("includesSearchAction: availableContentWidth < 720")
-        && libraryView.contains("VideoLibrarySearchToolbarControl(viewModel: viewModel)")
-        && libraryView.contains("VideoLibrarySourceToolbarButtons(")
-        && libraryView.contains("VideoLibraryContentTitleBar(viewModel: viewModel)")
-        && libraryView.contains("private struct VideoLibraryContentTitleBar")
-        && libraryView.contains("Text(LocalizedStringKey(viewModel.displayMode.titleKey))")
-        && libraryView.contains("TextField(\"Search Videos\"")
-        && libraryView.contains("VideoLibrarySortPopUpButton(selection: $viewModel.sortOption)")
-        && libraryView.contains("VideoLibraryLayoutSegmentedControl(selection: $viewModel.layoutMode)")
-        && libraryView.contains("selection: $viewModel.layoutMode")
-        && libraryView.contains("VideoLibrarySearchField(text: $viewModel.searchText)")
-        && libraryView.contains("private struct VideoLibrarySortPopUpButton: NSViewRepresentable")
-        && libraryView.contains("NSPopUpButton")
-        && libraryView.contains("private struct VideoLibraryLayoutSegmentedControl: NSViewRepresentable")
-        && libraryView.contains("NSSegmentedControl(")
-        && !libraryView.contains("Picker(\"Video Layout\"")
-        && !libraryView.contains("private struct VideoLibraryToolbarControls")
-        && !libraryView.contains("VideoLibraryToolbarControls(viewModel: viewModel)")
-        && !libraryView.contains("private struct VideoLibraryContentToolbar")
-        && !libraryView.contains("VideoLibraryContentToolbar(viewModel: viewModel)")
+        && libraryView.contains("availableContentWidth >= 760")
+        && libraryView.contains("Picker(\"Sort Videos\", selection: $viewModel.sortOption)")
+        && libraryView.contains("Label(\"Sort Videos\", systemImage: \"arrow.up.arrow.down\")")
+        && libraryView.contains("Picker(\"Video Library View\", selection: $viewModel.layoutMode)")
+        && libraryView.contains(".pickerStyle(.segmented)")
+        && libraryView.contains("LibraryCoverSizeButton(width: $posterSize)")
+        && !libraryView.contains("NSPopUpButton")
+        && !libraryView.contains("NSSegmentedControl")
+        && !libraryView.contains("VideoLibraryCompactToolbarMenu")
+        && !libraryView.contains("VideoLibrarySearchField")
+        && !libraryView.contains("ToolbarSpacer")
         && !libraryView.contains("VideoLibraryToolbarControlSurface"),
-    "Video library controls should stay in one native primary-action group and collapse to an explicit compact action menu"
+    "Video library toolbar should mirror the Bookshelf toolbar: sort menu, layout, cover size, source actions, and native toolbar search"
 )
 if let toolbarRange = libraryView.range(of: "private var videoToolbarContent: some ToolbarContent"),
    let toolbarEnd = libraryView[toolbarRange.lowerBound...].range(of: "@ViewBuilder\n    private var content")?.lowerBound {
     let toolbar = libraryView[toolbarRange.lowerBound..<toolbarEnd]
-    let sortIndex = toolbar.range(of: "VideoLibrarySortToolbarControl(viewModel: viewModel)")?.lowerBound
-    let layoutIndex = toolbar.range(of: "VideoLibraryLayoutToolbarControl(viewModel: viewModel)")?.lowerBound
-    let searchAndSourceIndex = toolbar.range(of: "VideoLibrarySearchAndSourceToolbarControl(")?.lowerBound
+    let sortIndex = toolbar.range(of: "VideoLibrarySortMenu(viewModel: viewModel)")?.lowerBound
+    let layoutIndex = toolbar.range(of: "VideoLibraryLayoutPicker(viewModel: viewModel)")?.lowerBound
+    // The media server branch has its own size button; check the library branch.
+    let sizeIndex = sortIndex.flatMap {
+        toolbar[$0...].range(of: "LibraryCoverSizeButton(width: $posterSize)")?.lowerBound
+    }
+    let sourceIndex = toolbar.range(of: "VideoLibrarySourceToolbarButtons(")?.lowerBound
     require(
         sortIndex != nil
             && layoutIndex != nil
-            && searchAndSourceIndex != nil
-            && sortIndex! < layoutIndex!
-            && layoutIndex! < searchAndSourceIndex!,
-        "Video library native toolbar groups should order sort, layout, then combined search/source actions"
-    )
-    require(
-        toolbar.contains("ToolbarItemGroup(placement: .primaryAction)")
-            && !toolbar.contains("ToolbarSpacer")
-            && toolbar.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)")
-            && !toolbar.contains("showUnfinishedOnly")
-            && !toolbar.contains("Label(\"Unfinished\"")
-            && !toolbar.contains("HStack(spacing: 8) {")
-            && !toolbar.contains("ScrollView(.horizontal")
-            && !toolbar.contains("GlassEffectContainer(spacing: 8)")
-            && !toolbar.contains("VideoLibraryToolbarControlSurface")
-            && !toolbar.contains(".modifier(VideoLibraryHeaderGlassSurface())")
-            && !toolbar.contains(".textFieldStyle(.roundedBorder)")
-            && !toolbar.contains(".colorScheme(.dark)")
-            && !toolbar.contains("Color(red: 0.08, green: 0.09, blue: 0.12)")
-            && !toolbar.contains(".background(Color("),
-        "Video library native toolbar should use one primary-action system group without adding a custom material strip"
-    )
-} else {
-    require(false, "Video library native toolbar groups should be present before the section header surface")
-}
-require(
-    libraryView.contains("private struct VideoLibrarySortToolbarControl")
-        && libraryView.contains("private struct VideoLibraryLayoutToolbarControl")
-        && libraryView.contains("private struct VideoLibrarySearchAndSourceToolbarControl")
-        && libraryView.contains("private struct VideoLibrarySearchToolbarControl")
-        && libraryView.contains("private struct VideoLibrarySortPopUpButton: NSViewRepresentable")
-        && libraryView.contains("private struct VideoLibraryLayoutSegmentedControl: NSViewRepresentable")
-        && libraryView.contains("NSSegmentedControl(")
-        && libraryView.contains("trackingMode: .selectOne")
-        && libraryView.contains("NSPopUpButton(frame: .zero, pullsDown: false)")
-        && !libraryView.contains("NativeGlassSegmentedPicker(")
-        && libraryView.contains("ToolbarItemGroup(placement: .primaryAction)")
-        && libraryView.contains(".frame(minWidth: 90, idealWidth: 140, maxWidth: 180)")
-        && !libraryView.contains("private struct VideoLibraryMediaToolbarSurface"),
-    "Video library page header should use the beta9 native sort pop-up and AppKit layout segmented control"
-)
-if let compactMenuRange = libraryView.range(of: "private struct VideoLibraryCompactToolbarMenu"),
-   let compactMenuEnd = libraryView[compactMenuRange.lowerBound...].range(of: "struct RemoteVideoLinkSheet")?.lowerBound {
-    let compactMenu = libraryView[compactMenuRange.lowerBound..<compactMenuEnd]
-    require(
-        compactMenu.contains("Label(\"Video Library Actions\", systemImage: \"ellipsis.circle\")")
-            && compactMenu.contains("Picker(\"Sort Videos\", selection: $viewModel.sortOption)")
-            && compactMenu.contains("Picker(\"Video Library View\", selection: $viewModel.layoutMode)")
-            && compactMenu.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")")
-            && compactMenu.contains("Label(\"Add Video Folder\", systemImage: \"folder.badge.plus\")")
-            && compactMenu.contains("Label(\"Add Link\", systemImage: \"link.badge.plus\")")
-            && compactMenu.contains("Label(\"Manage Sources\", systemImage: \"folder.badge.gearshape\")")
-            && compactMenu.contains(".popover(isPresented: $isSearching")
-            && compactMenu.contains("VideoLibrarySearchToolbarControl(viewModel: viewModel)"),
-        "Compact video toolbar menu should expose every hidden action and a usable search field"
-    )
-} else {
-    require(false, "Compact video toolbar menu should be present before the remote link sheet")
-}
-if let combinedRange = libraryView.range(of: "private struct VideoLibrarySearchAndSourceToolbarControl"),
-   let combinedEnd = libraryView[combinedRange.lowerBound...].range(of: "private struct VideoLibrarySearchToolbarControl")?.lowerBound {
-    let combined = libraryView[combinedRange.lowerBound..<combinedEnd]
-    let searchIndex = combined.range(of: "VideoLibrarySearchToolbarControl(viewModel: viewModel)")?.lowerBound
-    let sourceIndex = combined.range(of: "VideoLibrarySourceToolbarButtons(")?.lowerBound
-    require(
-        combined.contains("HStack(spacing: 8)")
-            && searchIndex != nil
+            && sizeIndex != nil
             && sourceIndex != nil
-            && searchIndex! < sourceIndex!,
-        "Video library search and source actions should share one compact toolbar item so the circular buttons stay visible"
+            && sortIndex! < layoutIndex!
+            && layoutIndex! < sizeIndex!
+            && sizeIndex! < sourceIndex!
+            && toolbar.contains("if viewModel.layoutMode == .posters {"),
+        "Video library toolbar should order sort, layout, poster size (posters only), then source actions"
+    )
+    require(
+        !toolbar.contains("HStack(")
+            && !toolbar.contains("ScrollView(.horizontal")
+            && !toolbar.contains("GlassEffectContainer")
+            && !toolbar.contains(".background(Color("),
+        "Video library toolbar should use one system group without a custom strip"
     )
 } else {
-    require(false, "Video library combined search/source toolbar control should be present before the search control")
+    require(false, "Video library toolbar should be present before the content shell")
 }
 require(
-    !libraryView.contains("private struct VideoLibraryHeaderGlassSurface")
-        && !libraryView.contains("private struct VideoLibrarySectionHeaderSurface")
-        && !libraryView.contains("private struct VideoLibrarySectionHeader"),
-    "Video library should not retain poster-only section header surfaces"
+    libraryView.contains("@AppStorage(\"videoLibraryLayoutMode\")")
+        && libraryView.contains("@AppStorage(\"videoLibraryPosterWidth\")")
+        && libraryView.contains("viewModel.layoutMode = VideoLibraryLayoutMode(rawValue: storedLayoutMode) ?? .posters")
+        && libraryView.contains("storedLayoutMode = layoutMode.rawValue"),
+    "Video library should remember the chosen layout and poster size"
 )
-require(
-    libraryView.contains("private struct VideoLibraryContentTitleBar")
-        && libraryView.contains(".frame(height: 34)"),
-    "Video library content title bar should stay compact so the native toolbar does not create excess top whitespace"
-)
-require(
-    !libraryView.contains(".background(.bar)"),
-    "Video library page header should not use the old opaque bar background"
-)
+if let headerRange = libraryView.range(of: "private struct VideoLibraryContentHeader"),
+   let headerEnd = libraryView[headerRange.lowerBound...].range(of: "struct RemoteVideoLinkSheet")?.lowerBound {
+    let header = libraryView[headerRange.lowerBound..<headerEnd]
+    require(
+        header.contains("LibraryShelfDetailHeader(")
+            && header.contains("title: Text(LocalizedStringKey(viewModel.displayMode.titleKey))")
+            && header.contains("count: count")
+            && header.contains("if usesModeMenu {")
+            && header.contains("Picker(\"Video Library\", selection: $viewModel.displayMode)")
+            && header.contains("Picker(\"Organization\", selection: $viewModel.displayMode)")
+            && !header.contains(".background(.bar)"),
+        "Video library header should reuse the shelf detail header and turn into the mode menu when the column is hidden"
+    )
+} else {
+    require(false, "Video library content header should be present before the remote link sheet")
+}
 require(
     libraryView.contains("if viewModel.selectedRow != nil {")
-        && libraryView.contains("VideoLibraryInspectorView(viewModel: viewModel)"),
-    "Video library details inspector should appear only after a video is selected"
+        && libraryView.contains("VideoLibraryInspectorView(")
+        && libraryView.contains("onOpen: { item in open(item, fromBeginning: false) }")
+        && libraryView.contains("onOpenFromBeginning: { item in open(item, fromBeginning: true) }"),
+    "Video library details inspector should appear only after a video is selected and play through the shared open path"
 )
 require(
     thumbnailStore != nil
@@ -527,30 +477,49 @@ require(
         && libraryView.contains("VideoLibraryPosterGridView")
         && libraryView.contains("VideoLibraryPosterCardView")
         && libraryView.contains("VideoLibraryPosterArtworkView")
-        && libraryView.contains("VideoLibraryNeutralCardSurface")
-        && libraryView.contains(".videoLibraryNeutralCardSurface(cornerRadius: 16)")
-        && libraryView.contains("VideoLibraryBottomProgressBar")
+        && libraryView.contains("VideoLibraryProgressTrack")
         && libraryView.contains("thumbnailRequestMode: .generateIfMissing")
         && libraryView.contains("requestMode: .generateIfMissing")
         && !libraryView.contains("globallyGeneratedThumbnailItemIDs")
         && !libraryView.contains("sections.flatMap(\\.rows).prefix(8)")
         && libraryView.contains("requestMode.taskIdentity")
-        && libraryView.contains("private var thumbnailTaskID: String")
+        && libraryView.contains("var thumbnailTaskID: String")
         && !libraryView.contains("index < 8")
         && !libraryView.contains("generatesMissingThumbnail")
+        && libraryView.contains("LazyVStack(alignment: .leading, spacing: VideoLibraryPosterLayout.sectionSpacing)")
         && libraryView.contains("LazyVGrid"),
-    "Video library should restore poster/list UI with visible thumbnails that generate when missing and mode-aware thumbnail tasks"
+    "Video library should keep visible thumbnails that generate when missing, with mode-aware thumbnail tasks and lazy sections"
 )
 if let posterCardRange = libraryView.range(of: "private struct VideoLibraryPosterCardView"),
-   let posterCardEnd = libraryView[posterCardRange.lowerBound...].range(of: "private struct VideoLibraryPosterArtworkView")?.lowerBound {
+   let posterCardEnd = libraryView[posterCardRange.lowerBound...].range(of: "private struct VideoLibraryItemContextMenu")?.lowerBound {
     let posterCard = libraryView[posterCardRange.lowerBound..<posterCardEnd]
     require(
-        posterCard.contains(".videoLibraryNeutralCardSurface(cornerRadius: 16)")
+        posterCard.contains("VideoLibraryPosterArtworkView(")
+            && posterCard.contains("Text(row.displayTitle)")
+            && posterCard.contains("VideoLibraryPlaybackText.location(for: row)")
+            && posterCard.contains("VideoLibraryDetailsButton(onSelect: onSelect, isArtworkOverlay: true)")
+            && posterCard.contains("VideoLibraryItemContextMenu(")
+            && !posterCard.contains(".videoLibraryNeutralCardSurface")
             && !posterCard.contains(".nativeGlassCardSurface"),
-        "Video poster cards should use the neutral card surface instead of a material glass background"
+        "Video poster cards should be borderless artwork plus title, without a surrounding card surface"
     )
 } else {
-    require(false, "Video poster card should be inspectable before poster artwork")
+    require(false, "Video poster card should be inspectable before the shared item context menu")
+}
+if let artworkRange = libraryView.range(of: "private struct VideoLibraryPosterArtworkView"),
+   let artworkEnd = libraryView[artworkRange.lowerBound...].range(of: "private struct VideoThumbnailImageView")?.lowerBound {
+    let artwork = libraryView[artworkRange.lowerBound..<artworkEnd]
+    require(
+        artwork.contains("VideoLibraryPlaybackText.state(for: row)")
+            && artwork.contains("VideoLibraryProgressTrack(progress: progress)")
+            && artwork.contains("row.metadata.isFavorite")
+            && artwork.contains(".glassEffect(.regular.tint(.black.opacity(0.25)), in: Circle())")
+            && artwork.contains(".strokeBorder(Color.accentColor, lineWidth: 2.5)")
+            && !artwork.contains("Material"),
+        "Video poster artwork should carry playback state, favorite, hover play, and selection on the frame itself"
+    )
+} else {
+    require(false, "Video poster artwork should be inspectable before the thumbnail view")
 }
 if let rowRange = libraryView.range(of: "private struct VideoLibraryRowView"),
    let rowEnd = libraryView[rowRange.lowerBound...].range(of: "private struct VideoLibraryDetailsButton")?.lowerBound {
@@ -560,14 +529,16 @@ if let rowRange = libraryView.range(of: "private struct VideoLibraryRowView"),
             && rowView.contains("requestMode: .generateIfMissing")
             && rowView.contains("Text(row.sourceName)")
             && rowView.contains("Text(row.item.parentFolder)")
-            && rowView.contains("Text(Self.fileSizeFormatter.string(fromByteCount: row.item.fileSize))")
+            && rowView.contains("VideoLibraryPlaybackText.fileSizeFormatter.string(fromByteCount: row.item.fileSize)")
             && rowView.contains("Text(modifiedAt, style: .date)")
-            && rowView.contains("ProgressView(value: progress)")
-            && rowView.contains("if let stateText")
+            && rowView.contains("VideoLibraryProgressTrack(progress: progress, height: 3)")
+            && rowView.contains("VideoLibraryPlaybackText.state(for: row)")
             && rowView.contains("Text(row.displayTitle)")
             && !rowView.contains("Text(row.item.title)")
-            && rowView.contains("VideoLibraryDetailsButton(onSelect: onSelect)"),
-        "Video library list rows should be dense metadata rows with cache-only thumbnail placeholders, display titles, source, folder, size, modified date, progress/state, and trailing Details"
+            && rowView.contains("VideoLibraryDetailsButton(onSelect: onSelect)")
+            && rowView.contains(".opacity(isHovered || isSelected ? 1 : 0)")
+            && rowView.contains(".listRowBackground("),
+        "Video library list rows should show display titles, source, folder, size, modified date, progress/state, and a hover Details control"
     )
 } else {
     require(false, "Video library row view should be present before details button")
@@ -617,7 +588,7 @@ if let inspectorCardRange = libraryView.range(of: "private struct VideoLibraryIn
 }
 require(
     libraryView.contains("VideoLibraryDetailsButton(onSelect: onSelect)")
-        && libraryView.contains("private struct VideoLibraryDetailsButton")
+        && libraryView.contains("struct VideoLibraryDetailsButton")
         && libraryView.contains("Button(action: onSelect)")
         && libraryView.contains(".help(\"Details\")")
         && libraryView.contains(".accessibilityLabel(Text(\"Details\"))"),
@@ -643,15 +614,6 @@ require(
         && libraryView.contains("Label(\"Refresh Source\"")
         && libraryView.contains("Label(\"Reveal Source in Finder\""),
     "Video source management should show source status counts and per-source actions"
-)
-require(
-    libraryView.components(separatedBy: "ToolbarItemGroup(placement: .primaryAction)").count == 2
-        && libraryView.contains("VideoLibrarySortToolbarControl(viewModel: viewModel)")
-        && libraryView.contains("VideoLibraryLayoutToolbarControl(viewModel: viewModel)")
-        && libraryView.contains("VideoLibrarySearchToolbarControl(viewModel: viewModel)")
-        && libraryView.contains("VideoLibrarySearchAndSourceToolbarControl(")
-        && libraryView.contains("VideoLibraryCompactToolbarMenu("),
-    "Video library should place full and compact controls in one native primary-action toolbar group"
 )
 require(
     libraryView.contains("VideoPlaybackHistoryStore.didChangeNotification")
@@ -687,11 +649,11 @@ require(
     "Video library view model should support editing collection membership from the V3 inspector"
 )
 require(
-    libraryView.contains("@State private var pendingCollectionDeletion: VideoLibraryCollection?")
+    libraryView.contains("var pendingCollectionDeletion: VideoLibraryCollection?")
         && libraryView.contains("VideoLibraryCollapsibleSectionHeader(")
         && libraryView.contains("onDeleteCollection:")
         && libraryView.contains("VideoLibraryCollectionActionsMenu(onDeleteCollection: onDeleteCollection)")
-        && libraryView.contains("private struct VideoLibraryCollectionActionsGlassEffect")
+        && libraryView.contains("struct VideoLibraryCollectionActionsGlassEffect")
         && libraryView.contains(".menuStyle(.borderlessButton)")
         && libraryView.contains("Image(systemName: \"ellipsis\")")
         && libraryView.contains("GlassEffectContainer(spacing: 0)")

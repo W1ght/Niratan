@@ -1,3 +1,4 @@
+// test-sources: NativeMac/NativeFullscreenImageDocument.swift
 import Foundation
 
 @main

@@ -1,3 +1,4 @@
+// test-sources: Features/Manga/MangaOCRService.swift Models/Manga.swift Features/Manga/OCR/MangaOCRTypes.swift Features/Manga/OCR/MangaOCRRegionBuilder.swift
 import Foundation
 
 @main

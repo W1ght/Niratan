@@ -1,3 +1,4 @@
+// test-sources: Core/VideoSubtitlePositionPolicy.swift
 import CoreGraphics
 import Foundation
 

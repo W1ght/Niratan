@@ -64,10 +64,17 @@ let ambientBackdrop = (try? source("Features/Video/VideoAmbientBackdrop.swift"))
 let ambientModel = (try? source("Features/Video/VideoAmbientBackdropModel.swift")) ?? ""
 let mpvClient = try source("Features/Video/Playback/HSMpvClient.mm")
 let playbackEngine = try source("Features/Video/Playback/PlaybackEngine.swift")
+    + source("Features/Video/Playback/VideoTrack.swift")
 let playerViewModel = try source("Features/Video/VideoPlayerViewModel.swift")
 let windowChrome = (try? source("Features/Video/VideoWindowChromeController.swift")) ?? ""
 let videoMediaTypes = try source("Features/Video/VideoMediaTypes.swift")
 let screen = try source("Features/Video/VideoPlayerScreen.swift")
+    + source("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + source("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + source("Features/Video/VideoPlayerScreen+OSD.swift")
+    + source("Features/Video/VideoPlayerScreen+Mining.swift")
+    + source("Features/Video/VideoPlayerScreen+Opening.swift")
+    + source("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let lookup = try source("Features/Video/VideoLookupCoordinator.swift")
 let popupPresentation = try source("Features/Popup/PopupPresentationCoordinator.swift")
 let popup = try source("Features/Popup/PopupView.swift")
@@ -79,28 +86,28 @@ let profilesView = try source("Features/Settings/ProfilesView.swift")
 let profileCoordinator = (try? source("Core/ProfileActivationCoordinator.swift")) ?? ""
 let condensedControlGroup = sourceBlock(
     controls,
-    from: "private var condensedControlGroup: some View",
-    to: "private var minimalControlGroup: some View"
+    from: "var condensedControlGroup: some View",
+    to: "var minimalControlGroup: some View"
 )
 let minimalControlGroup = sourceBlock(
     controls,
-    from: "private var minimalControlGroup: some View",
-    to: "private var utilityControlGroup: some View"
+    from: "var minimalControlGroup: some View",
+    to: "var utilityControlGroup: some View"
 )
 let subtitleTimingSection = sourceBlock(
     inspector,
-    from: "private var subtitleTimingSection: some View",
-    to: "private func trackSection("
+    from: "var subtitleTimingSection: some View",
+    to: "func trackSection("
 )
 let videoCanvas = sourceBlock(
     screen,
-    from: "private var videoCanvas: some View",
-    to: "private var videoWindowDragStrip: some View"
+    from: "var videoCanvas: some View",
+    to: "var videoWindowDragStrip: some View"
 )
 let videoWindowDragStrip = sourceBlock(
     screen,
-    from: "private var videoWindowDragStrip: some View",
-    to: "private var videoControlsMetrics: VideoControlsMetrics"
+    from: "var videoWindowDragStrip: some View",
+    to: "var videoControlsMetrics: VideoControlsMetrics"
 )
 
 require(
@@ -111,19 +118,58 @@ require(
     "video controls should use a compact IINA-like OSC with a dedicated inspector toggle"
 )
 require(
-    controls.contains("VStack(spacing: 5)")
-        && controls.contains("private static let floatingControlsWidth: CGFloat = 690")
-        && controls.contains("private static let floatingControlsHeight: CGFloat = 74")
-        && controls.contains("private static let floatingIconSize: CGFloat = 26")
+    controls.contains("static let floatingControlsWidth: CGFloat = 760")
+        && controls.contains("static let floatingControlsHeight: CGFloat = 90")
+        && controls.contains("static let floatingCornerRadius: CGFloat = 24")
+        && controls.contains("static let floatingIconSize: CGFloat = 30")
+        && controls.contains("static let floatingPlaybackButtonSize: CGFloat = 42")
         && controls.contains(".frame(width: activeChromeWidth, height: Self.floatingControlsHeight)")
-        && controls.contains(".frame(width: 84)")
-        && controls.contains("private static let floatingProgressHorizontalInset: CGFloat = 58")
-        && controls.contains("private static let compactProgressHorizontalInset: CGFloat = 0")
-        && countOccurrences(controls, of: ".frame(maxWidth: .infinity)\n                .frame(height: 16)") >= 2
-        && controls.contains(".padding(.horizontal, 12)")
-        && controls.contains(".padding(.vertical, 7)")
+        && controls.contains("static let compactProgressHorizontalInset: CGFloat = 0")
+        && countOccurrences(controls, of: ".frame(maxWidth: .infinity)\n                .frame(height: Self.timelineHitHeight)") >= 2
+        && controls.contains(".padding(.horizontal, Self.floatingHorizontalPadding)")
         && !controls.contains(".frame(maxWidth: 960)"),
-    "video controls should keep the IINA-like two-row proportions while allowing the OSC chrome to contract with the video window"
+    "video controls should be a timeline-first two-row panel that contracts with the video window"
+)
+if let floatingRange = controls.range(of: "private var floatingControls: some View"),
+   let floatingEnd = controls[floatingRange.lowerBound...].range(of: "private var compactBottomControls: some View")?.lowerBound {
+    let floating = controls[floatingRange.lowerBound..<floatingEnd]
+    let progressIndex = floating.range(of: "progressControlStrip")?.lowerBound
+    let controlsIndex = floating.range(of: "responsivePrimaryControlGroup")?.lowerBound
+    require(
+        progressIndex != nil && controlsIndex != nil && progressIndex! < controlsIndex!,
+        "the floating panel should put the timeline above the button row"
+    )
+} else {
+    require(false, "floating controls should be present before the compact bottom layout")
+}
+require(
+    controls.contains("private struct VideoTimelineTrack: View")
+        && controls.contains("isEmphasized: isProgressHovering || isScrubbing")
+        && controls.contains("DragGesture(minimumDistance: 0)")
+        && controls.contains("private func scrub(toX x: CGFloat, width: CGFloat)")
+        && controls.contains("private func endScrubbing()")
+        && controls.contains("onSeek(scrubTime)")
+        && controls.contains(".accessibilityRepresentation {")
+        && controls.contains("private struct VideoVolumeTrack: View")
+        && controls.contains("restingHeight: 3"),
+    "timeline and volume should be custom tracks that thicken on hover, seek on release, and stay accessible as sliders"
+)
+require(
+    controls.contains("var isMiningHistoryVisible = false")
+        && controls.contains("var isInspectorVisible = false")
+        && controls.contains("isActive: isMiningHistoryVisible")
+        && controls.contains("isActive: isInspectorVisible")
+        && controls.contains("isActive: isSubtitleGapFastForwardEnabled")
+        && screen.contains("isMiningHistoryVisible: isMiningHistoryVisible,")
+        && screen.contains("isInspectorVisible: isInspectorVisible,"),
+    "toggle buttons should show when their panel or mode is on"
+)
+require(
+    screen.contains("private var inspectorOverlayBottomInset: CGFloat")
+        && screen.contains("videoControlsMetrics.controlHeight + Self.inspectorOverlayVerticalInset / 2")
+        && screen.contains("+ videoControlsMetrics.bottomInset\n                + videoControlsMetrics.controlHeight")
+        && screen.contains(".padding(.bottom, inspectorOverlayBottomInset)"),
+    "the inspector should end above the playback controls in both layouts instead of covering their tools"
 )
 require(
     controls.contains("static func chromeSize(")
@@ -140,7 +186,7 @@ require(
     "rendered OSC width, fallback seek geometry, popup placement, and PlayerScreen hit geometry should resolve from the same available width"
 )
 require(
-    controls.contains("private enum ControlDensity")
+    controls.contains("enum ControlDensity")
         && controls.contains("case full")
         && controls.contains("case condensed")
         && controls.contains("case minimal")
@@ -189,7 +235,7 @@ requireOrdered(
 requireOrdered(
     controls,
     [
-        "private var utilityControlGroup",
+        "var utilityControlGroup",
         "miningHistoryButton",
         "openVideoButton",
         "mineCurrentSubtitleButton",
@@ -202,11 +248,11 @@ require(
     controls.contains("var onSetSpeed: (Double) -> Void")
         && controls.contains("@Binding var isSpeedPanelVisible: Bool")
         && !controls.contains("@State private var isSpeedPanelVisible = false")
-        && screen.contains("@State private var isSpeedPanelVisible = false")
+        && screen.contains("var isSpeedPanelVisible = false")
         && screen.contains("isSpeedPanelVisible: $isSpeedPanelVisible")
-        && controls.contains("@State private var speedInputText = \"\"")
-        && controls.contains("private var speedControlButton: some View")
-        && controls.contains("private var speedControlPanel: some View")
+        && controls.contains("var speedInputText = \"\"")
+        && controls.contains("var speedControlButton: some View")
+        && controls.contains("var speedControlPanel: some View")
         && controls.contains("Label(\"Playback Speed\", systemImage: \"speedometer\")")
         && controls.contains("VideoPlaybackSpeed.label(snapshot.speed)")
         && controls.contains("VideoPlaybackSpeed.presetChoices")
@@ -218,7 +264,7 @@ require(
     "video bottom controls should expose playback speed through a floating panel with presets, slider, and numeric input"
 )
 require(
-    screen.contains("private var shouldShowVideoDismissLayer: Bool")
+    screen.contains("var shouldShowVideoDismissLayer: Bool")
         && screen.contains("hasActiveVideoPopup || isInspectorVisible || isSpeedPanelVisible")
         && screen.contains("isSpeedPanelVisible = false")
         && screen.contains("|| isSpeedPanelVisible"),
@@ -226,19 +272,19 @@ require(
 )
 require(
     !controls.contains(".glassEffect(.regular.interactive(), in: Circle())")
-        && controls.contains("private struct VideoPlaybackButtonStyle")
+        && controls.contains("struct VideoPlaybackButtonStyle")
         && controls.contains("treatment.iconPressedFill(isPressed: configuration.isPressed)"),
     "the play button should use pressed feedback without a glass circle"
 )
 require(
-    controls.contains("private struct VideoSpeedControlButtonStyle")
+    controls.contains("struct VideoSpeedControlButtonStyle")
         && !controls.contains("func speedFill(isSelected:")
         && !controls.contains("func speedStrokeOpacity(isSelected:"),
     "the speed button should not draw a persistent fill or stroke"
 )
 require(
     screen.contains("layout: userConfig.videoControlBarLayout")
-        && screen.contains("private var videoControlsMetrics: VideoControlsMetrics")
+        && screen.contains("var videoControlsMetrics: VideoControlsMetrics")
         && !screen.contains("profiles: profileRepository.index.profiles")
         && !screen.contains("selectedProfileID:")
         && !screen.contains("onSelectProfile:")
@@ -246,10 +292,10 @@ require(
     "video screen should keep playback drag bounds aligned without wiring a Profile selector"
 )
 require(
-    screen.contains("private final class VideoPlayerModelStore: ObservableObject")
+    screen.contains("final class VideoPlayerModelStore: ObservableObject")
         && screen.contains("let model = VideoPlayerViewModel(engine: MpvPlayerEngine())")
-        && screen.contains("@StateObject private var modelStore = VideoPlayerModelStore()")
-        && screen.contains("private var model: VideoPlayerViewModel")
+        && screen.contains("var modelStore = VideoPlayerModelStore()")
+        && screen.contains("var model: VideoPlayerViewModel")
         && screen.contains("modelStore.model")
         && !screen.contains("@State private var model")
         && !screen.contains("State(initialValue: VideoPlayerViewModel(engine: MpvPlayerEngine()))")
@@ -277,7 +323,7 @@ require(
 require(
     controls.contains("var onDragChanged: (CGSize) -> Void")
         && controls.contains("var onDragEnded: (CGSize) -> Void")
-        && controls.contains("private var controlDragSurface: some View")
+        && controls.contains("var controlDragSurface: some View")
         && controls.contains("DragGesture(minimumDistance: 2, coordinateSpace: .global)")
         && controls.contains("Color.black.opacity(0.001)")
         && controls.contains(".contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))"),
@@ -301,17 +347,13 @@ require(
     "switching to Compact Bottom should clear stale Floating drag offsets"
 )
 require(
-    controls.contains("VideoFloatingGlassSurface")
-        && controls.contains("glassEffect(.regular.interactive()"),
-    "video controls should use a single interactive Liquid Glass surface"
+    controls.contains("VideoFloatingGlassSurface(cornerRadius: Self.floatingCornerRadius)")
+        && controls.contains(".glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))"),
+    "video controls should use a single Liquid Glass panel"
 )
 require(
-    controls.contains("RoundedRectangle(cornerRadius: 12, style: .continuous)"),
-    "video controls should render as a compact IINA-like rounded rectangle"
-)
-require(
-    controls.contains(".thinMaterial"),
-    "video controls should keep a pre-macOS 26 material fallback"
+    !controls.contains("Material"),
+    "video controls should use Liquid Glass without a pre-macOS 26 material fallback"
 )
 require(
     !controls.contains("autoHide")
@@ -321,7 +363,7 @@ require(
 require(
     !subtitles.contains(".glassEffect(")
         && subtitles.contains("let backgroundDisabled: Bool")
-        && subtitles.contains("if !backgroundDisabled && normalizedBackgroundOpacity > 0")
+        && subtitles.contains("!backgroundDisabled && normalizedBackgroundOpacity > 0")
         && !subtitles.contains("VideoSubtitleGlassSurface"),
     "subtitle overlay should remain transparent by default while allowing the explicit user-controlled background opacity setting"
 )
@@ -366,17 +408,17 @@ require(
     interactiveSubtitles.contains("let fontFamily: String")
         && interactiveSubtitles.contains("let fontSize: Double")
         && interactiveSubtitles.contains("let fontWeight: Int")
-        && interactiveSubtitles.contains("private func subtitleFont() -> NSFont")
+        && interactiveSubtitles.contains("func subtitleFont() -> NSFont")
         && interactiveSubtitles.contains(".systemFont(ofSize: size, weight: subtitleFontWeight())")
         && !interactiveSubtitles.contains(".systemFont(ofSize: 20, weight: .medium)"),
     "interactive subtitle text should use configurable asbplayer-style font settings instead of the old hard-coded 20pt font"
 )
 require(
-    subtitles.contains("@State private var isHovering = false")
+    subtitles.contains("var isHovering = false")
         && subtitles.contains(".onHover { hovering in")
-        && subtitles.contains("private var maskedBlurRadius: CGFloat")
-        && subtitles.contains("private var maskedOpacity: Double")
-        && subtitles.contains("private var isMaskRevealed: Bool")
+        && subtitles.contains("var maskedBlurRadius: CGFloat")
+        && subtitles.contains("var maskedOpacity: Double")
+        && subtitles.contains("var isMaskRevealed: Bool")
         && subtitles.contains("isHovering || isLookupPopupVisible")
         && subtitles.contains(".blur(radius: maskedBlurRadius)")
         && subtitles.contains(".opacity(maskedOpacity)"),
@@ -392,8 +434,8 @@ require(
 )
 require(
     screen.contains("enum VideoFileImportKind")
-        && screen.contains("@State private var pendingFileImportKind: VideoFileImportKind?")
-        && screen.contains("@State private var activeFileImportKind: VideoFileImportKind?")
+        && screen.contains("var pendingFileImportKind: VideoFileImportKind?")
+        && screen.contains("var activeFileImportKind: VideoFileImportKind?")
         && screen.contains(".fileImporter(")
         && screen.contains("allowedContentTypes: (pendingFileImportKind ?? activeFileImportKind)?.allowedContentTypes(")
         && screen.contains("guard let kind = activeFileImportKind ?? pendingFileImportKind else { return }")
@@ -432,8 +474,8 @@ require(
 require(
     screen.contains("restoreRememberedSubtitleSelectionOrAutoload(for: mediaURL)")
         && screen.contains("VideoSubtitleAutoloadCandidate.bestCandidate(for: mediaURL)")
-        && screen.contains("from: subtitleURL")
-        && screen.contains("useSelectedMpvTrackRenderer: true")
+        && screen.contains("loadPrimarySubtitle(from: subtitleURL, loadIntoMpv: true)")
+        && !screen.contains("useSelectedMpvTrackRenderer")
         && screen.contains("loadPrimarySubtitle(from: url, loadIntoMpv: true)"),
     "video import should auto-load same-folder subtitle sidecars through the same primary subtitle path as manual imports"
 )
@@ -448,7 +490,7 @@ require(
 )
 require(
     screen.contains("openPlaylistEpisode(url)")
-        && screen.contains("private func openPlaylistEpisode(_ url: URL)")
+        && screen.contains("func openPlaylistEpisode(_ url: URL)")
         && screen.contains("lookup.closeAll(player: model)")
         && screen.contains("subtitles.clear()")
         && screen.contains("model.selectPlaylistItem(url)"),
@@ -477,7 +519,7 @@ require(
     "interactive subtitle views should pass through clicks outside rendered text while still reporting hover for subtitle masks"
 )
 require(
-    interactiveSubtitles.contains("private func performLookup(at point: CGPoint)")
+    interactiveSubtitles.contains("func performLookup(at point: CGPoint)")
         && interactiveSubtitles.contains("override func mouseDown(with event: NSEvent)")
         && interactiveSubtitles.contains("performLookup(at: point)")
         && interactiveSubtitles.contains("scheduleShiftHoverLookup(at: point)"),
@@ -523,9 +565,9 @@ require(
         && screen.contains(".contentShape(Rectangle())")
         && screen.contains("dismissVideoOverlaysFromCanvas()")
         && screen.contains(".zIndex(2.5)")
-        && screen.contains("private var shouldShowVideoDismissLayer: Bool")
+        && screen.contains("var shouldShowVideoDismissLayer: Bool")
         && screen.contains("hasActiveVideoPopup || isInspectorVisible")
-        && screen.contains("private func dismissVideoPopupsIfNeeded()"),
+        && screen.contains("func dismissVideoPopupsIfNeeded()"),
     "video should install a transparent dismiss layer above subtitles so non-subtitle clicks close active lookup popups or the inspector"
 )
 require(
@@ -544,12 +586,12 @@ require(
     "video canvas should use double-click to toggle full screen without moving that behavior into the control bar"
 )
 require(
-        screen.contains("@State private var isPlaybackChromeVisible = true")
-        && screen.contains("@State private var isPointerInsidePlayerSurface = true")
-        && screen.contains("@State private var lastPlaybackChromePointerLocation: CGPoint?")
-        && screen.contains("@State private var playbackChromeDragOffset: CGSize = .zero")
-        && screen.contains("@State private var playbackChromeStoredOffset: CGSize = .zero")
-        && screen.contains("@State private var playbackChromeAutoHideTask: Task<Void, Never>?")
+        screen.contains("var isPlaybackChromeVisible = true")
+        && screen.contains("var isPointerInsidePlayerSurface = true")
+        && screen.contains("var lastPlaybackChromePointerLocation: CGPoint?")
+        && screen.contains("var playbackChromeDragOffset: CGSize = .zero")
+        && screen.contains("var playbackChromeStoredOffset: CGSize = .zero")
+        && screen.contains("var playbackChromeAutoHideTask: Task<Void, Never>?")
         && screen.contains("@Environment(\\.scenePhase) private var scenePhase")
         && screen.contains(".onChange(of: scenePhase)")
         && screen.contains("playerSurfaceHoverChanged(hovering)")
@@ -560,26 +602,26 @@ require(
         && screen.contains("lastPlaybackChromePointerLocation = NSEvent.mouseLocation")
         && screen.contains("TapGesture(count: 1)")
         && screen.contains("togglePlaybackFromPointer()")
-        && screen.contains("private func schedulePlaybackChromeAutoHide()")
+        && screen.contains("func schedulePlaybackChromeAutoHide()")
         && screen.contains(".onChange(of: isInspectorVisible)")
         && screen.contains("if inspectorVisible {")
         && screen.contains("revealPlaybackChrome(scheduleHide: false)")
         && screen.contains("schedulePlaybackChromeAutoHide()")
-        && screen.contains("private func hidePlaybackChromeForPointerExit()")
-        && screen.contains("private func clampedPlaybackChromeOffset")
+        && screen.contains("func hidePlaybackChromeForPointerExit()")
+        && screen.contains("func clampedPlaybackChromeOffset")
         && screen.contains("playbackChromeStoredOffset = clampedPlaybackChromeOffset")
         && screen.contains("onDragChanged: { translation in")
         && screen.contains("onDragEnded: { translation in")
         && screen.contains(".position(playbackChromeBasePosition(in: geometry.size))")
         && screen.contains(".offset(playbackChromeCurrentOffset(in: geometry.size))")
         && screen.contains("Task.sleep(nanoseconds: 1_000_000_000)")
-        && screen.contains("private func hidePlaybackChromeAndCursor()")
+        && screen.contains("func hidePlaybackChromeAndCursor()")
         && screen.contains("windowChrome.hidePlaybackCursorUntilMouseMoves()")
         && screen.contains("windowChrome.restorePlaybackCursor()")
-        && screen.contains("private func playbackChromeHoverChanged(_ hovering: Bool)")
+        && screen.contains("func playbackChromeHoverChanged(_ hovering: Bool)")
         && !screen.contains("revealPlaybackChrome(scheduleHide: false)\n        } else {\n            schedulePlaybackChromeAutoHide()")
         && !screen.contains("!isPointerOverPlaybackChrome,\n              !hasActiveVideoPopup")
-        && screen.contains("private var shouldShowPlaybackChrome: Bool"),
+        && screen.contains("var shouldShowPlaybackChrome: Bool"),
     "video playback chrome and cursor should share one one-second idle callback, restore on pointer activity, and remain draggable"
 )
 require(
@@ -590,10 +632,10 @@ require(
 requireOrdered(
     screen,
     [
-        "private func hidePlaybackChromeAndCursor()",
+        "func hidePlaybackChromeAndCursor()",
         "isPlaybackChromeVisible = false",
         "windowChrome.hidePlaybackCursorUntilMouseMoves()",
-        "private func schedulePlaybackChromeAutoHide()",
+        "func schedulePlaybackChromeAutoHide()",
         "hidePlaybackChromeAndCursor()",
     ],
     "video cursor hiding should run directly after playback chrome hiding from the same auto-hide task instead of a derived SwiftUI onChange"
@@ -714,7 +756,7 @@ require(
 )
 require(
     !screen.contains("ToolbarItemGroup(placement: .primaryAction)")
-        && screen.contains("private struct VideoTitlebarBackdrop: NSViewRepresentable")
+        && screen.contains("struct VideoTitlebarBackdrop: NSViewRepresentable")
         && screen.contains("view.material = .titlebar")
         && videoCanvas.contains("if windowChrome.showsWindowedTitlebarSurface")
         && videoCanvas.contains("videoWindowDragStrip")
@@ -733,7 +775,7 @@ require(
         && screen.contains(".transition(.move(edge: .trailing).combined(with: .opacity))")
         && screen.contains("HStack(spacing: 0)")
         && screen.contains("VideoMiningHistorySidebar(")
-        && screen.contains("@State private var isMiningHistoryVisible = false"),
+        && screen.contains("var isMiningHistoryVisible = false"),
     "video inspector should still overlay the video while mining history uses a separate fixed sidebar that pushes the video"
 )
 require(
@@ -744,13 +786,14 @@ require(
         && screen.contains("let sidebarCurrentTime = (isTranscriptSidebarTab || isChaptersSidebarTab)")
         && screen.contains("transcript: sidebarTranscript")
         && screen.contains("chapters: sidebarChapters")
-        && screen.contains("currentTime: sidebarCurrentTime"),
+        && screen.contains("currentTime: sidebarCurrentTime")
+        && screen.contains("duration: isChaptersSidebarTab ? model.snapshot.duration : 0"),
     "video history sidebar should not receive hot playback transcript/chapter/currentTime state while the history tab is selected"
 )
 require(
-    screen.contains("private static let inspectorOverlayTrailingInset: CGFloat = 16")
-        && screen.contains("private static let inspectorOverlayVerticalInset: CGFloat = 16")
-        && screen.contains(".padding(.vertical, Self.inspectorOverlayVerticalInset)")
+    screen.contains("static let inspectorOverlayTrailingInset: CGFloat = 16")
+        && screen.contains("static let inspectorOverlayVerticalInset: CGFloat = 16")
+        && screen.contains(".padding(.top, Self.inspectorOverlayVerticalInset)")
         && screen.contains(".padding(.trailing, Self.inspectorOverlayTrailingInset)"),
     "video inspector should be inset from the video window edge"
 )
@@ -770,9 +813,9 @@ require(
     "split ASS should render only primary cues as visible interactive TextKit text using the configured appearance and height"
 )
 require(
-    screen.contains("private var hasActiveVideoPopup: Bool")
+    screen.contains("var hasActiveVideoPopup: Bool")
         && screen.contains("!lookup.presentation.popups.isEmpty")
-        && screen.contains("private var hasVisibleVideoPopup: Bool")
+        && screen.contains("var hasVisibleVideoPopup: Bool")
         && screen.contains("lookup.presentation.popups.contains { $0.showPopup }"),
     "video subtitle masks should reveal only for visible lookup popups while popup-stack lifecycle checks keep using the active stack"
 )
@@ -795,20 +838,31 @@ require(
 )
 require(
     inspector.contains("VideoInspectorGlassSurface")
+        && inspector.contains("VideoInspectorTabBar(selection: $selectedTab)")
+        && inspector.contains("matchedGeometryEffect(id: \"selection\", in: selectionNamespace)")
         && inspector.contains("VideoInspectorSegmentedPicker(")
-        && inspector.contains("minSegmentWidth: 62")
-        && inspector.contains("fillsWidth: true")
         && !inspector.contains("NativeGlassSegmentedPicker(")
         && !inspector.contains("VideoInspectorSwiftUIGlassSegmentedControl")
         && !inspector.contains("ControlGroup {")
         && !inspector.contains(".buttonStyle(.glassProminent)")
+        && !inspector.contains(".buttonStyle(.glass)")
         && !inspector.contains(".shadow(")
         && !inspector.contains("NSSegmentedControl")
         && inspector.contains("VideoInspectorSectionGlassSurface")
-        && countOccurrences(inspector, of: ".buttonStyle(.glass)") >= 10
+        && inspector.contains("private struct VideoInspectorChoiceRow")
+        && inspector.contains("private struct VideoInspectorStepperDisplay")
         && !inspector.contains("VideoInspectorGlassButtonStyle")
         && !inspector.contains("SubtitleTranscriptView"),
-    "video inspector should use native macOS 26 glass buttons while preserving its compact segmented control"
+    "video inspector should be one glass panel with a tab strip and flat grouped lists, without nested glass buttons"
+)
+require(
+    inspector.contains("private var header: some View")
+        && inspector.contains("String(localized: \"Now Playing\")")
+        && inspector.contains("private var currentEpisodeIndex: Int?")
+        && inspector.contains("VideoInspectorEpisodeRow(")
+        && inspector.contains("inspectorSection(\"Picture Adjustments\"")
+        && inspector.contains("rowLabel(\"A-B Loop\""),
+    "video inspector should name the playing video and episode position, number episodes, and group picture and loop controls"
 )
 require(
     inspectorState.contains("struct VideoInspectorState: Equatable")
@@ -824,7 +878,7 @@ require(
 )
 require(
     countOccurrences(inspector, of: ".glassEffect(") == 1
-        && inspector.contains("private static let subtitleFontFamilies: [String] ="),
+        && inspector.contains("static let subtitleFontFamilies: [String] ="),
     "video inspector should keep only one outer glass effect and cache font families to avoid per-tick glass/font work"
 )
 require(
@@ -854,8 +908,8 @@ require(
 require(
     playbackEngine.contains("static let allowedMilliseconds = -60_000...60_000")
         && playbackEngine.contains("static let sliderMilliseconds = -10_000...10_000")
-        && inspector.contains("private static let subtitleTimingLargeStepMilliseconds = 1_000")
-        && inspector.contains("private static let subtitleTimingSmallStepMilliseconds = 50")
+        && inspector.contains("static let subtitleTimingLargeStepMilliseconds = 1_000")
+        && inspector.contains("static let subtitleTimingSmallStepMilliseconds = 50")
         && inspector.contains("subtitleTimingSection")
         && inspector.contains("Slider(")
         && inspector.contains("get: { Double(VideoSubtitleTiming.clampedSliderMilliseconds(subtitleTimingMilliseconds)) }")
@@ -867,8 +921,8 @@ require(
         && inspector.contains("applySubtitleTimingMilliseconds(current + Self.subtitleTimingLargeStepMilliseconds)")
         && inspector.contains("TextField(\"Offset\", text: $subtitleTimingInputText)")
         && inspector.contains("Image(systemName: \"keyboard\")")
-        && subtitleTimingSection.contains(".buttonStyle(.glass)")
-        && subtitleTimingSection.contains(".buttonBorderShape(.circle)")
+        && subtitleTimingSection.contains("VideoInspectorStepperDisplay(")
+        && inspector.contains(".lineLimit(1)\n                .minimumScaleFactor(0.7)")
         && !subtitleTimingSection.contains(".clipShape(Circle())"),
     "video subtitle timing should keep the slider at +/-10000ms, let buttons and input reach +/-60000ms, and avoid clipping the complete control row"
 )
@@ -889,7 +943,7 @@ require(
     "video shortcuts should align the adjacent subtitle to the current playback time"
 )
 require(
-    miningHistorySidebar.contains("subtitleAlignmentControls")
+    miningHistorySidebar.contains("transcriptToolbar")
         && miningHistorySidebar.contains("onAlignPreviousSubtitle")
         && miningHistorySidebar.contains("onAlignNextSubtitle")
         && miningHistorySidebar.contains("canAlignPreviousSubtitle")
@@ -921,49 +975,64 @@ require(
         && miningHistorySidebar.contains("enum VideoStudySidebarTab")
         && miningHistorySidebar.contains("case chapters")
         && miningHistorySidebar.contains("let chapters: [VideoChapter]")
-        && miningHistorySidebar.contains("NativeGlassSegmentedPicker")
+        && miningHistorySidebar.contains("let duration: TimeInterval")
+        && miningHistorySidebar.contains("private struct VideoStudyTabBar")
         && miningHistorySidebar.contains("SubtitleTranscriptView")
         && miningHistorySidebar.contains("chapterList")
         && miningHistorySidebar.contains("currentChapterID")
         && miningHistorySidebar.contains("onSeekChapter(chapter.id)")
+        && miningHistorySidebar.contains("VideoStudyProgressBar(")
         && miningHistorySidebar.contains("No Chapters")
-        && miningHistorySidebar.contains("VideoStudyListCard {\n            onJump(item)")
+        && miningHistorySidebar.contains("VideoStudyListRow {\n            onJump(item)")
         && miningHistorySidebar.contains("Label(\"Copy Subtitle\", systemImage: \"doc.on.doc\")")
         && miningHistorySidebar.contains("Label(\"Delete\", systemImage: \"trash\")")
         && miningHistorySidebar.contains("onCopy(item)")
+        && miningHistorySidebar.contains(".contextMenu {")
+        && miningHistorySidebar.contains("VideoStudySearchField(prompt: \"Search Mining History\"")
+        && miningHistorySidebar.contains("VideoStudySearchField(prompt: \"Search Transcript\"")
+        && miningHistorySidebar.contains("for item in items.reversed()")
         && !miningHistorySidebar.contains("onContinueMining")
-        && !miningHistorySidebar.contains("Menu")
+        && !miningHistorySidebar.contains(" Menu {")
         && !miningHistorySidebar.contains("Image(systemName: \"ellipsis\")")
         && miningHistorySidebar.contains("confirmationDialog")
         && miningHistorySidebar.contains("Clear Mining History"),
-    "video study sidebar should switch between mining history, transcript and chapters while preserving direct history actions"
+    "video study sidebar should switch between searchable newest-first mining history, transcript and chapters while preserving direct history actions"
 )
 require(
-    studyListCard.contains("struct VideoStudyListCard")
-        && studyListCard.contains("VideoStudyListCardSurface")
+    studyListCard.contains("struct VideoStudyListRow")
+        && studyListCard.contains("VideoStudyListRowSurface")
+        && studyListCard.contains("struct VideoStudyGroup")
+        && studyListCard.contains("struct VideoStudySearchField")
+        && studyListCard.contains("enum VideoStudySearch")
         && studyListCard.contains("backgroundTint")
         && studyListCard.contains("onHover")
         && !studyListCard.contains(".glassEffect(")
+        && !studyListCard.contains("Material")
         && !studyListCard.contains("withAnimation(.smooth(duration: 0.16))"),
-    "video study lists should use lightweight row tint instead of per-row glass or hover animation during playback scrolling"
+    "video study lists should use lightweight flat row tint instead of per-row glass or hover animation during playback scrolling"
 )
 require(
-    miningHistorySidebar.contains("VideoStudyListCard(")
-        && miningHistorySidebar.contains("LazyVStack(alignment: .leading, spacing: 8)")
+    miningHistorySidebar.contains("VideoStudyListRow(")
+        && miningHistorySidebar.contains("VideoStudyGroup {")
         && miningHistorySidebar.contains("VideoStudySidebarBackground")
-        && transcriptView.contains("VideoStudyListCard(")
-        && transcriptView.contains("LazyVStack(spacing: 8)"),
-    "mining history, transcript and chapters should use the same spaced card-list presentation"
+        && !miningHistorySidebar.contains(".glassEffect(")
+        && transcriptView.contains("VideoStudyListRow(")
+        && transcriptView.contains("LazyVStack(spacing: 2)"),
+    "mining history, transcript and chapters should share the flat study row presentation"
 )
 require(
     transcriptView.contains("extension SubtitleTranscriptView: Equatable")
         && transcriptView.contains("lhs.currentRowID == rhs.currentRowID")
-        && transcriptView.contains("private func followPlayback(")
+        && transcriptView.contains("lhs.query == rhs.query")
+        && transcriptView.contains("func followPlayback(")
+        && transcriptView.contains("guard isFollowingPlayback,")
+        && transcriptView.contains(".onScrollPhaseChange")
+        && transcriptView.contains("Back to Current Line")
         && transcriptView.contains("proxy.scrollTo(row.id, anchor: .center)")
         && !transcriptView.contains("withAnimation(.smooth(duration: 0.18))")
         && miningHistorySidebar.contains("SubtitleTranscriptView(")
         && miningHistorySidebar.contains(".equatable()"),
-    "video transcript sidebar should skip playback ticks inside the same subtitle row and avoid animated auto-scroll"
+    "video transcript sidebar should skip playback ticks inside the same subtitle row, pause following while the user scrolls, and avoid animated auto-scroll"
 )
 require(
     ambientBackdrop.contains("struct VideoAmbientBackdrop")
@@ -990,7 +1059,7 @@ require(
     "mining screenshots should remain on mpv's video-only capture path instead of capturing the ambient UI"
 )
 require(
-    screen.contains("@State private var miningHistory = VideoMiningHistoryStore()")
+    screen.contains("var miningHistory = VideoMiningHistoryStore()")
         && screen.contains("mineCurrentSubtitle()")
         && screen.contains("miningHistory.record(")
         && screen.contains("VideoMiningHistoryNavigationResolver.resolve(")
@@ -1008,7 +1077,7 @@ require(
     "shared Popup mining should no longer expose Video-only history result hooks"
 )
 require(
-    transcriptView.contains("@State private var rowWindow = SubtitleTranscriptWindow()")
+    transcriptView.contains("var rowWindow = SubtitleTranscriptWindow()")
         && transcriptView.contains("transcript.rows(in: rowWindow.visibleRange)")
         && transcriptView.contains("extendWindowIfNeeded(forVisibleOffset:")
         && transcriptView.contains("rowWindow.followPlayback("),
@@ -1043,7 +1112,7 @@ require(
     "video transcript should track a cheap transcript change token instead of comparing the full row array"
 )
 require(
-    transcriptView.contains("@State private var focusedRowID")
+    transcriptView.contains("var focusedRowID")
         && transcriptView.contains("row.id != focusedRowID || rowWindow.visibleRange != previousRange"),
     "video transcript should avoid re-scrolling the list on every playback tick while the focused row is unchanged"
 )

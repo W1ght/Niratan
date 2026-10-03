@@ -1,3 +1,4 @@
+// test-sources: Features/Manga/MangaMokuroParser.swift Models/Manga.swift
 import Foundation
 
 @main

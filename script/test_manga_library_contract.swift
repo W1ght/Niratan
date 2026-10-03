@@ -54,7 +54,18 @@ let ocr = try source("Features/Manga/MangaOCRService.swift")
 let pageProcessing = try source("Features/Manga/MangaPageProcessing.swift")
 let library = try source("Features/Manga/MangaLibraryView.swift")
 let libraryModel = try source("Features/Manga/MangaLibraryViewModel.swift")
-let reader = try source("Features/Manga/MangaReaderView.swift")
+let readerView = try source("Features/Manga/MangaReaderView.swift")
+let readerCanvas = try source("Features/Manga/MangaReaderCanvas.swift")
+let readerSettings = try source("Features/Manga/MangaReaderSettings.swift")
+let readerSettingsPanel = try source("Features/Manga/MangaReaderSettingsPanel.swift")
+let readerOCRSettings = try source("Features/Manga/MangaReaderOCRSettings.swift")
+let readerShortcuts = try source("Features/Manga/MangaShortcutActions.swift")
+let ocrRouter = try source("Features/Manga/MangaOCREngineRouter.swift")
+let ocrModelStore = try source("Features/Manga/OCR/MangaOCRModelStore.swift")
+let shortcutRegistry = try source("Features/Settings/ApplicationShortcutRegistry.swift")
+/// The reader UI spans the SwiftUI shell, the AppKit canvas and the settings
+/// panel; reader contracts check them together.
+let reader = [readerView, readerCanvas, readerSettingsPanel, readerOCRSettings].joined(separator: "\n")
 let readerModel = try source("Features/Manga/MangaReaderViewModel.swift")
 let pageProvider = try source("Features/Manga/MangaPageProvider.swift")
 let suwayomiModel = try source("Models/Suwayomi.swift")
@@ -77,6 +88,12 @@ let popupModels = try source("Features/Popup/PopupModels.swift")
 let popupView = try source("Features/Popup/PopupView.swift")
 let nativeReader = try source("NativeMac/NativeReaderView.swift")
 let videoPlayer = try source("Features/Video/VideoPlayerScreen.swift")
+    + source("Features/Video/VideoPlayerScreen+Subtitles.swift")
+    + source("Features/Video/VideoPlayerScreen+Chrome.swift")
+    + source("Features/Video/VideoPlayerScreen+OSD.swift")
+    + source("Features/Video/VideoPlayerScreen+Mining.swift")
+    + source("Features/Video/VideoPlayerScreen+Opening.swift")
+    + source("Features/Video/VideoPlayerScreen+Shortcuts.swift")
 let dictionaryView = try source("Features/Dictionary/DictionarySearchView.swift")
 let quickLookup = try source("NativeMac/QuickLookupPanelController.swift")
 let textSelection = try source("Core/SelectionLookup/TextSelectionResolver.swift")
@@ -88,7 +105,7 @@ require(
     section.contains("case manga")
         && detail.contains("MangaLibraryView(")
         && detail.contains("viewModel: mangaLibraryViewModel")
-        && rootView.contains("@State private var mangaLibraryViewModel")
+        && rootView.contains("var mangaLibraryViewModel")
         && rootView.contains("return .hidden")
         && !rootView.contains("ToolbarItem(placement: .primaryAction)")
         && !rootView.contains(".frame(width: 1, height: 1)")
@@ -105,7 +122,7 @@ require(
     "Manga must be a first-class native navigation section while the main split view fills the window inside the system-reserved toolbar safe area"
 )
 require(
-    app.contains("@State private var mangaWindowCoordinator")
+    app.contains("var mangaWindowCoordinator")
         && app.contains(".environment(mangaWindowCoordinator)"),
     "The dedicated manga reader window must receive scene-owned coordination"
 )
@@ -146,7 +163,7 @@ require(
         && discoveryService.contains("retryAfter")
         && discoveryService.contains("canonicalWorkID")
         && discoveryService.contains("format_in: [MANGA, ONE_SHOT]")
-        && discoveryView.contains("@ObservationIgnored private var states")
+        && discoveryView.contains("var states")
         && discoveryView.contains("requestTask?.cancel()")
         && discoveryView.contains("loadNextPageIfNeeded")
         && discoveryView.contains("await resolveInstalledSources()")
@@ -174,7 +191,7 @@ require(
 require(
     library.contains("case local")
         && library.contains("case online")
-        && library.contains("@State private var remoteConnector: MangaRemoteConnector = .aidoku")
+        && library.contains("var remoteConnector: MangaRemoteConnector = .aidoku")
         && library.contains("MangaSourceBrowseView(")
         && library.contains("MangaSourcesView(")
         && suwayomiView.contains("Suwayomi Server")
@@ -390,9 +407,13 @@ require(
         && pageProcessing.contains("splitsWidePages")
         && pageProcessing.contains("cropsWhiteBorders")
         && pageProcessing.contains("readingDirection == .rightToLeft")
+        && pageProcessing.contains("rotatesClockwise")
+        && pageProcessing.contains("rotatedPageAspectRatio = 1.15")
+        && pageProcessing.contains("borderDifferenceThreshold = 35.0")
         && reader.contains(#""Split Wide Pages""#)
-        && reader.contains(#""Crop White Borders""#),
-    "Manga must keep wide-page splitting and scan-border cropping inside its native page pipeline"
+        && reader.contains(#""Crop Borders""#)
+        && reader.contains(#""Rotate Wide Pages to Fit""#),
+    "Manga must keep wide-page splitting, rotation and Fushi-style background-aware border cropping inside its native page pipeline"
 )
 require(
     store.contains(".withSecurityScope")
@@ -448,7 +469,8 @@ require(
     "Manga import must accept direct ordinary image folders, CBZ/ZIP, Mokuro and EPUB without restoring recursive parent-folder imports"
 )
 require(
-    library.contains("showTitle: true")
+    library.contains("title: \"Unshelved\"")
+        && library.contains("title: \"Currently Reading\"")
         && library.contains("viewModel.recordOpened(item)")
         && libraryModel.contains("$0.lastReadAt != nil")
         && store.contains("func recordOpened(itemID: String"),
@@ -500,17 +522,17 @@ require(
     "Mokuro metadata must resolve locally before Google OCR and enable lookup without the OCR toggle"
 )
 require(
-    reader.contains("case .singlePage, .doublePage")
+    reader.contains("case .paged, .verticalPaged")
         && reader.contains("MangaContinuousReader")
         && reader.contains("allowsMagnification = true")
         && reader.contains("MangaSpreadDocumentView")
         && reader.contains("MangaCenteredClipView")
         && reader.contains("lastAppliedFitMagnification")
         && reader.contains("viewportSize != lastViewportSize")
-        && reader.contains("maxMagnification = max(8, fit * 2)")
-        && reader.contains("minMagnification = fit * 0.5")
-        && reader.contains(#".onKeyPress(.escape)"#)
-        && reader.contains("viewModel.handleEscape() ? .handled : .ignored")
+        && reader.contains("maxMagnification = max(fit * maximumScale, fit)")
+        && reader.contains("minMagnification = min(fit * minimumScale, target)")
+        && reader.contains("MangaShortcutActions.back.id")
+        && reader.contains("viewModel.handleEscape()")
         && reader.contains("handleLeftArrow()")
         && reader.contains("handleRightArrow()")
         && reader.contains("override func scrollWheel(with event: NSEvent)")
@@ -522,7 +544,7 @@ require(
         && reader.contains("configureContinuousZoom(")
         && reader.contains("onContinuousZoomScaleChange?(targetScale)")
         && reader.contains("override func rightMouseDown(with event: NSEvent)")
-        && reader.contains("private var ancestorScrollView: NSScrollView?")
+        && reader.contains("var ancestorScrollView: NSScrollView?")
         && reader.contains("candidate = view.superview")
         && reader.contains("NSPasteboard.general.writeObjects([image])")
         && reader.contains("NSSavePanel()")
@@ -534,7 +556,7 @@ require(
         && models.contains("MangaWheelNavigationResolver")
         && models.contains("MangaWheelZoomResolver")
         && readerModel.contains("func handleEscape() -> Bool")
-        && readerModel.contains("guard !popupPresentation.popups.isEmpty else { return false }")
+        && readerModel.contains("if !popupPresentation.popups.isEmpty {")
         && readerModel.contains(
             """
             func handleLeftArrow() {
@@ -557,23 +579,21 @@ require(
                 }
             """
         ),
-    "The reader must provide paged, double-page, continuous, resize-aware zoom, mouse-wheel paging at every zoom, modifier-wheel zoom, trackpad and right-button panning, page image actions, popup Escape dismissal, and direction-aware keyboard behavior"
+    "The reader must provide paged, double-page, continuous, resize-aware zoom, mouse-wheel paging, modifier-wheel zoom, trackpad and right-button panning, page image actions, popup Escape dismissal, and direction-aware keyboard behavior"
 )
 require(
     models.contains(#"static let layoutKey = "mangaReaderLayout""#)
         && models.contains(#"static let directionKey = "mangaReadingDirection""#)
         && models.contains(#"static let zoomLevelKey = "mangaReaderZoomLevel""#)
-        && !models.contains("enum MangaReaderZoomLevel")
-        && readerModel.contains("MangaReaderPreferences.layout(in: preferences)")
-        && readerModel.contains("MangaReaderPreferences.direction(in: preferences)")
-        && readerModel.contains("MangaReaderPreferences.zoomPercentage(in: preferences)")
-        && readerModel.contains("MangaReaderPreferences.save(layout: layout, in: preferences)")
-        && readerModel.contains("MangaReaderPreferences.save(direction: direction, in: preferences)")
-        && readerModel.contains("MangaReaderPreferences.save(")
-        && !reader.contains(#"Picker("Reading Layout""#)
-        && !reader.contains(#"Picker("Reading Direction""#)
-        && reader.contains("viewModel.layout = layout")
-        && reader.contains("viewModel.direction = direction")
+        && readerSettings.contains(#"static let globalKey = "mangaReaderSettings""#)
+        && readerSettings.contains(#"static let overridesFileName = "manga_reader_overrides.json""#)
+        && readerSettings.contains("static func migratedSettings(from defaults: UserDefaults)")
+        && readerSettings.contains("MangaReaderPreferences.layoutKey")
+        && readerSettings.contains("settings.ocrEngine = .googleLens")
+        && readerSettings.contains("value(.mode, defaults.mode)")
+        && readerSettings.contains("static let maximumZoomPercentage = 400")
+        && readerModel.contains("settingsStore.update(key, from: newSettings, documentID: documentID)")
+        && readerModel.contains("func resetAllOverrides()")
         && reader.contains("MangaZoomControls(viewModel: viewModel)")
         && reader.contains("Slider(")
         && reader.contains(#"TextField("", text: $percentageText)"#)
@@ -585,13 +605,44 @@ require(
         && reader.contains("apply(Int(sliderPercentage.rounded()))")
         && reader.contains("percentageText = String(Int(newValue.rounded()))")
         && !reader.contains("Zoom Presets")
-        && reader.contains("MangaReaderPreferences.clampedZoomPercentage")
-        && reader.contains("zoomScale: viewModel.zoomScale")
+        && reader.contains("MangaReaderSettings.maximumZoomPercentage")
         && reader.contains("let pageWidth = basePageWidth * viewModel.zoomScale")
         && reader.contains("ScrollView([.horizontal, .vertical])")
         && reader.contains("let target = fit * requestedZoomScale")
-        && reader.contains(#"? "checkmark""#),
-    "Manga layout, direction, and persisted page zoom must expose a page-navigator-width macOS 26 glass slider that commits after dragging plus numeric input without zoom presets"
+        && reader.contains(".inspector(isPresented: $viewModel.showsSettingsPanel)")
+        && reader.contains("Picker(\"Apply Changes To\"")
+        && !reader.contains(".background(.regularMaterial)")
+        && !reader.contains(".background(.ultraThinMaterial)"),
+    "Manga settings must migrate the previous layout, direction, zoom, processing and OCR choices into global settings with sparse per-title overrides edited from a native inspector"
+)
+require(
+    readerSettings.contains("func tapZoneAction(at point: CGPoint) -> MangaTapZoneAction?")
+        && readerSettings.contains("case leftRight")
+        && readerSettings.contains("case lShaped")
+        && readerSettings.contains("case kindle")
+        && readerSettings.contains("webtoonAspectThreshold = 2.0")
+        && pageProcessing.contains("enum MangaSpreadResolver")
+        && pageProcessing.contains("showsCoverAlone")
+        && pageProcessing.contains("showsWidePagesAlone")
+        && readerModel.contains("private func advanceChapter(_ turn: MangaPageTurn)")
+        && readerModel.contains("openChapter(at: previous, pageIndex: Int.max)")
+        && readerModel.contains("median > MangaReaderSettings.webtoonAspectThreshold")
+        && readerModel.contains("private func advancePanel(_ turn: MangaPageTurn) -> Bool")
+        && reader.contains("canScroll(toward: navigation)")
+        && reader.contains("func canvasBlankMouseDown(_ event: NSEvent, in view: NSView)")
+        && reader.contains("toggleDoubleClickZoom(at:")
+        && reader.contains("addPageTransition(turn:")
+        && reader.contains("CIColorControls")
+        && reader.contains("CIColorInvert")
+        && reader.contains("drawOCRBoxes()")
+        && reader.contains("modifiers.contains(.shift)")
+        && reader.contains("kIOPMAssertionTypePreventUserIdleDisplaySleep")
+        && reader.contains("toolbar.isVisible = visible")
+        && reader.contains("window.setFrame(frame, display: true)")
+        && readerShortcuts.contains(#"id: "manga.pageLeft""#)
+        && readerShortcuts.contains(#"id: "manga.toggleInterface""#)
+        && shortcutRegistry.contains("MangaShortcutActions.all"),
+    "The Manga reader must follow Fushi's desktop reading model: spreads with lone covers and wide pages, click zones, pan-before-turn wheel paging, double-click zoom, page transitions, filters, auto chapter advance, panel navigation, hover lookup and rebindable shortcuts"
 )
 require(
     reader.contains("MangaPageNavigator(")
@@ -608,7 +659,9 @@ require(
 require(
     reader.contains("ScrollViewReader { scrollProxy in")
         && reader.contains("MangaContinuousPageFramePreferenceKey")
-        && reader.contains("LazyVStack(spacing: 0)")
+        && reader.contains("LazyVStack(spacing: gap)")
+        && reader.contains("let gap: CGFloat = settings.showsPageGaps ? 12 : 0")
+        && readerModel.contains("func pageAspectRatio(for page: MangaPresentationPage) -> CGFloat")
         && !reader.contains(".padding(.vertical, 12)")
         && reader.contains("topVisiblePageIndex(")
         && reader.contains("requestedScrollTarget = pageIndex")
@@ -669,10 +722,14 @@ require(
 )
 require(
     reader.contains("mangaGoogleOCRDisclosureAccepted")
+        && ocrRouter.contains(#"static let googleLensConsentKey = "mangaGoogleOCRDisclosureAccepted""#)
+        && readerModel.contains("!MangaOCREngineRouter.hasGoogleLensConsent()")
+        && readerModel.contains("|| MangaOCREngineRouter.hasGoogleLensConsent())")
+        && ocrRouter.contains("Google Lens recognition belongs to MangaOCRService")
         && reader.contains("Use Google Lens Text Recognition?")
         && reader.contains("sends a reduced copy of every page without Mokuro text to Google")
         && reader.contains("Results are cached on this Mac"),
-    "Google Lens OCR must disclose whole-manga upload and local caching before its first request"
+    "Google Lens OCR must disclose whole-manga upload and local caching before its first request, and never start automatically without that consent"
 )
 require(
     reader.contains("MangaOCRTextRegion")
@@ -693,9 +750,9 @@ require(
         && reader.contains("drawHorizontalOCRText")
         && reader.contains("drawVerticalOCRText")
         && reader.contains("mouseMoved(with event:")
-        && reader.contains("let localRect = self.convert(")
-        && reader.contains("self.bounds.height - localRect.maxY")
-        && !reader.contains("let localRect = self.contentView.convert(")
+        && reader.contains("let localRect = convert(documentRect, from: spreadView)")
+        && reader.contains(": bounds.height - localRect.maxY")
+        && !reader.contains("let localRect = contentView.convert(")
         && reader.contains("onDismissOCRSelection")
         && !reader.contains("mangaPopupCloseButton")
         && reader.contains("PopupView(")
@@ -804,14 +861,15 @@ require(
         && !library.contains(#"Label("Refresh Manga Library""#)
         && !library.contains(#"systemImage: "arrow.clockwise""#)
         && !library.contains(".formStyle(.grouped)")
-        && library.contains(#"NativeReaderSheetPanel("Manage Manga Shelves""#)
+        && library.contains("LibraryShelfSidebar(")
+        && !library.contains(#""Manage Manga Shelves""#)
         && !libraryModel.contains("var searchText"),
     "Manga library surfaces must fill the detail host while navigation and local-library actions use the same native macOS toolbar structure as the novel bookshelf"
 )
 require(
     suwayomiView.contains("connectionLoadID = loadID")
         && suwayomiView.contains("activeOperationID")
-        && suwayomiView.contains("private func beginOperation()")
+        && suwayomiView.contains("func beginOperation()")
         && suwayomiView.contains("isCurrentOperation(operationID)")
         && suwayomiView.contains("profileID: profileID")
         && suwayomiView.contains("loadID: loadID")
@@ -833,7 +891,7 @@ require(
         && pageProvider.contains("String(prepared.fetchedAt)")
         && pageProvider.contains("String(prepared.pageCount)")
         && pageProvider.contains("[.modificationDate: Date()]")
-        && pageProvider.contains("private static func pruneCache(")
+        && pageProvider.contains("static func pruneCache(")
         && pageProvider.contains("values.isSymbolicLink != true")
         && pageProvider.contains("try? data.write(to: diskURL")
         && readerModel.contains("let imageExtension = payload.fileExtension")
@@ -872,7 +930,7 @@ require(
             "kSecAttrGeneric as String: Data(profileID.utf8)"
         )
         && suwayomiStore.contains(
-            "private func pruneVersionedSecrets("
+            "func pruneVersionedSecrets("
         )
         && suwayomiStore.contains(
             "try Task.checkCancellation()"
@@ -884,6 +942,22 @@ require(
             "let savedConfiguration = try await store.save("
         ),
     "Manga lookup must follow the active Profile while Suwayomi retries and credential clearing preserve their security boundaries"
+)
+
+require(
+    ocrRouter.contains("case .automatic:")
+        && ocrRouter.contains("if await store.isReady(.mangaCTC)")
+        && ocrRouter.contains("return await visionSelection(store: store)")
+        && ocr.contains("idPrefix: String")
+        && ocr.contains("MangaOCRRegionBuilder.regions(")
+        && models.contains("var engineID: String = Self.googleLensEngineID")
+        && ocr.contains("? language.rawValue")
+        && ocrModelStore.contains("digest == file.sha256")
+        && ocrModelStore.contains("expectedBytes")
+        && !ocrModelStore.contains("/resolve/main/")
+        && readerOCRSettings.contains("MangaOCRModelRow(")
+        && readerModel.contains("func rerunOCR()"),
+    "On-device manga OCR must resolve engines locally, keep separate per-engine caches (Google Lens keeps its original directory), and download only pinned, verified models"
 )
 
 print("Manga library contract passed")

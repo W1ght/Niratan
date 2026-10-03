@@ -1,3 +1,5 @@
+// test-sources: Features/Manga/MangaPageLoader.swift Models/Manga.swift Features/Manga/MangaEPUBParser.swift Features/Manga/MangaMokuroParser.swift
+// test-modules: ZIPFoundation
 import Foundation
 import ZIPFoundation
 

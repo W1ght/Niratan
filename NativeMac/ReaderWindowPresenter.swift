@@ -13,6 +13,10 @@ final class ReaderWindowPresenter: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private weak var coordinator: ReaderWindowCoordinator?
 
+    func closeWindow() {
+        window?.performClose(nil)
+    }
+
     func open(
         book: BookMetadata,
         coordinator: ReaderWindowCoordinator,

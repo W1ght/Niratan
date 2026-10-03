@@ -661,6 +661,45 @@ final class VideoLibraryViewModel {
         }
     }
 
+    /// Badge counts for the mode column, ignoring the search field. Grouped
+    /// modes count their groups; Needs Review is left out because it runs
+    /// every smart rule against every video.
+    func modeCounts() -> [VideoLibraryDisplayMode: Int] {
+        _ = playbackHistoryRevision
+        var counts: [VideoLibraryDisplayMode: Int] = [:]
+        var seriesNames = Set<String>()
+        var folderPaths = Set<String>()
+        for row in rows(for: allItems) {
+            let state = row.playbackState
+            let isMissing = isMissing(row.item)
+            counts[.all, default: 0] += 1
+            if state?.isResumable == true {
+                counts[.continueWatching, default: 0] += 1
+            }
+            if state == nil && !isMissing {
+                counts[.unwatched, default: 0] += 1
+            }
+            if state?.isFinished == true {
+                counts[.finished, default: 0] += 1
+            }
+            if state != nil {
+                counts[.recent, default: 0] += 1
+            }
+            if isMissing {
+                counts[.missing, default: 0] += 1
+            }
+            if row.metadata.isFavorite {
+                counts[.favorites, default: 0] += 1
+            }
+            seriesNames.insert(row.organization.seriesName)
+            folderPaths.insert(row.organization.folderPath)
+        }
+        counts[.series] = seriesNames.count
+        counts[.folders] = folderPaths.count
+        counts[.collections] = catalog.collections.count
+        return counts
+    }
+
     private func isCoveredByCollection(_ row: VideoLibraryRow) -> Bool {
         catalog.collections.contains { collection in
             switch collection.kind {

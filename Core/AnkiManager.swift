@@ -271,7 +271,7 @@ class AnkiManager {
 
         guard isAnkiConnectReachable else {
             scheduleAnkiConnectReconnect()
-            errorMessage = "AnkiConnect is not connected. Please start Anki and try again."
+            errorMessage = String(localized: "AnkiConnect is not connected. Please start Anki and try again.")
             return
         }
 
@@ -301,7 +301,7 @@ class AnkiManager {
     private func applyFetchedAnkiMetadata(decks: [String], noteTypes: [AnkiNoteType]) {
         let usableNoteTypes = noteTypes.filter { !$0.fields.isEmpty }
         guard !decks.isEmpty, !usableNoteTypes.isEmpty else {
-            errorMessage = "No decks or models were returned from Anki."
+            errorMessage = String(localized: "No decks or models were returned from Anki.")
             return
         }
 
@@ -521,24 +521,11 @@ class AnkiManager {
             ? await getMediaDirPath()
             : nil
         
-        var options: [String: Any] = ["allowDuplicate": configuration.allowDuplicates]
-        if configuration.duplicateScope == .collection {
-            options["duplicateScope"] = "collection"
-        } else {
-            options["duplicateScope"] = "deck"
-            if configuration.duplicateScope == .deckroot {
-                let rootDeck = deck.split(separator: "::", maxSplits: 1).first.map(String.init) ?? deck
-                options["duplicateScopeOptions"] = [
-                    "deckName": rootDeck,
-                    "checkChildren": true
-                ]
-            }
-        }
-        if configuration.checkAllModels {
-            var duplicateScopeOptions = options["duplicateScopeOptions"] as? [String: Any] ?? [:]
-            duplicateScopeOptions["checkAllModels"] = true
-            options["duplicateScopeOptions"] = duplicateScopeOptions
-        }
+        let options = configuration.duplicateScope.ankiConnectOptions(
+            deck: deck,
+            allowDuplicates: configuration.allowDuplicates,
+            checkAllModels: configuration.checkAllModels
+        )
         var note: [String: Any] = [
             "deckName": deck,
             "modelName": noteType,
@@ -999,6 +986,21 @@ class AnkiManager {
         )
     }
     
+    /// First glossary, in dictionary order, from a term dictionary of the given category.
+    private func categoryGlossary(
+        _ category: DictionaryCategory,
+        fallback: DictionaryCategory? = nil,
+        singleGlossaries: [String: String]
+    ) -> String {
+        for dictionary in DictionaryManager.shared.termDictionaries where dictionary.category == category {
+            if let glossary = singleGlossaries[dictionary.index.title], !glossary.isEmpty {
+                return glossary
+            }
+        }
+        guard let fallback else { return "" }
+        return categoryGlossary(fallback, singleGlossaries: singleGlossaries)
+    }
+
     private func handlebarToValue(handlebar: String, context: MiningContext, content: [String: String], singleGlossaries: [String: String]) -> String {
         if handlebar.hasPrefix(Handlebars.singleGlossaryPrefix) {
             let dictName = String(handlebar.dropFirst(Handlebars.singleGlossaryPrefix.count).dropLast())
@@ -1045,6 +1047,30 @@ class AnkiManager {
             case .selectedGlossaryNoDictionaryFallback:
                 let selected = singleGlossaries[content["selectedDictionary"] ?? ""] ?? content["glossaryFirst"] ?? ""
                 return Self.stripDictionaryName(selected)
+            case .monolingualDefinition:
+                return categoryGlossary(.monolingual, singleGlossaries: singleGlossaries)
+            case .monolingualDefinitionBrief:
+                return Self.stripGlossaryHeaders(categoryGlossary(.monolingual, singleGlossaries: singleGlossaries))
+            case .monolingualDefinitionNoDictionary:
+                return Self.stripDictionaryName(categoryGlossary(.monolingual, singleGlossaries: singleGlossaries))
+            case .bilingualDefinition:
+                return categoryGlossary(.bilingual, singleGlossaries: singleGlossaries)
+            case .bilingualDefinitionBrief:
+                return Self.stripGlossaryHeaders(categoryGlossary(.bilingual, singleGlossaries: singleGlossaries))
+            case .bilingualDefinitionNoDictionary:
+                return Self.stripDictionaryName(categoryGlossary(.bilingual, singleGlossaries: singleGlossaries))
+            case .monolingualDefinitionFallback:
+                return categoryGlossary(.monolingual, fallback: .bilingual, singleGlossaries: singleGlossaries)
+            case .monolingualDefinitionFallbackBrief:
+                return Self.stripGlossaryHeaders(categoryGlossary(.monolingual, fallback: .bilingual, singleGlossaries: singleGlossaries))
+            case .monolingualDefinitionFallbackNoDictionary:
+                return Self.stripDictionaryName(categoryGlossary(.monolingual, fallback: .bilingual, singleGlossaries: singleGlossaries))
+            case .bilingualDefinitionFallback:
+                return categoryGlossary(.bilingual, fallback: .monolingual, singleGlossaries: singleGlossaries)
+            case .bilingualDefinitionFallbackBrief:
+                return Self.stripGlossaryHeaders(categoryGlossary(.bilingual, fallback: .monolingual, singleGlossaries: singleGlossaries))
+            case .bilingualDefinitionFallbackNoDictionary:
+                return Self.stripDictionaryName(categoryGlossary(.bilingual, fallback: .monolingual, singleGlossaries: singleGlossaries))
             case .frequencies:
                 return content["frequenciesHtml"] ?? ""
             case .frequencyHarmonicRank:

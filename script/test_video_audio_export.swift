@@ -1,3 +1,4 @@
+// test-skip: manual tool (needs <source-media> <output> arguments and the app's Objective-C++ mpv bridge)
 import Foundation
 
 @main

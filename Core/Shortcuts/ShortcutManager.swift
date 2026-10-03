@@ -211,7 +211,7 @@ final class ShortcutManager {
         switch scope {
         case .popup: 500
         case .sasayaki: 400
-        case .reader, .dictionary, .video: 300
+        case .reader, .dictionary, .video, .manga: 300
         case .global: 100
         }
     }

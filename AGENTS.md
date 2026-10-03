@@ -27,7 +27,7 @@ Niratan 是只面向 macOS 26+ 的原生语言学习 App。仓库只有一个全
 ## 仓库特有陷阱
 
 - UI 验证只操作本次构建输出的绝对 `.app` / executable path。`moe.shishamo.hoshi` 是身份断言，不是新旧构建选择器；进程名、窗口标题和 `/Applications/Niratan.app` 都不足以证明运行了本次产物。
-- 并行验证使用不同 `./script/build_and_run.sh --instance <id>` 或 DerivedData 路径；这不会隔离 UserDefaults、Application Support、Profile 或用户媒体数据。
+- 并行验证使用不同 `./script/build_and_run.sh --instance <id>` 或 DerivedData 路径；这不会隔离 UserDefaults、Application Support、Profile 或用户媒体数据。需要写入数据的验证改用 `--data-root <dir>`（仅 Debug 构建），它会把偏好设置、Application Support 和 Keychain 条目都放到该目录下。
 - Reader 不得恢复触控板滑动翻页；离散鼠标滚轮翻页与精确触控板滚动是不同输入路径。
 - Google Lens OCR 会上传缩小后的漫画页面，必须明确说明并由用户触发；取消、切章或替换 session 后不得写回旧结果。
 - YouTubeKit 使用获准的系统 JavaScriptCore 本地路径；不得把“禁止恢复 Shinsou、官方 AidokuRunner 与非受限漫画运行时”误解成删除 YouTubeKit 或 Aidoku 兼容层所需的隔离 JavaScriptCore 资源。

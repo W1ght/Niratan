@@ -56,9 +56,9 @@ struct KeyboardShortcutBinding: Codable, Equatable, Hashable, Identifiable {
         case "rightArrow": "→"
         case "upArrow": "↑"
         case "downArrow": "↓"
-        case "pageUp": "Page Up"
-        case "pageDown": "Page Down"
-        case "space": "Space"
+        case "pageUp": String(localized: "Page Up")
+        case "pageDown": String(localized: "Page Down")
+        case "space": String(localized: "Space")
         default: key.uppercased()
         }
     }

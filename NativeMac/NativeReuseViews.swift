@@ -8,13 +8,13 @@ struct NativeBookshelfReuseView: View {
     let onOpenBook: (BookMetadata) -> Void
     @Binding var pendingImportURL: URL?
     @Binding var pendingRemoteImportURL: URL?
-    @State private var showShelfManagement = false
     @State private var isSelecting = false
     @State private var selectedBooks = Set<BookMetadata>()
     @State private var showBulkDeleteConfirmation = false
     @State private var pendingLookup: String?
     @State private var pendingTab: Int?
-    @State private var updateChecker = UpdateChecker()
+    @State private var searchText = ""
+    @AppStorage("bookshelfCoverWidth") private var coverWidth = Double(BookshelfLayout.v050CoverWidth)
     @State private var showStatisticsDashboard = false
     @State private var showZLibrary = false
 
@@ -25,6 +25,9 @@ struct NativeBookshelfReuseView: View {
             pendingTab = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .readerWindowProgressDidChange)) { _ in
+            viewModel.loadBooks()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: SyncStorage.booksChangedNotification)) { _ in
             viewModel.loadBooks()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -47,48 +50,26 @@ struct NativeBookshelfReuseView: View {
             }
         } else {
         BookshelfFileDropTarget(onDrop: viewModel.importDroppedEPUBs) {
-            VStack(alignment: .leading, spacing: 18) {
-                let sections = viewModel.shelfSections(
-                    sortedBy: userConfig.bookshelfSortOption,
-                    showReading: userConfig.bookshelfShowReading
-                )
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    shelfSidebar
+                        .frame(width: LibraryShelfLayout.sidebarWidth(for: proxy.size.width))
 
-                if viewModel.books.isEmpty && viewModel.googleDriveBooks.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Books", systemImage: "books.vertical")
-                    } description: {
-                        Text("Import an EPUB using the toolbar button to start reading.")
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 320)
-                } else {
-                    ScrollView {
-                        NativeBookshelfSectionsView(
-                            viewModel: viewModel,
-                            sections: sections,
-                            isSelecting: isSelecting,
-                            selectedBooks: $selectedBooks,
-                            pendingLookup: $pendingLookup,
-                            pendingTab: $pendingTab,
-                            onOpenBook: onOpenBook
-                        )
-                    }
-                    .scrollIndicators(.hidden)
+                    shelfDetail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .toolbar {
             toolbarContent
         }
+        .searchable(text: $searchText, placement: .toolbar, prompt: Text("Search Books"))
         .fileImporter(
             isPresented: $viewModel.isImporting,
             allowedContentTypes: [.epub],
             allowsMultipleSelection: true,
             onCompletion: viewModel.importBooks
         )
-        .sheet(isPresented: $showShelfManagement) {
-            ShelfManagementView(viewModel: viewModel)
-        }
         .sheet(isPresented: $showZLibrary) {
             ZLibraryView(
                 isBookAlreadyImported: { book in
@@ -131,29 +112,12 @@ struct NativeBookshelfReuseView: View {
         } message: {
             Text(viewModel.successMessage)
         }
-        .alert(updateAlertTitle, isPresented: updateAlertBinding) {
-            if case .available = updateChecker.alert {
-                Button("Download and Install") {
-                    Task {
-                        await updateChecker.downloadAndOpenAvailableUpdate()
-                    }
-                }
-                Button("Later", role: .cancel) { }
-            } else {
-                Button("OK", role: .cancel) { }
-            }
-        } message: {
-            Text(updateAlertMessage)
-        }
         .overlay {
             if viewModel.isSyncing {
                 LoadingOverlay(String(localized: "Syncing..."))
             }
             if viewModel.isDownloading {
                 LoadingOverlay(String(localized: "Downloading EPUB..."))
-            }
-            if updateChecker.isDownloading {
-                LoadingOverlay(updateChecker.downloadStatusText)
             }
             if let importBooksProgress = viewModel.importBooksProgress {
                 LoadingOverlay(importBooksProgress)
@@ -164,9 +128,6 @@ struct NativeBookshelfReuseView: View {
         }
         .onAppear {
             viewModel.loadBooks()
-        }
-        .task {
-            await updateChecker.checkAutomaticallyIfNeeded()
         }
         .onChange(of: pendingImportURL, initial: true) { _, url in
             guard let url else { return }
@@ -194,6 +155,149 @@ struct NativeBookshelfReuseView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var shelfSidebar: some View {
+        LibraryShelfSidebar(
+            selection: shelfSelection,
+            smartRows: shelfSmartRows,
+            shelves: viewModel.shelves.map { shelf in
+                LibraryShelfEntry(
+                    id: shelf.name,
+                    name: shelf.name,
+                    count: viewModel.bookCount(for: .shelf(shelf.name))
+                )
+            },
+            onCreate: { name in
+                viewModel.createShelf(name: name)
+            },
+            onRename: { shelfName, newName in
+                viewModel.renameShelf(shelfName, to: newName)
+            },
+            onDelete: { shelfName in
+                viewModel.deleteShelf(name: shelfName)
+            },
+            onMove: viewModel.moveShelves
+        )
+    }
+
+    private var shelfSelection: Binding<LibraryShelfSelection> {
+        Binding {
+            viewModel.resolvedShelfSelection
+        } set: { selection in
+            viewModel.shelfSelection = selection
+        }
+    }
+
+    private var shelfSmartRows: [LibraryShelfSmartRow] {
+        var rows = [
+            LibraryShelfSmartRow(
+                selection: .all,
+                title: "All Books",
+                systemImage: "books.vertical",
+                count: viewModel.bookCount(for: .all)
+            ),
+            LibraryShelfSmartRow(
+                selection: .reading,
+                title: "Currently Reading",
+                systemImage: "book",
+                count: viewModel.bookCount(for: .reading)
+            ),
+            LibraryShelfSmartRow(
+                selection: .unshelved,
+                title: "Unshelved",
+                systemImage: "tray",
+                count: viewModel.bookCount(for: .unshelved)
+            ),
+        ]
+        if !viewModel.googleDriveBooks.isEmpty {
+            rows.append(LibraryShelfSmartRow(
+                selection: .googleDrive,
+                title: "Google Drive",
+                systemImage: "icloud",
+                count: viewModel.bookCount(for: .googleDrive)
+            ))
+        }
+        return rows
+    }
+
+    @ViewBuilder
+    private var shelfDetail: some View {
+        if viewModel.books.isEmpty && viewModel.googleDriveBooks.isEmpty {
+            ContentUnavailableView {
+                Label("No Books", systemImage: "books.vertical")
+            } description: {
+                Text("Import an EPUB using the toolbar button to start reading.")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            let selection = viewModel.resolvedShelfSelection
+            let section = displayedSection(for: selection)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    LibraryShelfDetailHeader(
+                        title: shelfTitle(for: selection),
+                        count: section.books.count
+                    )
+
+                    if section.books.isEmpty, section.isFiltered {
+                        ContentUnavailableView.search(text: searchText)
+                            .frame(maxWidth: .infinity, minHeight: 280)
+                    } else if section.books.isEmpty {
+                        LibraryShelfEmptyView(selection: selection)
+                    } else {
+                        ShelfView(
+                            viewModel: viewModel,
+                            section: section,
+                            showTitle: false,
+                            isSelecting: isSelecting,
+                            allowsCollapse: false,
+                            selectedBooks: $selectedBooks,
+                            pendingLookup: $pendingLookup,
+                            pendingTab: $pendingTab,
+                            onOpenBook: onOpenBook
+                        )
+                        .id(section.id)
+                        .environment(\.shelfCoverWidth, BookshelfLayout.clampedCoverWidth(coverWidth))
+                    }
+                }
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .scrollIndicators(.hidden)
+            .scrollEdgeEffectStyle(.soft, for: .top)
+        }
+    }
+
+    /// The selected shelf, narrowed to titles matching the toolbar search field.
+    private func displayedSection(for selection: LibraryShelfSelection) -> ShelfSection {
+        var section = viewModel.shelfSection(
+            for: selection,
+            sortedBy: userConfig.bookshelfSortOption
+        )
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return section }
+        section.books = section.books.filter {
+            $0.displayTitle.localizedStandardContains(query)
+                || $0.title.localizedStandardContains(query)
+        }
+        section.isFiltered = true
+        return section
+    }
+
+    private func shelfTitle(for selection: LibraryShelfSelection) -> Text {
+        switch selection {
+        case .all:
+            Text("All Books")
+        case .reading:
+            Text("Currently Reading")
+        case .unshelved:
+            Text("Unshelved")
+        case .googleDrive:
+            Text("Google Drive")
+        case .shelf(let name):
+            Text(verbatim: name)
         }
     }
 
@@ -247,7 +351,7 @@ struct NativeBookshelfReuseView: View {
                 .disabled(selectedBooks.isEmpty)
             }
         } else {
-            ToolbarItemGroup(placement: .navigation) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Menu {
                     Picker("Sort", selection: Bindable(userConfig).bookshelfSortOption) {
                         ForEach(SortOption.allCases) { option in
@@ -255,6 +359,7 @@ struct NativeBookshelfReuseView: View {
                                 .tag(option)
                         }
                     }
+                    .pickerStyle(.inline)
                 } label: {
                     Label("Sort", systemImage: "arrow.up.arrow.down")
                 }
@@ -268,18 +373,8 @@ struct NativeBookshelfReuseView: View {
                     Label("Select Books", systemImage: "checklist")
                 }
                 .help("Select Books")
-            }
 
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    Task {
-                        await updateChecker.check(manual: true)
-                    }
-                } label: {
-                    Label("Check for Updates", systemImage: updateChecker.hasAvailableUpdate ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
-                }
-                .disabled(updateChecker.isBusy)
-                .help("Check for Updates")
+                LibraryCoverSizeButton(width: $coverWidth)
 
                 if userConfig.enableSync && GoogleDriveAuth.shared.isAuthenticated {
                     Button {
@@ -297,13 +392,6 @@ struct NativeBookshelfReuseView: View {
                     .disabled(viewModel.isLoadingGoogleDriveBooks)
                     .help("Refresh Google Drive Books")
                 }
-
-                Button {
-                    showShelfManagement = true
-                } label: {
-                    Label("Manage Shelves", systemImage: "folder.badge.gearshape")
-                }
-                .help("Manage Shelves")
 
                 if userConfig.enableStatistics {
                     Button {
@@ -333,53 +421,6 @@ struct NativeBookshelfReuseView: View {
         }
     }
 
-    private var updateAlertBinding: Binding<Bool> {
-        Binding {
-            updateChecker.alert != nil
-        } set: { isPresented in
-            if !isPresented {
-                updateChecker.alert = nil
-            }
-        }
-    }
-
-    private var updateAlertTitle: String {
-        switch updateChecker.alert {
-        case .available:
-            String(localized: "Update Available")
-        case .upToDate:
-            String(localized: "You're Up to Date")
-        case .failed:
-            String(localized: "Update Check Failed")
-        case .downloadFailed:
-            String(localized: "Update Download Failed")
-        case nil:
-            ""
-        }
-    }
-
-    private var updateAlertMessage: String {
-        switch updateChecker.alert {
-        case .available(let release, let currentVersion):
-            String(
-                format: String(localized: "Version %@ is available. You are using %@."),
-                release.version,
-                currentVersion
-            )
-        case .upToDate(let currentVersion):
-            String(
-                format: String(localized: "Niratan %@ is the latest version."),
-                currentVersion
-            )
-        case .failed:
-            String(localized: "Unable to check for updates. Please try again later.")
-        case .downloadFailed:
-            String(localized: "Unable to download or verify the update. Please try again later.")
-        case nil:
-            ""
-        }
-    }
-
     private func clearSelection() {
         withAnimation(.default.speed(2)) {
             isSelecting = false
@@ -396,36 +437,6 @@ struct NativeBookshelfReuseView: View {
         case .title:
             Label(LocalizedStringKey("Sort Option Title"), systemImage: sortOption.icon)
         }
-    }
-}
-
-private struct NativeBookshelfSectionsView: View {
-    let viewModel: BookshelfViewModel
-    let sections: [ShelfSection]
-    let isSelecting: Bool
-    @Binding var selectedBooks: Set<BookMetadata>
-    @Binding var pendingLookup: String?
-    @Binding var pendingTab: Int?
-    let onOpenBook: (BookMetadata) -> Void
-
-    var body: some View {
-        VStack(spacing: 26) {
-            ForEach(sections) { section in
-                if !section.books.isEmpty {
-                    ShelfView(
-                        viewModel: viewModel,
-                        section: section,
-                        showTitle: sections.count > 1,
-                        isSelecting: isSelecting,
-                        selectedBooks: $selectedBooks,
-                        pendingLookup: $pendingLookup,
-                        pendingTab: $pendingTab,
-                        onOpenBook: onOpenBook
-                    )
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -448,17 +459,19 @@ struct NativeSettingsReuseView: View {
     @State private var selection: NativeSettingsSection? = .appearance
 
     var body: some View {
-        HStack(spacing: 0) {
-            settingsSidebar
-                .frame(width: 240)
-                .background {
-                    NativeGlassPageBackground()
-                        .ignoresSafeArea(.container, edges: .top)
-                }
+        GeometryReader { proxy in
+            HStack(spacing: 0) {
+                settingsSidebar
+                    .frame(width: Self.sidebarWidth(for: proxy.size.width))
+                    .background {
+                        NativeGlassPageBackground()
+                            .ignoresSafeArea(.container, edges: .top)
+                    }
 
-            NativeSettingsDetailView(section: selection ?? .appearance, userConfig: userConfig)
-                .id(selection ?? .appearance)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                NativeSettingsDetailView(section: selection ?? .appearance, userConfig: userConfig)
+                    .id(selection ?? .appearance)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .background {
             NativeGlassPageBackground()
@@ -467,6 +480,11 @@ struct NativeSettingsReuseView: View {
         .toolbar {
             ToolbarSpacer(.fixed, placement: .primaryAction)
         }
+    }
+
+    /// Narrow hosts (the main window's Settings section) shrink the sidebar so the detail cards keep enough width.
+    private static func sidebarWidth(for totalWidth: CGFloat) -> CGFloat {
+        min(240, max(180, totalWidth * 0.28))
     }
 
     private var settingsSidebar: some View {
@@ -558,7 +576,7 @@ enum NativeSettingsSection: String, CaseIterable, Identifiable {
         case .gameController:
             "Game Controller"
         case .sync:
-            "ッツ Sync"
+            "Syncing"
         case .backup:
             "Backup"
         case .about:
@@ -617,7 +635,7 @@ struct NativeGlassSegmentedPicker<SelectionValue: Hashable, SegmentLabel: View>:
         HStack(spacing: 0) {
             ForEach(Array(values.enumerated()), id: \.element) { index, value in
                 segmentButton(value)
-                    .layoutPriority(selection == value ? 1 : 0)
+                    .layoutPriority(!fillsWidth && selection == value ? 1 : 0)
 
                 if index < values.count - 1 {
                     Divider()
@@ -711,7 +729,9 @@ struct NativeGlassMenuPicker<SelectionValue: Hashable, Label: View>: View {
             .contentShape(Capsule())
             .modifier(NativeGlassMenuPickerSurface())
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
         .fixedSize(horizontal: !fillsWidth, vertical: true)
     }
 }
@@ -785,6 +805,17 @@ struct NativeSettingsDetailView: View {
     }
 }
 
+/// Settings content renders as cards in the Settings window and as a compact
+/// desktop inspector (grouped rows, no cards) inside Reader side panels.
+enum NativeSettingsPresentation {
+    case cards
+    case inspector
+}
+
+extension EnvironmentValues {
+    @Entry var nativeSettingsPresentation: NativeSettingsPresentation = .cards
+}
+
 enum NativeSettingsPalette {
     static func separator(_ colorScheme: ColorScheme) -> Color {
         if colorScheme == .dark {
@@ -799,11 +830,29 @@ struct NativeSettingsForm<Content: View>: View {
     var horizontalPadding: CGFloat = 24
     var verticalPadding: CGFloat = 18
     var spacing: CGFloat = 22
+    var maxContentWidth: CGFloat = 840
     @ViewBuilder var content: () -> Content
+    @Environment(\.nativeSettingsPresentation) private var presentation
 
     var body: some View {
+        if presentation == .inspector {
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                    content()
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .scrollIndicators(.automatic)
+        } else {
+            cardsBody
+        }
+    }
+
+    private var cardsBody: some View {
         GeometryReader { proxy in
-            let contentWidth = max(proxy.size.width - horizontalPadding * 2, 0)
+            let contentWidth = min(max(proxy.size.width - horizontalPadding * 2, 0), maxContentWidth)
 
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: spacing) {
@@ -812,6 +861,7 @@ struct NativeSettingsForm<Content: View>: View {
                 .frame(width: contentWidth, alignment: .topLeading)
                 .padding(.horizontal, horizontalPadding)
                 .padding(.vertical, verticalPadding)
+                .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.automatic)
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
@@ -835,7 +885,40 @@ struct NativeSettingsSectionCard<Header: View, Content: View, Footer: View>: Vie
         self.footer = footer
     }
 
+    @Environment(\.nativeSettingsPresentation) private var presentation
+
     var body: some View {
+        if presentation == .inspector {
+            inspectorBody
+        } else {
+            cardsBody
+        }
+    }
+
+    private var inspectorBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            header()
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 2)
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            footer()
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.6)
+        }
+    }
+
+    private var cardsBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             header()
                 .font(.subheadline.weight(.semibold))
@@ -913,15 +996,28 @@ struct NativeSettingsRow<Label: View, Accessory: View>: View {
         self.accessory = accessory
     }
 
+    @Environment(\.nativeSettingsPresentation) private var presentation
+
     var body: some View {
-        HStack(spacing: 12) {
-            label()
-                .font(.body.weight(.medium))
-            Spacer(minLength: 20)
-            accessory()
+        if presentation == .inspector {
+            HStack(spacing: 10) {
+                label()
+                    .font(.callout)
+                Spacer(minLength: 12)
+                accessory()
+                    .controlSize(.small)
+            }
+            .frame(minHeight: 32)
+        } else {
+            HStack(spacing: 12) {
+                label()
+                    .font(.body.weight(.medium))
+                Spacer(minLength: 20)
+                accessory()
+            }
+            .frame(minHeight: 46)
+            .padding(.horizontal, 16)
         }
-        .frame(minHeight: 46)
-        .padding(.horizontal, 16)
     }
 }
 
@@ -1020,6 +1116,27 @@ extension View {
     }
 }
 
+struct NativeSettingsSubtitledLabel: View {
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
+
+    init(_ title: LocalizedStringKey, subtitle: LocalizedStringKey) {
+        self.title = title
+        self.subtitle = subtitle
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+            Text(subtitle)
+                .font(.caption)
+                .fontWeight(.regular)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
 extension NativeSettingsRow where Label == Text {
     init(_ title: LocalizedStringKey, @ViewBuilder accessory: @escaping () -> Accessory) {
         self.init {
@@ -1050,13 +1167,14 @@ struct NativeSettingsToggle: View {
 
 struct NativeSettingsButtonRow<Content: View>: View {
     @ViewBuilder var content: () -> Content
+    @Environment(\.nativeSettingsPresentation) private var presentation
 
     var body: some View {
         GlassEffectContainer(spacing: 8) {
             rowContent
         }
-        .frame(minHeight: 46)
-        .padding(.horizontal, 16)
+        .frame(minHeight: presentation == .inspector ? 36 : 46)
+        .padding(.horizontal, presentation == .inspector ? 0 : 16)
         .buttonStyle(NativeSettingsActionButtonStyle())
     }
 
@@ -1075,7 +1193,7 @@ struct NativeSettingsActionButtonStyle: ButtonStyle {
         configuration.label
             .font(.body.weight(.semibold))
             .lineLimit(1)
-            .foregroundStyle(isEnabled ? .primary : .tertiary)
+            .foregroundStyle(configuration.role == .destructive ? AnyShapeStyle(.red) : AnyShapeStyle(.primary))
             .padding(.horizontal, 16)
             .padding(.vertical, 5)
             .frame(minHeight: 30)
@@ -1141,7 +1259,7 @@ struct NativeSettingsValuePill<Content: View>: View {
             .lineLimit(1)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.thinMaterial, in: Capsule())
+            .background(.fill.tertiary, in: Capsule())
     }
 }
 
@@ -1215,11 +1333,6 @@ struct NativeReaderSheetPanel<Content: View>: View {
 
 private extension View {
     @ViewBuilder
-    func nativeSettingsCardGlass() -> some View {
-        self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    @ViewBuilder
     func nativeGlassCircleButton() -> some View {
         self.glassEffect(.regular.interactive(), in: Circle())
     }
@@ -1227,10 +1340,13 @@ private extension View {
 
 struct NativeSettingsSeparator: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.nativeSettingsPresentation) private var presentation
 
     var body: some View {
-        Divider()
-            .overlay(NativeSettingsPalette.separator(colorScheme))
-            .padding(.leading, 16)
+        if presentation != .inspector {
+            Divider()
+                .overlay(NativeSettingsPalette.separator(colorScheme))
+                .padding(.leading, 16)
+        }
     }
 }

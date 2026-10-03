@@ -231,7 +231,7 @@ nonisolated enum ZLibraryClientError: LocalizedError, Equatable {
 
 enum ZLibrarySessionStorage {
     private static let account = "zLibrarySession"
-    private static let service = "moe.shishamo.hoshi.zlibrary"
+    private static let service = DevelopmentDataIsolation.keychainName("moe.shishamo.hoshi.zlibrary")
 
     static func load() -> ZLibrarySession? {
         let query: [String: Any] = [

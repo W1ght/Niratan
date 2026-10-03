@@ -71,14 +71,14 @@ expectContains(
 
 expect(
     sidebar.contains(".scrollContentBackground(.hidden)")
-        && sidebar.contains("NativeGlassPageBackground(isolatesContainerMaterial: true)")
-        && glass.contains("var isolatesContainerMaterial = false")
-        && glass.contains("Color(nsColor: .windowBackgroundColor)"),
-    "Main sidebar should isolate the split-view material beneath the shared theme-aware glass background"
+        && sidebar.contains("NativeGlassPageBackground()")
+        && glass.contains("Color(nsColor: .windowBackgroundColor)")
+        && !glass.contains("Material"),
+    "Shared glass page, card and capsule surfaces must not stack SwiftUI Material beneath macOS 26 glass"
 )
 
 expect(
-    reuse.contains("private var settingsSidebar: some View")
+    reuse.contains("var settingsSidebar: some View")
         && reuse.contains(".listStyle(.sidebar)\n        .scrollContentBackground(.hidden)\n        .background(.clear)"),
     "Settings sidebar should reveal its shared theme-aware glass background"
 )

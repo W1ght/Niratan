@@ -1,6 +1,159 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Kanji": {
+      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "汉字"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "漢字"
+          }
+        }
+      }
+    },
+    "Yomitan term, frequency, pitch and kanji dictionaries (.zip) are supported": {
+      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持 Yomitan 词条、词频、音调和汉字词典（.zip）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支援 Yomitan 詞條、詞頻、音調和漢字辭典（.zip）"
+          }
+        }
+      }
+    },
+    "Stroke Order Font": {
+      "comment": "Context: Settings > Dictionaries kanji section. Downloads the optional kanji stroke order font used by kanji entries in lookup popups.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "笔顺字体"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筆順字型"
+          }
+        }
+      }
+    },
+    "Installed": {
+      "comment": "Context: Settings > Dictionaries kanji section. Downloads the optional kanji stroke order font used by kanji entries in lookup popups.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安裝"
+          }
+        }
+      }
+    },
+    "Shows stroke order diagrams for the character in kanji entries.": {
+      "comment": "Context: Settings > Dictionaries kanji section. Downloads the optional kanji stroke order font used by kanji entries in lookup popups.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在汉字条目中显示该字的笔顺图。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在漢字條目中顯示該字的筆順圖。"
+          }
+        }
+      }
+    },
+    "Downloading Stroke Order Font": {
+      "comment": "Context: Settings > Dictionaries kanji section. Downloads the optional kanji stroke order font used by kanji entries in lookup popups.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载笔顺字体"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下載筆順字型"
+          }
+        }
+      }
+    },
+    "Download Font": {
+      "comment": "Context: Settings > Dictionaries kanji section. Downloads the optional kanji stroke order font used by kanji entries in lookup popups.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载字体"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下載字型"
+          }
+        }
+      }
+    },
+    "This will download and automatically import the kanji stroke order font (17 MB).": {
+      "comment": "Context: Settings > Dictionaries kanji section. Downloads the optional kanji stroke order font used by kanji entries in lookup popups.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将下载并自动导入汉字笔顺字体（17 MB）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將下載並自動匯入漢字筆順字型（17 MB）。"
+          }
+        }
+      }
+    },
+    "Failed to download the stroke order font": {
+      "comment": "Context: Settings > Dictionaries kanji section. Downloads the optional kanji stroke order font used by kanji entries in lookup popups.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "笔顺字体下载失败"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筆順字型下載失敗"
+          }
+        }
+      }
+    },
     "Apply Defaults": {
       "comment": "Context: Settings > Anki. Restores the selected supported note type using media fields shared by EPUB and Video mining.",
       "localizations": {
@@ -1001,6 +1154,22 @@
         }
       }
     },
+    "Supported Formats": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持的格式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支援的格式"
+          }
+        }
+      }
+    },
     "Subtitle audio clip": {
       "comment": "Context: Settings > Anki. Short explanation for the {video-audio-clip} placeholder.",
       "localizations": {
@@ -1018,7 +1187,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tags"
+            "value": "标签"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標籤"
           }
         }
       }
@@ -1216,17 +1391,422 @@
         }
       }
     },
-    "Yomitan term, frequency and pitch dictionaries (.zip) are supported": {
-      "comment": "Context: Settings > Dictionaries main screen. Surrounding UI includes recommended dictionary download/update alerts, a dictionary type segmented picker, and the installed dictionary list.",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "支持 Yomitan 词条、词频和音调词典（.zip）"
-          }
+  "Frequency Sorting": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "频率排序"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "頻率排序"
         }
       }
     }
+  },
+  "Frequency Dictionary": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "频率词典"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "頻率辭典"
+        }
+      }
+    }
+  },
+  "Auto": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "自动"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "自動"
+        }
+      }
+    }
+  },
+  "Ascending": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "升序"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "升冪"
+        }
+      }
+    }
+  },
+  "Descending": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "降序"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "降冪"
+        }
+      }
+    }
+  },
+  "Results with the same match are ranked by the selected frequency dictionary. Results without a value are listed last.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "匹配程度相同的结果按所选频率词典排序，没有频率值的结果排在最后。"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "匹配程度相同的結果依所選頻率辭典排序，沒有頻率值的結果排在最後。"
+        }
+      }
+    }
+  },
+  "Search Text": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "搜索文本"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "搜尋文字"
+        }
+      }
+    }
+  },
+  "Text Size": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文字大小"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文字大小"
+        }
+      }
+    }
+  },
+  "Category": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分类"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "分類"
+        }
+      }
+    }
+  },
+  "Category for Anki definition fields": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "用于 Anki 释义字段的分类"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "用於 Anki 釋義欄位的分類"
+        }
+      }
+    }
+  },
+  "No Category": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无分类"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無分類"
+        }
+      }
+    }
+  },
+  "Monolingual": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "单语"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "單語"
+        }
+      }
+    }
+  },
+  "Bilingual": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "双语"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "雙語"
+        }
+      }
+    }
+  },
+  "Exclude": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "排除"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "排除"
+        }
+      }
+    }
+  },
+  "Refresh": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "刷新"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "重新整理"
+        }
+      }
+    }
+  },
+  "Failed to save dictionary config: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法保存词典配置：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法儲存辭典設定：%@"
+        }
+      }
+    }
+  },
+  "Failed to save collapsed dictionaries: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法保存折叠词典设置：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法儲存摺疊辭典設定：%@"
+        }
+      }
+    }
+  },
+  "Failed to download dictionaries: %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法下载词典：%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法下載辭典：%@"
+        }
+      }
+    }
+  },
+  "Failed to import dictionary": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法导入词典"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法匯入辭典"
+        }
+      }
+    }
+  },
+  "Failed to import dictionary:\n%@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法导入词典：\n%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "無法匯入辭典：\n%@"
+        }
+      }
+    }
+  },
+  "Some dictionaries could not be imported:\n%@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "部分词典无法导入：\n%@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "部分辭典無法匯入：\n%@"
+        }
+      }
+    }
+  },
+  "%@: Import failed": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@：导入失败"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@：匯入失敗"
+        }
+      }
+    }
+  },
+  "Fetching %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在获取 %@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在取得 %@"
+        }
+      }
+    }
+  },
+  "Downloading %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在下载 %@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在下載 %@"
+        }
+      }
+    }
+  },
+  "Importing %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在导入 %@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在匯入 %@"
+        }
+      }
+    }
+  },
+  "Checking %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在检查 %@"
+        }
+      },
+      "zh-Hant": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在檢查 %@"
+        }
+      }
+    }
+  }
   },
   "version": "1.0"
 }

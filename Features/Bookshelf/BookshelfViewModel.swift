@@ -31,6 +31,7 @@ class BookshelfViewModel {
     var isInitialPresentationReady: Bool = false
     var importBooksProgress: String?
     var downloadingBooks: [UUID: Double] = [:]
+    var shelfSelection: LibraryShelfSelection = .all
     
     private var bookProgress: [UUID: Double] = [:]
     private var googleDriveSyncFiles: [UUID: DriveSyncFiles] = [:]
@@ -68,11 +69,31 @@ class BookshelfViewModel {
         try? BookStorage.save(shelves, inside: directory, as: FileNames.shelves)
     }
     
-    func createShelf(name: String) {
-        if !shelves.contains(where: { $0.name == name }) {
-            shelves.append(BookShelf(name: name, bookIds: []))
-            saveShelves()
+    @discardableResult
+    func createShelf(name: String) -> String? {
+        guard let name = LibraryShelfNaming.normalized(name),
+              LibraryShelfNaming.isAvailable(name, among: shelves.map(\.name)) else {
+            return nil
         }
+        shelves.append(BookShelf(name: name, bookIds: []))
+        saveShelves()
+        return name
+    }
+
+    /// Renames a shelf in place, keeping its books and position. Returns the new shelf key (its name).
+    @discardableResult
+    func renameShelf(_ oldName: String, to newName: String) -> String? {
+        guard let index = shelves.firstIndex(where: { $0.name == oldName }),
+              let name = LibraryShelfNaming.normalized(newName),
+              LibraryShelfNaming.isAvailable(name, among: shelves.map(\.name), excluding: oldName) else {
+            return nil
+        }
+        shelves[index].name = name
+        saveShelves()
+        if shelfSelection == .shelf(oldName) {
+            shelfSelection = .shelf(name)
+        }
+        return name
     }
     
     func deleteShelf(name: String) {
@@ -124,6 +145,88 @@ class BookshelfViewModel {
         persistManualBookOrder()
     }
     
+    func shelfName(containing bookID: UUID) -> String? {
+        shelves.first { $0.bookIds.contains(bookID) }?.name
+    }
+
+    /// The shelf column selection, falling back to All when its shelf or source no longer exists.
+    var resolvedShelfSelection: LibraryShelfSelection {
+        switch shelfSelection {
+        case .shelf(let name) where !shelves.contains(where: { $0.name == name }):
+            return .all
+        case .googleDrive where googleDriveBooks.isEmpty:
+            return .all
+        default:
+            return shelfSelection
+        }
+    }
+
+    func shelfSection(for selection: LibraryShelfSelection, sortedBy option: SortOption) -> ShelfSection {
+        switch selection {
+        case .all:
+            return ShelfSection(
+                shelf: nil,
+                books: sortBooks(books, by: option, manualOrder: manualBookOrder),
+                isAll: true
+            )
+        case .reading:
+            return ShelfSection(
+                shelf: nil,
+                books: sortBooks(readingBooks, by: option, manualOrder: manualBookOrder),
+                isReading: true
+            )
+        case .unshelved:
+            return ShelfSection(
+                shelf: nil,
+                books: sortBooks(unshelvedBooks, by: option, manualOrder: manualBookOrder)
+            )
+        case .googleDrive:
+            return ShelfSection(
+                shelf: nil,
+                books: sortBooks(googleDriveBooks, by: option == .manual ? .title : option),
+                isGoogleDrive: true
+            )
+        case .shelf(let name):
+            guard let shelf = shelves.first(where: { $0.name == name }) else {
+                return shelfSection(for: .all, sortedBy: option)
+            }
+            let shelvedBooks = books.filter { shelf.bookIds.contains($0.id) }
+            return ShelfSection(
+                shelf: shelf,
+                books: sortBooks(shelvedBooks, by: option, manualOrder: shelf.bookIds)
+            )
+        }
+    }
+
+    func bookCount(for selection: LibraryShelfSelection) -> Int {
+        switch selection {
+        case .all:
+            return books.count
+        case .reading:
+            return readingBooks.count
+        case .unshelved:
+            return unshelvedBooks.count
+        case .googleDrive:
+            return googleDriveBooks.count
+        case .shelf(let name):
+            guard let shelf = shelves.first(where: { $0.name == name }) else { return 0 }
+            let ids = Set(books.map(\.id))
+            return shelf.bookIds.filter { ids.contains($0) }.count
+        }
+    }
+
+    private var readingBooks: [BookMetadata] {
+        books.filter {
+            let p = progress(for: $0)
+            return p > 0 && p < 0.999
+        }
+    }
+
+    private var unshelvedBooks: [BookMetadata] {
+        let shelvedIds = Set(shelves.flatMap { $0.bookIds })
+        return books.filter { !shelvedIds.contains($0.id) }
+    }
+
     func deleteBooks(_ books: Set<BookMetadata>) {
         for book in books {
             deleteBook(book)
@@ -215,7 +318,7 @@ class BookshelfViewModel {
             let bookInfo = BookStorage.loadBookInfo(root: root)
             let bookmark = BookStorage.loadBookmark(root: root)
             
-            if let total = bookInfo?.characterCount, total > 0,
+            if let total = bookInfo?.characterCount ?? book.characterCount, total > 0,
                let current = bookmark?.characterCount {
                 bookProgress[book.id] = Double(current) / Double(total)
             } else {
@@ -228,7 +331,89 @@ class BookshelfViewModel {
         bookProgress[book.id] ?? 0.0
     }
     
+    /// Whole-library Google Drive sync is active, so deleting offers local and everywhere.
+    var usesLibrarySync: Bool {
+        GoogleDriveSyncManager.shared.enabled
+    }
+
+    /// Only an EPUB that is already on Drive in its current version can be removed locally.
+    func canDeleteLocally(_ book: BookMetadata) -> Bool {
+        guard book.epub != nil,
+              let record = SyncStorage.shared.state.books[SyncStorage.key(book.folder)],
+              let published = record.files[.epub], published.value != nil else { return false }
+        return (record.sources[.epub] ?? .min) <= published.modified
+    }
+
+    /// Frees the EPUB on this Mac; the book stays in the library and can be downloaded again.
+    func deleteLocalBook(_ book: BookMetadata) {
+        do {
+            try SyncStorage.shared.deleteLocalBook(key: SyncStorage.key(book.folder))
+            loadBooks()
+        } catch {
+            showError(message: error.localizedDescription)
+        }
+    }
+
+    func syncLibraryBook(_ book: BookMetadata) {
+        Task {
+            await GoogleDriveSyncManager.shared.sync(book: book)
+            if let message = GoogleDriveSyncManager.shared.errorMessage {
+                showError(message: message)
+            }
+        }
+    }
+
+    /// Opens a book that only exists on Google Drive after downloading its EPUB.
+    func downloadBook(_ book: BookMetadata, onOpen: @escaping (BookMetadata) -> Void) {
+        guard downloadingBooks[book.id] == nil else { return }
+        let sync = GoogleDriveSyncManager.shared
+        guard sync.enabled else {
+            showError(message: String(localized: "Turn on Google Drive sync in Settings to download this book."))
+            return
+        }
+
+        downloadingBooks[book.id] = 0
+        sync.downloadTask?.cancel()
+        sync.downloadTask = Task {
+            defer {
+                downloadingBooks.removeValue(forKey: book.id)
+                if !Task.isCancelled {
+                    sync.downloadTask = nil
+                    sync.startFileSync()
+                }
+            }
+            do {
+                let downloaded = try await sync.downloadBook(book) { progress in
+                    self.downloadingBooks[book.id] = progress
+                }
+                try Task.checkCancellation()
+                loadBooks()
+                onOpen(downloaded)
+            } catch is CancellationError {
+            } catch {
+                if !Task.isCancelled {
+                    showError(message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
     func deleteBook(_ book: BookMetadata) {
+        if usesLibrarySync {
+            do {
+                try SyncStorage.shared.deleteBook(key: SyncStorage.key(book.folder), syncEnabled: true)
+                books.removeAll { $0.id == book.id }
+                for i in shelves.indices {
+                    shelves[i].bookIds.removeAll { $0 == book.id }
+                }
+                saveShelves()
+                manualBookOrder.removeAll { $0 == book.id }
+                persistManualBookOrder()
+            } catch {
+                showError(message: error.localizedDescription)
+            }
+            return
+        }
         do {
             let bookURL = try BookStorage.getBooksDirectory().appendingPathComponent(book.folder)
             try BookStorage.delete(at: bookURL)
@@ -315,7 +500,7 @@ class BookshelfViewModel {
                 return
             }
             
-            importBooksProgress = "Importing 1 / \(urls.count)..."
+            importBooksProgress = String(localized: "Importing 1 / \(urls.count)...")
             Task {
                 defer { importBooksProgress = nil }
                 await Task.yield()
@@ -331,14 +516,14 @@ class BookshelfViewModel {
                     }
                     let next = index + 1
                     if next < urls.count {
-                        importBooksProgress = "Importing \(next + 1) / \(urls.count)..."
+                        importBooksProgress = String(localized: "Importing \(next + 1) / \(urls.count)...")
                         await Task.yield()
                     }
                 }
                 loadBooks()
                 
                 if !failed.isEmpty {
-                    showError(message: "Failed to import:\n\(failed.joined(separator: "\n"))")
+                    showError(message: String(localized: "Failed to import:\n\(failed.joined(separator: "\n"))"))
                 }
             }
         } catch {
@@ -395,6 +580,16 @@ class BookshelfViewModel {
         guard !isLoadingGoogleDriveBooks else { return }
         isLoadingGoogleDriveBooks = true
         defer { isLoadingGoogleDriveBooks = false }
+        if UserDefaults.standard.string(forKey: "syncProvider") == SyncProvider.gdrive.rawValue {
+            // Library sync shows remote books as placeholders on the regular shelves.
+            googleDriveBooks = []
+            let sync = GoogleDriveSyncManager.shared
+            await sync.sync()
+            if let message = sync.errorMessage, !suppressOfflineErrors {
+                showError(message: message)
+            }
+            return
+        }
 
         do {
             let root = try await GoogleDriveHandler.shared.findRootFolder()
@@ -495,6 +690,33 @@ class BookshelfViewModel {
         }
     }
     
+    func syncBookWithFushi(_ book: BookMetadata) {
+        isSyncing = true
+        Task {
+            defer {
+                isSyncing = false
+            }
+            switch await FushiProgressCoordinator.shared.syncBook(book, trigger: .manual(presentOnBookshelf: true)) {
+            case .pulled:
+                loadBookProgress()
+                showSuccess(message: String(localized: "Updated \(book.displayTitle) from Fushi"))
+            case .pushed:
+                showSuccess(message: String(localized: "Sent \(book.displayTitle)'s position to Fushi"))
+            case .unchanged:
+                showSuccess(message: String(localized: "\(book.displayTitle) is already synced with Fushi"))
+            case .conflict:
+                // The bookshelf asks which position to keep.
+                break
+            case .notOnHost:
+                showError(message: String(localized: "Fushi has no novel titled \(book.displayTitle). Add the same EPUB to Fushi to sync it."))
+            case .unavailable:
+                showError(message: String(localized: "Pair with Fushi in Settings > Syncing first."))
+            case .failed(let message):
+                showError(message: String(localized: "Sync with Fushi failed: \(message)"))
+            }
+        }
+    }
+
     private func handleSyncResult(_ result: SyncResult) {
         switch result {
         case .synced(let title):
@@ -753,8 +975,18 @@ struct ShelfSection: Identifiable {
     var books: [BookMetadata]
     var isReading: Bool = false
     var isGoogleDrive: Bool = false
+    var isAll: Bool = false
+    var isFiltered: Bool = false
+
+    /// Reading, Google Drive and search results mix or hide items, so only full shelves reorder.
+    var allowsReordering: Bool {
+        !isReading && !isGoogleDrive && !isFiltered
+    }
     
     var id: String {
+        if isAll {
+            return "__all__"
+        }
         if isReading {
             return "__reading__"
         }

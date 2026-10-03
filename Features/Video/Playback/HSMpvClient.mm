@@ -2659,6 +2659,46 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     return YES;
 }
 
+- (int64_t)existingExternalSubtitleTrackIDForURL:(NSURL *)url {
+    int64_t count = 0;
+    if (mpv_get_property(_handle, "track-list/count", MPV_FORMAT_INT64, &count) < 0) {
+        return 0;
+    }
+    NSString *targetPath = url.URLByResolvingSymlinksInPath.path;
+    for (int64_t index = 0; index < count; index++) {
+        NSString *prefix = [NSString stringWithFormat:@"track-list/%lld/", index];
+        char *type = mpv_get_property_string(_handle, [prefix stringByAppendingString:@"type"].UTF8String);
+        BOOL isSubtitle = type && strcmp(type, "sub") == 0;
+        mpv_free(type);
+        if (!isSubtitle) {
+            continue;
+        }
+        char *title = mpv_get_property_string(_handle, [prefix stringByAppendingString:@"title"].UTF8String);
+        BOOL isInternalEffectsTrack = title
+            && strcmp(title, HSMpvInternalASSSubtitleEffectsTitle.UTF8String) == 0;
+        mpv_free(title);
+        if (isInternalEffectsTrack) {
+            continue;
+        }
+        char *filename = mpv_get_property_string(
+            _handle,
+            [prefix stringByAppendingString:@"external-filename"].UTF8String
+        );
+        NSString *path = filename ? [NSString stringWithUTF8String:filename] : nil;
+        mpv_free(filename);
+        if (path.length == 0
+            || ![[NSURL fileURLWithPath:path].URLByResolvingSymlinksInPath.path isEqualToString:targetPath]) {
+            continue;
+        }
+        int64_t trackID = 0;
+        if (mpv_get_property(_handle, [prefix stringByAppendingString:@"id"].UTF8String, MPV_FORMAT_INT64, &trackID) >= 0
+            && trackID > 0) {
+            return trackID;
+        }
+    }
+    return 0;
+}
+
 - (void)loadExternalSubtitle:(NSURL *)url {
     if (!_handle || _shuttingDown) {
         return;
@@ -2666,6 +2706,19 @@ static NSImage *HSMpvAmbientImageFromNode(mpv_node *node, NSInteger maximumDimen
     [self clearASSSubtitleEffectsRestoringLogicalTrack:NO];
     [self resetSubtitleCueCache];
     [self emitSubtitleCuesFromNode:NULL];
+    // mpv's `sub-auto` may already have loaded a same-name file before the
+    // Swift track snapshot catches up; reuse it instead of adding a duplicate.
+    int64_t existingTrackID = [self existingExternalSubtitleTrackIDForURL:url];
+    if (existingTrackID > 0) {
+        mpv_set_property(_handle, "sid", MPV_FORMAT_INT64, &existingTrackID);
+        mpv_set_property_string(
+            _handle,
+            "sub-visibility",
+            _nativeSubtitleRenderingEnabled.load(std::memory_order_acquire) ? "yes" : "no"
+        );
+        [self refreshSubtitleCues];
+        return;
+    }
     const char *command[] = {
         "sub-add",
         url.fileSystemRepresentation,

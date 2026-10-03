@@ -1,3 +1,4 @@
+// test-sources: Features/Video/VideoPlaylist.swift
 import Foundation
 
 private func expect<T: Equatable>(_ actual: T, _ expected: T, _ message: String) {

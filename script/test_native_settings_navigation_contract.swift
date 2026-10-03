@@ -35,7 +35,7 @@ private enum NativeSettingsNavigationContractTests {
         )
         require(
             root.contains(".toolbarBackgroundVisibility(windowToolbarBackgroundVisibility, for: .windowToolbar)")
-                && root.contains("private var windowToolbarBackgroundVisibility: Visibility")
+                && root.contains("var windowToolbarBackgroundVisibility: Visibility")
                 && root.contains("return .hidden"),
             "Native app sections should preserve one stable transparent system toolbar over the shared glass background"
         )
@@ -47,8 +47,8 @@ private enum NativeSettingsNavigationContractTests {
             "Native Settings sidebar, detail and cards must use shared glass surfaces behind the transparent toolbar"
         )
         require(
-            settings.contains("private struct NativeSettingsTextFieldModifier: ViewModifier")
-                && settings.contains("@FocusState private var isFocused: Bool")
+            settings.contains("struct NativeSettingsTextFieldModifier: ViewModifier")
+                && settings.contains("var isFocused: Bool")
                 && settings.contains("content\n            .textFieldStyle(.plain)\n            .focused($isFocused)")
                 && settings.contains(".glassEffect(.regular.interactive(), in: Capsule())")
                 && settings.contains("isFocused ? Color.accentColor")
@@ -88,14 +88,14 @@ private enum NativeSettingsNavigationContractTests {
             "The dictionary page must keep lookup and display preferences inline"
         )
         require(
-            dictionary.contains("@State private var showCollapsedDictionaryCustomization = false")
+            dictionary.contains("var showCollapsedDictionaryCustomization = false")
                 && dictionary.contains(".sheet(isPresented: $showCollapsedDictionaryCustomization)")
                 && dictionary.contains("DictionaryBehaviorSettingsSections(")
                 && dictionary.contains("showCollapsedDictionaryCustomization: $showCollapsedDictionaryCustomization")
                 && dictionary.contains("@Binding var showCollapsedDictionaryCustomization: Bool")
                 && dictionary.contains("showCollapsedDictionaryCustomization = true")
                 && dictionary.contains("CollapsedDictionariesSheet()")
-                && dictionary.contains("private struct CollapsedDictionariesSheet: View")
+                && dictionary.contains("struct CollapsedDictionariesSheet: View")
                 && dictionary.contains("NativeSettingsForm(horizontalPadding: 18, verticalPadding: 18, spacing: 16)")
                 && dictionary.contains("NativeGlassPageBackground()")
                 && dictionary.contains("ContentUnavailableView")
@@ -122,9 +122,9 @@ private enum NativeSettingsNavigationContractTests {
         require(
             dictionary.contains("RecommendedDictionarySelectionSheet")
                 && dictionary.contains("DictionaryUpdateSelectionSheet")
-                && dictionary.contains("@State private var selectedRecommendedDictionaryIDs: Set<String> = []")
-                && dictionary.contains("@State private var selectedUpdatableDictionaryIDs: Set<UUID> = []")
-                && dictionary.contains("@State private var showNoDictionaryUpdatesAlert = false")
+                && dictionary.contains("var selectedRecommendedDictionaryIDs: Set<String> = []")
+                && dictionary.contains("var selectedUpdatableDictionaryIDs: Set<UUID> = []")
+                && dictionary.contains("var showNoDictionaryUpdatesAlert = false")
                 && dictionary.contains("dictionaryManager.importRecommendedDictionaries(selectedRecommendations)")
                 && dictionary.contains("dictionaryManager.updateDictionaries(selectedDictionaries, refreshAvailabilityAfterUpdate: true)")
                 && !dictionary.contains("recommendedDownloadMessage")
@@ -230,7 +230,7 @@ private enum NativeSettingsNavigationContractTests {
         require(
             audio.contains("let sourceID = source.id")
                 && audio.contains("deleteAudioSource(id: sourceID)")
-                && audio.contains("private func deleteAudioSource(id sourceID: AudioSource.ID)")
+                && audio.contains("func deleteAudioSource(id sourceID: AudioSource.ID)")
                 && audio.contains("let remainingSources = userConfig.audioSources.filter { $0.id != sourceID }")
                 && audio.contains("userConfig.audioSources = remainingSources")
                 && !audio.contains("removeAll { $0.id == source.id }"),

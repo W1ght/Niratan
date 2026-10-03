@@ -81,7 +81,13 @@ struct BookCell: View {
                 }
             }
             
-            if userConfig.enableSync {
+            if userConfig.enableSync && userConfig.syncProvider == .gdrive && GoogleDriveSyncManager.shared.enabled {
+                Button {
+                    viewModel.syncLibraryBook(book)
+                } label: {
+                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                }
+            } else if userConfig.enableSync && userConfig.syncProvider == .ttu {
                 if userConfig.syncMode == .manual {
                     Menu {
                         Button {
@@ -106,11 +112,20 @@ struct BookCell: View {
                 }
             }
             
+            if FushiInterconnectStore.shared.isPaired {
+                Button {
+                    viewModel.syncBookWithFushi(book)
+                } label: {
+                    Label("Sync with Fushi", systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
+
             Button {
                 markReadConfirmation = true
             } label: {
                 Label("Mark Read", systemImage: "checkmark")
             }
+            .disabled(book.epub == nil)
             
             Button {
                 renameDraft = BookRenameDraft(book: book, title: book.displayTitle)
@@ -144,8 +159,23 @@ struct BookCell: View {
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
-                viewModel.deleteBook(book)
+            if viewModel.usesLibrarySync {
+                if viewModel.canDeleteLocally(book) {
+                    Button("Delete Local Copy") {
+                        viewModel.deleteLocalBook(book)
+                    }
+                }
+                Button("Delete Everywhere", role: .destructive) {
+                    viewModel.deleteBook(book)
+                }
+            } else {
+                Button("Delete", role: .destructive) {
+                    viewModel.deleteBook(book)
+                }
+            }
+        } message: {
+            if viewModel.usesLibrarySync {
+                Text("Deleting everywhere removes the book from Google Drive and your other devices. Reading statistics are kept.")
             }
         }
         .confirmationDialog(
@@ -178,7 +208,8 @@ struct BookCell: View {
         let content = BookView(
             book: book,
             progress: viewModel.progress(for: book),
-            isSelected: isSelecting && isSelected
+            isSelected: isSelecting && isSelected,
+            downloadProgress: viewModel.downloadingBooks[book.id]
         )
 
         if let dragCoordinateSpaceName,

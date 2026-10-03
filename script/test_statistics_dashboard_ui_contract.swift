@@ -49,8 +49,8 @@ assertContains(reuseSource, "StatisticsDashboardView(", "Bookshelf routes to the
 assertContains(reuseSource, "shelves: viewModel.shelves", "Bookshelf passes shelf data into the statistics dashboard")
 
 let dashboardSource = try source("Features/Bookshelf/StatisticsDashboardView.swift")
-let dashboardStateSection = slice(dashboardSource, from: "struct StatisticsDashboardView", to: "private var calendar")
-let trendChartViewSection = slice(dashboardSource, from: "private struct StatisticsTrendChartView", to: "private enum StatisticsDashboardPlaceholder")
+let dashboardStateSection = slice(dashboardSource, from: "struct StatisticsDashboardView", to: "var calendar")
+let trendChartViewSection = slice(dashboardSource, from: "struct StatisticsTrendChartView", to: "private enum StatisticsDashboardPlaceholder")
 assertContains(dashboardSource, "struct StatisticsDashboardView", "Dashboard view exists")
 assertContains(dashboardSource, "private let statisticsDashboardSpacing: CGFloat = 16", "Dashboard uses compact top-level spacing")
 assertContains(dashboardSource, "isLoadingSnapshot", "Dashboard tracks background statistics loading")
@@ -103,8 +103,10 @@ assertContains(dashboardSource, "selectedStatisticsBook", "Book ranking tracks t
 assertContains(dashboardSource, ".sheet(item: $selectedStatisticsBook)", "Book ranking opens the selected book in a native sheet")
 assertContains(dashboardSource, "StatisticsBookDetailPanel", "Dashboard includes per-book daily statistics details")
 assertContains(dashboardSource, "Delete This Day", "Per-book statistics can delete a selected day")
+assertContains(dashboardSource, "ReadingSessionLog.editing(", "Per-book statistics edit individual reading sessions")
+assertContains(dashboardSource, "Delete This Session", "Per-book statistics can delete a single reading session")
 assertContains(dashboardSource, "Delete All Statistics", "Per-book statistics can delete all recorded days")
-assertContains(dashboardSource, "try BookStorage.save(updated", "Statistics edits use the atomic BookStorage save path")
+assertContains(dashboardSource, "try StatisticsStorage.save(updated", "Statistics edits use the atomic session storage save path")
 assertContains(dashboardSource, "NativeGlassCircleButton(systemName: \"xmark\"", "Per-book statistics uses the macOS 26 glass close control")
 assertContains(dashboardSource, ".buttonStyle(.glassProminent)", "Per-book statistics uses a prominent macOS 26 glass save control")
 assertContains(dashboardSource, ".buttonStyle(.glass)", "Per-book statistics uses macOS 26 glass destructive controls")
@@ -179,10 +181,10 @@ assertNotContains(dashboardSource, "Button(\"Bookshelf\")", "Dashboard content s
 assertNotContains(dashboardSource, "title: \"Target Days\"", "Weekly target row should not use ambiguous wording")
 assertNotContains(dashboardSource, "targetType: targetSettings.dailyTargetType", "Goal target type should not drive other dashboard cards")
 
-let calendarSection = slice(dashboardSource, from: "private var calendarSection", to: "private var heatmap")
+let calendarSection = slice(dashboardSource, from: "var calendarSection", to: "private var heatmap")
 assertNotContains(calendarSection, "NativeGlassSegmentedPicker", "Reading Calendar should not own the range picker")
 
-let dashboardColumns = slice(dashboardSource, from: "private func dashboardColumns", to: "@ViewBuilder\n    private var corruptStatisticsWarning")
+let dashboardColumns = slice(dashboardSource, from: "func dashboardColumns", to: "@ViewBuilder\n    private var corruptStatisticsWarning")
 assertContains(dashboardColumns, "let columnWidth = max((width - statisticsDashboardSpacing * 2) / 3, 260)", "Wide dashboard uses spacing-aware three-column math")
 assertContains(dashboardColumns, "let doubleColumnWidth = columnWidth * 2 + statisticsDashboardSpacing", "Wide dashboard uses an explicit two-column cluster")
 assertContains(dashboardColumns, ".frame(width: doubleColumnWidth", "Wide dashboard gives shelf comparison exactly two columns")
@@ -193,18 +195,18 @@ assertContainsInOrder(dashboardColumns, ["VStack(spacing: statisticsDashboardSpa
 assertContainsInOrder(dashboardColumns, ["else if width >= 840", "todaySection", "targetSettingsSection", "weekSection", "calendarSection", "shelfComparisonSection", "selectedRangeSection", "speedSummarySection", "bookRankingSection"], "Medium dashboard uses continuous column flow so later cards fill shorter-column gaps")
 assertNotContains(dashboardColumns, "distributionSection", "Wide dashboard should not reserve a column for the removed By Book module")
 
-let dashboardLayout = slice(dashboardSource, from: "private func dashboardLayout", to: "private var fullWidthTrendSection")
+let dashboardLayout = slice(dashboardSource, from: "func dashboardLayout", to: "private var fullWidthTrendSection")
 assertNotContains(dashboardLayout, "shelfComparisonSection", "Shelf comparison should not force a separate full-width row")
 
-let shelfComparisonSection = slice(dashboardSource, from: "private var shelfComparisonSection", to: "private var trendSection")
+let shelfComparisonSection = slice(dashboardSource, from: "var shelfComparisonSection", to: "private var trendSection")
 assertContains(shelfComparisonSection, ".frame(minWidth: 660", "Shelf comparison table is compact enough for two dashboard columns")
 assertContains(shelfComparisonSection, ".frame(minWidth: 640, minHeight: 96)", "Shelf comparison empty state keeps the compact footprint")
 
-let shelfComparisonHelpers = slice(dashboardSource, from: "private var shelfComparisonHeader", to: "private func goalRing")
+let shelfComparisonHelpers = slice(dashboardSource, from: "var shelfComparisonHeader", to: "private func goalRing")
 assertContains(shelfComparisonHelpers, "HStack(spacing: 10)", "Shelf comparison columns use compact spacing")
 assertContains(shelfComparisonHelpers, ".padding(.vertical, 7)", "Shelf comparison rows use compact vertical padding")
 
-let trendSection = slice(dashboardSource, from: "private var trendSection", to: "private var trendChart")
+let trendSection = slice(dashboardSource, from: "var trendSection", to: "private var trendChart")
 assertContains(trendSection, "selection: $selectedMode", "Trend owns the year/month/week/day range picker")
 assertContains(trendSection, "StatisticsRangeMode.allCases", "Trend exposes all range modes")
 assertContains(trendSection, "rangeModeText(mode)", "Trend reuses localized range labels")

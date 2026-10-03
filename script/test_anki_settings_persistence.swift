@@ -1,3 +1,4 @@
+// test-sources: Models/Anki.swift
 import Foundation
 
 @main

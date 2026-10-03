@@ -1,0 +1,7 @@
+# 仓库统一使用 LF：源码契约测试按 "\n" 匹配源码，Windows 上 autocrlf 产生的 CRLF 会造成假失败。
+* text=auto eol=lf
+
+*.png binary
+*.PNG binary
+*.jpg binary
+*.epub binary

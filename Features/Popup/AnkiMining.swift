@@ -31,13 +31,13 @@ struct AnkiMiningResult {
         return payload
     }
 
-    static func added(noteID: Int64, _ message: String = "Added to Anki.") -> AnkiMiningResult {
+    static func added(noteID: Int64, _ message: String = String(localized: "Added to Anki.")) -> AnkiMiningResult {
         AnkiMiningResult(status: .added, message: message, noteID: noteID)
     }
 
     static func duplicate(
         noteID: Int64? = nil,
-        _ message: String = "Already exists in Anki."
+        _ message: String = String(localized: "Already exists in Anki.")
     ) -> AnkiMiningResult {
         AnkiMiningResult(status: .duplicate, message: message, noteID: noteID)
     }
@@ -62,7 +62,7 @@ func preflightAnkiMining(content: [String: String]) async -> AnkiMiningResult? {
 
     guard AnkiManager.shared.selectedDeck != nil,
           AnkiManager.shared.selectedNoteType != nil else {
-        return .failed("Configure Anki deck and model first.")
+        return .failed(String(localized: "Configure Anki deck and model first."))
     }
 
     let expression = content["expression"] ?? "Entry"
@@ -75,7 +75,7 @@ func preflightAnkiMining(content: [String: String]) async -> AnkiMiningResult? {
         if duplicateLookup.isDuplicate {
             return .duplicate(
                 noteID: duplicateLookup.noteIDs.first,
-                "Already exists in Anki."
+                String(localized: "Already exists in Anki.")
             )
         }
     }
@@ -128,8 +128,8 @@ func mineAnkiEntry(
     }
 
     if let noteID = await AnkiManager.shared.addNote(content: content, context: context) {
-        return .added(noteID: noteID, "Added to Anki.")
+        return .added(noteID: noteID, String(localized: "Added to Anki."))
     }
 
-    return .failed(AnkiManager.shared.errorMessage ?? "Failed to add card.")
+    return .failed(AnkiManager.shared.errorMessage ?? String(localized: "Failed to add card."))
 }

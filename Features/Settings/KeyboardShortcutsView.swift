@@ -96,6 +96,17 @@ struct KeyboardShortcutsView: View {
 
     private var selectionLookupSettings: some View {
         NativeSettingsRow("Cross-App Selection Lookup (Experimental)") {
+            Text(selectionLookupStatusTitle)
+                .font(.callout)
+                .foregroundStyle(selectionLookupStatusColor)
+
+            if selectionLookupCoordinator.availability == .permissionRequired {
+                Button("Request Access") {
+                    selectionLookupCoordinator.requestAccess()
+                }
+                .buttonStyle(NativeSettingsActionButtonStyle())
+            }
+
             Toggle(
                 "",
                 isOn: Binding(
@@ -104,15 +115,6 @@ struct KeyboardShortcutsView: View {
                 )
             )
             .labelsHidden()
-
-            Text(selectionLookupStatusTitle)
-                .foregroundStyle(selectionLookupStatusColor)
-
-            if selectionLookupCoordinator.availability == .permissionRequired {
-                Button("Request Access") {
-                    selectionLookupCoordinator.requestAccess()
-                }
-            }
         }
     }
 
@@ -197,7 +199,7 @@ private struct ShortcutRecorderRow: View {
             .disabled(shortcut == action.defaultBinding)
 
             Button(action: onRecord) {
-                ShortcutValuePill {
+                NativeSettingsValuePill {
                     if isRecording {
                         Text("Press keys...")
                             .foregroundStyle(Color.accentColor)
@@ -224,19 +226,5 @@ private struct ShortcutRecorderRow: View {
             Label("Shortcut Conflict", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
         }
-    }
-}
-
-private struct ShortcutValuePill<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        content()
-            .font(.body.monospaced())
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.thinMaterial, in: Capsule())
     }
 }

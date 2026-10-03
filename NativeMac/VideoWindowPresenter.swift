@@ -249,19 +249,7 @@ private struct VideoWindowRootView: View {
     }
 
     private var preferredColorScheme: ColorScheme? {
-        if userConfig.theme == .custom {
-            return userConfig.uiTheme.colorScheme
-        }
-
-        if userConfig.theme == .system {
-            return nil
-        }
-
-        if userConfig.theme == .sepia && userConfig.sepiaInvertInDark {
-            return nil
-        }
-
-        return userConfig.theme.colorScheme
+        userConfig.preferredColorScheme ?? NativeSystemAppearance.shared.colorScheme
     }
 
 }

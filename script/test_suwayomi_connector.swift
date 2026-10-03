@@ -1,3 +1,4 @@
+// test-sources: Features/Manga/SuwayomiClient.swift Models/Suwayomi.swift
 import Foundation
 
 private final class SuwayomiMockProtocol:

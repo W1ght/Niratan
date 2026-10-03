@@ -51,7 +51,7 @@ require(
     "Subtitle matching should not present a nested file importer"
 )
 require(
-    sheet.contains("private enum SasayakiFileImportKind"),
+    sheet.contains("enum SasayakiFileImportKind"),
     "Sasayaki should centralize audio and subtitle file importing"
 )
 require(
@@ -59,7 +59,7 @@ require(
     "Subtitle importing should accept text fallback types"
 )
 require(
-    sheet.contains("@State private var isFileImporterPresented = false")
+    sheet.contains("var isFileImporterPresented = false")
         && sheet.contains("isPresented: $isFileImporterPresented"),
     "File importer presentation should not clear the pending import kind before completion"
 )

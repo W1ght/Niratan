@@ -1,3 +1,4 @@
+// test-sources: Features/Reader/Lyrics/ReaderLyricsSelectionResolver.swift
 import Foundation
 
 @main

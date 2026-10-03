@@ -1,3 +1,4 @@
+// test-sources: Models/Manga.swift Features/Manga/MangaPageProcessing.swift
 import AppKit
 import Foundation
 import ImageIO

@@ -6,19 +6,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allow Niratan to access AnkiConnect, Suwayomi Server, and user-installed Aidoku sources on your local network."
+            "value" : "Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, Fushi interconnect hosts, and user-installed Aidoku sources on your local network."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "允许 Niratan 访问本地网络中的 AnkiConnect、Suwayomi Server 和用户安装的 Aidoku 图源。"
+            "value" : "允许 Niratan 访问本地网络中的 AnkiConnect、Suwayomi Server、Jellyfin、Emby 和 Plex 媒体服务器、Fushi 互联主机，以及用户安装的 Aidoku 图源。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "允許 Niratan 存取本機網路中的 AnkiConnect、Suwayomi Server 和使用者安裝的 Aidoku 圖源。"
+            "value" : "允許 Niratan 存取本機網路中的 AnkiConnect、Suwayomi Server、Jellyfin、Emby 和 Plex 媒體伺服器、Fushi 互聯主機，以及使用者安裝的 Aidoku 圖源。"
           }
         }
       }

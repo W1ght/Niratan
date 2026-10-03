@@ -1,3 +1,4 @@
+// test-sources: Models/Subtitle.swift Features/Video/Subtitles/SubtitleCueStore.swift Features/Video/Subtitles/SubtitleOverlayRowHeightMeasurer.swift Features/Video/Subtitles/SubtitleParser.swift Features/Video/Subtitles/VideoSubtitleEdgeStyle.swift Features/Video/Subtitles/EmbeddedSubtitlePayloadParser.swift
 import Foundation
 #if canImport(AppKit)
 import AppKit
@@ -698,8 +699,20 @@ do {
 let videoPlayerScreenPath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     .appendingPathComponent("Features/Video/VideoPlayerScreen.swift")
 let videoPlayerScreen = try String(contentsOf: videoPlayerScreenPath, encoding: .utf8)
+    + String(contentsOf: videoPlayerScreenPath.deletingLastPathComponent()
+        .appendingPathComponent("VideoPlayerScreen+Subtitles.swift"), encoding: .utf8)
+    + String(contentsOf: videoPlayerScreenPath.deletingLastPathComponent()
+        .appendingPathComponent("VideoPlayerScreen+Chrome.swift"), encoding: .utf8)
+    + String(contentsOf: videoPlayerScreenPath.deletingLastPathComponent()
+        .appendingPathComponent("VideoPlayerScreen+OSD.swift"), encoding: .utf8)
+    + String(contentsOf: videoPlayerScreenPath.deletingLastPathComponent()
+        .appendingPathComponent("VideoPlayerScreen+Mining.swift"), encoding: .utf8)
+    + String(contentsOf: videoPlayerScreenPath.deletingLastPathComponent()
+        .appendingPathComponent("VideoPlayerScreen+Opening.swift"), encoding: .utf8)
+    + String(contentsOf: videoPlayerScreenPath.deletingLastPathComponent()
+        .appendingPathComponent("VideoPlayerScreen+Shortcuts.swift"), encoding: .utf8)
 expect(
-    videoPlayerScreen.contains("private static let subtitleFileExtensions = [\"srt\", \"vtt\", \"ass\", \"ssa\"]"),
+    videoPlayerScreen.contains("static let subtitleFileExtensions = [\"srt\", \"vtt\", \"ass\", \"ssa\"]"),
     "player subtitle importer should allow ASS and SSA files"
 )
 
