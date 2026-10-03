@@ -95,7 +95,7 @@ nonisolated extension Timestamped {
     }
 }
 
-enum SyncProvider: String, CaseIterable, Codable {
+nonisolated enum SyncProvider: String, CaseIterable, Codable, Sendable {
     /// Whole-library sync between Niratan devices.
     case gdrive
     /// Per-book ッツ/yatsu compatible sync (the original Niratan sync).

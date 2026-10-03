@@ -35,7 +35,7 @@ struct SyncView: View {
                     NativeGlassSegmentedPicker(
                         selection: Binding(
                             get: { userConfig.syncProvider },
-                            set: changeProvider
+                            set: { changeProvider($0) }
                         ),
                         values: [SyncProvider.gdrive, .ttu],
                         minSegmentWidth: 96
