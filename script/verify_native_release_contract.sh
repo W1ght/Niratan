@@ -107,7 +107,7 @@ assert_contains "$PROJECT_FILE" "InfoPlist.xcstrings"
 assert_contains "$INFO_PLIST_STRINGS" '"NSLocalNetworkUsageDescription"'
 assert_contains "$INFO_PLIST_STRINGS" '"zh-Hans"'
 assert_contains "$INFO_PLIST_STRINGS" '"zh-Hant"'
-LOCAL_NETWORK_DESCRIPTION='Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, and user-installed Aidoku sources on your local network.'
+LOCAL_NETWORK_DESCRIPTION='Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, Fushi interconnect hosts, and user-installed Aidoku sources on your local network.'
 assert_contains "$PROJECT_FILE" \
   "INFOPLIST_KEY_NSLocalNetworkUsageDescription = \"$LOCAL_NETWORK_DESCRIPTION\";"
 assert_contains "$INFO_PLIST" "$LOCAL_NETWORK_DESCRIPTION"

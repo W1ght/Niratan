@@ -192,7 +192,7 @@ assert_occurrences "$ABOUT_VIEW" \
 assert_not_contains "$ABOUT_VIEW" 'Copyright (c) 2017-2026 Thomas Zoechling'
 assert_not_contains "$ABOUT_VIEW" 'Copyright (c) 2016 Michael Rönnau'
 
-LOCAL_NETWORK_DESCRIPTION='Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, and user-installed Aidoku sources on your local network.'
+LOCAL_NETWORK_DESCRIPTION='Allow Niratan to access AnkiConnect, Suwayomi Server, Jellyfin, Emby and Plex media servers, Fushi interconnect hosts, and user-installed Aidoku sources on your local network.'
 assert_occurrences "$PROJECT_FILE" \
   "INFOPLIST_KEY_NSLocalNetworkUsageDescription = \"$LOCAL_NETWORK_DESCRIPTION\";" 2
 assert_contains "$INFO_PLIST" "$LOCAL_NETWORK_DESCRIPTION"
