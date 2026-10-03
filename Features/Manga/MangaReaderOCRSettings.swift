@@ -80,33 +80,29 @@ struct MangaReaderOCRSettingsSection: View {
     @State private var showsRerunConfirmation = false
 
     var body: some View {
-        Section("Recognition") {
-            panel.row("ocrTrigger") {
-                Picker("Recognize Pages", selection: panel.binding(\.ocrTrigger)) {
-                    ForEach(MangaOCRTrigger.allCases) { trigger in
-                        Text(LocalizedStringKey(trigger.titleKey)).tag(trigger)
-                    }
-                }
-            }
-            panel.row("ocrEngine") {
-                Picker("Engine", selection: panel.binding(\.ocrEngine)) {
-                    ForEach(MangaOCREngineChoice.allCases) { engine in
-                        Text(LocalizedStringKey(engine.titleKey)).tag(engine)
-                    }
-                }
-            }
+        panel.section("Recognition", footer: engineDescription) {
+            panel.pickerRow(
+                "ocrTrigger", "Recognize Pages", systemImage: "text.viewfinder",
+                selection: panel.binding(\.ocrTrigger), values: MangaOCRTrigger.allCases
+            ) { LocalizedStringKey($0.titleKey) }
+            panel.pickerRow(
+                "ocrEngine", "Engine", systemImage: "cpu",
+                selection: panel.binding(\.ocrEngine), values: MangaOCREngineChoice.allCases
+            ) { LocalizedStringKey($0.titleKey) }
             if let selection = viewModel.ocrEngine {
-                LabeledContent("Current Engine") {
+                panel.labeledRow(nil, "Current Engine", systemImage: "checkmark.seal") {
                     Text(LocalizedStringKey(selection.engine.titleKey))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
-            Text(engineDescription)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Button("Re-run OCR on This Manga…") {
-                showsRerunConfirmation = true
+            panel.labeledRow(nil, "Re-run OCR on This Manga…", systemImage: "arrow.clockwise") {
+                Button("Re-run OCR") {
+                    showsRerunConfirmation = true
+                }
+                .buttonStyle(MangaSettingsChipButtonStyle(isProminent: true))
+                .disabled(viewModel.ocrEngine?.isAvailable != true)
             }
-            .disabled(viewModel.ocrEngine?.isAvailable != true)
         }
         .confirmationDialog(
             "Re-run OCR on This Manga?",
@@ -119,7 +115,10 @@ struct MangaReaderOCRSettingsSection: View {
             Text("Pages recognized by the current engine are recognized again. Embedded Mokuro text is not affected.")
         }
 
-        Section("On-Device Models") {
+        panel.section(
+            "On-Device Models",
+            footer: "Models are downloaded once from their pinned public sources and verified before use. Page images never leave this Mac with on-device engines."
+        ) {
             MangaOCRModelRow(
                 set: .mangaCTC,
                 titleKey: "Manga CTC (Fast)",
@@ -135,21 +134,20 @@ struct MangaReaderOCRSettingsSection: View {
                 titleKey: "Text Detector for Apple Vision",
                 detailKey: "Lets Apple Vision read each speech bubble separately for better accuracy."
             )
-            Text("Models are downloaded once from their pinned public sources and verified before use. Page images never leave this Mac with on-device engines.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
 
-        Section("Text Regions") {
-            panel.row("showsOCRBoxes") {
-                Toggle("Show Recognized Text Regions", isOn: panel.binding(\.showsOCRBoxes))
-            }
-            panel.row("looksUpOnHover") {
-                Toggle("Look Up on Hover", isOn: panel.binding(\.looksUpOnHover))
-            }
-            Text("Hold Shift while hovering to look up text at any time.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        panel.section(
+            "Text Regions",
+            footer: "Hold Shift while hovering to look up text at any time."
+        ) {
+            panel.toggleRow(
+                "showsOCRBoxes", "Show Recognized Text Regions",
+                systemImage: "rectangle.dashed", value: \.showsOCRBoxes
+            )
+            panel.toggleRow(
+                "looksUpOnHover", "Look Up on Hover",
+                systemImage: "cursorarrow.rays", value: \.looksUpOnHover
+            )
         }
     }
 
@@ -173,10 +171,11 @@ struct MangaPanelNavigationSettingsSection: View {
     let panel: MangaReaderSettingsPanel
 
     var body: some View {
-        Section("Panel Navigation") {
-            panel.row("panelNavigation") {
-                Toggle("Panel-by-Panel Navigation", isOn: panel.binding(\.panelNavigation))
-            }
+        panel.section("Panel Navigation") {
+            panel.toggleRow(
+                "panelNavigation", "Panel-by-Panel Navigation",
+                systemImage: "rectangle.3.group", value: \.panelNavigation
+            )
             MangaOCRModelRow(
                 set: .panelDetector,
                 titleKey: "Panel Detection Model",
@@ -194,40 +193,55 @@ private struct MangaOCRModelRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: status?.isReady == true ? "checkmark.circle.fill" : "arrow.down.circle")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(status?.isReady == true ? Color.accentColor : Color.secondary)
+                    .frame(width: 18)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(titleKey)
+                        .font(.callout)
                     Text(sizeDescription)
-                        .font(.caption)
+                        .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 if manager.isDownloading(set) {
                     Button("Cancel") {
                         manager.cancel(set)
                     }
+                    .buttonStyle(MangaSettingsChipButtonStyle())
                 } else if status?.isReady == true {
                     Button("Delete", role: .destructive) {
                         manager.delete(set)
                     }
+                    .buttonStyle(MangaSettingsChipButtonStyle(isDestructive: true))
                 } else {
                     Button("Download") {
                         manager.download(set)
                     }
+                    .buttonStyle(MangaSettingsChipButtonStyle(isProminent: true))
                 }
             }
             if let progress = manager.progress[set] {
                 ProgressView(value: progress)
+                    .controlSize(.small)
+                    .padding(.leading, 28)
             }
             Text(detailKey)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 28)
             if let error = manager.errors[set] {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.red)
+                    .padding(.leading, 28)
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .task {
             await manager.refresh()
         }

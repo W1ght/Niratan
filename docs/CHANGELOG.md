@@ -2,6 +2,16 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 2.0.1
+
+### 中文
+
+- 漫画阅读器设置侧栏改用与视频播放器检查器一致的样式：顶部显示当前漫画标题和关闭按钮，标签栏改为图标加文字并带滑动指示；选项改为带图标的分组列表，开关、菜单和滑块统一对齐，滑块不再显示密集刻度。只对当前漫画生效的选项旁有一键恢复全局值的按钮，底部可切换“这部漫画／全部漫画”并恢复全局默认。
+
+### English
+
+- The manga reader settings inspector now matches the video player inspector: a header with the manga title and a close button, icon tabs with a sliding indicator, and grouped lists with an icon per option and aligned switches, menus and sliders (without dense tick marks). Options customized for the current manga keep a button to return to the global value, and the footer switches between This Manga and All Manga and restores global defaults.
+
 ## 2.0.0
 
 ### 中文

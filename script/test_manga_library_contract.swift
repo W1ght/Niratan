@@ -610,7 +610,9 @@ require(
         && reader.contains("ScrollView([.horizontal, .vertical])")
         && reader.contains("let target = fit * requestedZoomScale")
         && reader.contains(".inspector(isPresented: $viewModel.showsSettingsPanel)")
-        && reader.contains("Picker(\"Apply Changes To\"")
+        && reader.contains("selection: $viewModel.settingsScope,\n                    values: MangaReaderSettingsScope.allCases")
+        && reader.contains("MangaSettingsSection(title: title")
+        && !reader.contains(".formStyle(.grouped)")
         && !reader.contains(".background(.regularMaterial)")
         && !reader.contains(".background(.ultraThinMaterial)"),
     "Manga settings must migrate the previous layout, direction, zoom, processing and OCR choices into global settings with sparse per-title overrides edited from a native inspector"
