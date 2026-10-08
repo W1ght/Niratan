@@ -170,6 +170,7 @@
 				Reader/Lyrics/ReaderLyricsTextView.swift,
 				Reader/ReaderChapterIndex.swift,
 				Reader/ReaderPageIndex.swift,
+				Reader/ReaderBookmarkPersistencePolicy.swift,
 				Reader/ReaderStatisticsPersistencePolicy.swift,
 				Reader/ReaderShortcutActions.swift,
 				Reader/Search/ReaderGoToView.swift,
@@ -322,6 +323,10 @@
 				Video/VideoWindowChromeController.swift,
 				Video/VideoWindowCoordinator.swift,
 				Sync/GoogleDriveClient.swift,
+				Sync/GoogleDriveAuthorizationPolicy.swift,
+				Sync/GoogleDriveLoopbackAuthorization.swift,
+				Sync/EPUBSyncCoordinates.swift,
+				Sync/GoogleDriveSync/GoogleDriveSyncCache.swift,
 				Sync/GoogleDriveSync/GoogleDriveSyncHandler.swift,
 				Sync/GoogleDriveSync/GoogleDriveSyncManager.swift,
 				"Sync/GoogleDriveSync/GoogleDriveSyncManager+Files.swift",
@@ -664,7 +669,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 2.0.1;
+				MARKETING_VERSION = 2.0.2;
 				OTHER_LDFLAGS = "-lmpv";
 				PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -706,7 +711,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/Vendor/libmpv/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 2.0.1;
+				MARKETING_VERSION = 2.0.2;
 				OTHER_LDFLAGS = "-lmpv";
 				PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;
 				PRODUCT_NAME = "$(TARGET_NAME)";

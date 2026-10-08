@@ -9,9 +9,13 @@
 window.hoshiReader = {
     ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
     ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
+    sharedRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ가-힣ㄱ-ㆎ\p{Radical}\p{Unified_Ideograph}]+/gimu,
+    sharedRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ가-힣ㄱ-ㆎ\p{Radical}\p{Unified_Ideograph}]/iu,
+    sharedSyncCoordinates: false,
     activeCueId: null,
     cueWrappers: new Map(),
     nodeStartOffsets: new WeakMap(),
+    nodeStartNativeOffsets: new WeakMap(),
     nodeStartRawOffsets: new WeakMap(),
     horizontalPageColumns: 1,
     horizontalSpreadPageSize: null,
@@ -30,17 +34,41 @@ window.hoshiReader = {
     countChars(text) {
         return Array.from(this.normalizeText(text)).length;
     },
+
+    countNativeChars(text) {
+        return Array.from(text.replace(this.ttuRegexNegated, '')).length;
+    },
     
     countRawChars(text) {
         return Array.from(text).length;
     },
     
     normalizeText(text) {
-        return text.replace(this.ttuRegexNegated, '');
+        return text.replace(this.sharedSyncCoordinates ? this.sharedRegexNegated : this.ttuRegexNegated, '');
     },
     
     isMatchableChar(char) {
-        return this.ttuRegex.test(char || '');
+        return (this.sharedSyncCoordinates ? this.sharedRegex : this.ttuRegex).test(char || '');
+    },
+
+    rangeForCharacter(node, characterIndex) {
+        // Bookmarks count normalized code points; DOM Range offsets count UTF-16 units.
+        let index = 0;
+        let offset = 0;
+        for (const char of node.textContent) {
+            const next = offset + char.length;
+            if (this.isMatchableChar(char)) {
+                if (index === characterIndex) {
+                    const range = document.createRange();
+                    range.setStart(node, offset);
+                    range.setEnd(node, next);
+                    return range;
+                }
+                index += 1;
+            }
+            offset = next;
+        }
+        return null;
     },
     
     createWalker(rootNode) {
@@ -58,20 +86,25 @@ window.hoshiReader = {
     
     buildNodeOffsets() {
         const offsets = new WeakMap();
+        const nativeOffsets = new WeakMap();
         const rawOffsets = new WeakMap();
         const walker = this.createWalker();
         let count = 0;
+        let nativeCount = 0;
         let rawCount = 0;
         let node;
         
         while (node = walker.nextNode()) {
             offsets.set(node, count);
+            nativeOffsets.set(node, nativeCount);
             rawOffsets.set(node, rawCount);
             count += this.countChars(node.textContent);
+            nativeCount += this.countNativeChars(node.textContent);
             rawCount += this.countRawChars(node.textContent);
         }
         
         this.nodeStartOffsets = offsets;
+        this.nodeStartNativeOffsets = nativeOffsets;
         this.nodeStartRawOffsets = rawOffsets;
     },
     
@@ -215,7 +248,7 @@ window.hoshiReader = {
     },
     
     notifyRestoreComplete() {
-        window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
+        window.webkit?.messageHandlers?.restoreCompleted?.postMessage(window.hoshiReaderRestoreToken ?? null);
         this.registerPageTracking();
     },
 
@@ -280,11 +313,11 @@ window.hoshiReader = {
         let node;
 
         while (node = walker.nextNode()) {
-            const nodeLen = this.countChars(node.textContent);
+            const nodeLen = this.countNativeChars(node.textContent);
             if (!nodeLen) {
                 continue;
             }
-            const nodeStart = this.nodeStartOffsets.get(node) ?? totalChars;
+            const nodeStart = this.nodeStartNativeOffsets.get(node) ?? totalChars;
             totalChars = nodeStart + nodeLen;
             range.selectNodeContents(node);
             for (const rect of range.getClientRects()) {
@@ -308,7 +341,7 @@ window.hoshiReader = {
                         low = mid + 1;
                     }
                 }
-                starts[page] = nodeStart + this.countChars(node.textContent.slice(0, low));
+                starts[page] = nodeStart + this.countNativeChars(node.textContent.slice(0, low));
                 range.selectNodeContents(node);
             }
         }
@@ -832,20 +865,21 @@ window.hoshiReader = {
         var targetCharCount = Math.ceil(totalChars * progress);
         var runningSum = 0;
         var targetNode = null;
+        var targetOffset = 0;
         
         walker = this.createWalker();
         while (node = walker.nextNode()) {
-            runningSum += this.countChars(node.textContent);
-            if (runningSum > targetCharCount) {
+            var nodeLength = this.countChars(node.textContent);
+            if (runningSum + nodeLength > targetCharCount) {
                 targetNode = node;
+                targetOffset = targetCharCount - runningSum;
                 break;
             }
+            runningSum += nodeLength;
         }
         
         if (targetNode) {
-            var range = document.createRange();
-            range.setStart(targetNode, 0);
-            range.setEnd(targetNode, 1);
+            var range = this.rangeForCharacter(targetNode, targetOffset);
             var rect = this.getRect(range);
             var anchor = (context.vertical ? rect.top : rect.left) + (context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft);
             var targetScroll = this.alignToPage(context, anchor);

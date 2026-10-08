@@ -27,6 +27,9 @@ nonisolated struct SyncRecord: Codable, Equatable, Sendable {
 }
 
 nonisolated struct SyncState: Codable {
+    /// Remote ids in this state belong to one library, independently of the network cache.
+    /// Missing in older Niratan files, so losing the cache cannot reuse their old file ids.
+    var libraryName: String?
     var books: [String: SyncRecord] = [:]
     var shelvesPending = false
     var shelvesFingerprint: String?
@@ -36,7 +39,6 @@ nonisolated struct SyncState: Codable {
 @MainActor
 protocol SyncOpenReader: AnyObject {
     var syncFolder: String { get }
-    var acceptsSyncedPosition: Bool { get }
     func prepareForExternalStatisticsMutation()
     func applySyncedState(bookmarkChanged: Bool)
     func closeForSyncedDeletion()
@@ -102,11 +104,13 @@ final class SyncStorage {
             record.generation = archived ? 0 : 1
             record.deleted = archived
             record.files = [:]
+            record.cleanup = []
             record.attached = false
             record.pending = true
             record.fingerprint = nil
             state.books[key] = record
         }
+        state.libraryName = "Hoshi Reader"
         state.shelvesPending = true
         state.shelvesFingerprint = nil
         try saveChanges()
@@ -163,6 +167,13 @@ final class SyncStorage {
             var record = state.books[key]!
             for fileType in SyncFileType.allCases where !record.deleted || fileType == .cover {
                 let url = try sourceURL(key: key, fileType: fileType)
+                if fileType == .epub, record.attached, record.files[.epub]?.value != nil, url == nil {
+                    // Published EPUBs can be fetched again. Losing this device's copy is
+                    // cache eviction, not a newer edit that removes the cloud reference.
+                    record.sources.removeValue(forKey: .epub)
+                    record.observed.removeValue(forKey: .epub)
+                    continue
+                }
                 let observed = url.flatMap(Self.modificationDate)
                 if observed != record.observed[fileType] {
                     record.observed[fileType] = observed
@@ -247,21 +258,20 @@ final class SyncStorage {
                 files: record.files
             )
         }
+        if !record.deleted, root.deletingLastPathComponent().lastPathComponent != Self.archiveFolder {
+            try restoreArchive(folder: metadata.folder, into: root)
+        }
 
         let now = Date.now.syncMilliseconds
         var ledger = SyncBookLedger.load(root: root)
         let original = ledger
-        SyncStatisticsBridge.reconcile(
-            ledger: &ledger,
-            statistics: BookStorage.loadStatistics(root: root) ?? [],
-            key: key,
-            deviceID: SyncDevice.id,
-            resetMinutes: Self.resetMinutes,
-            now: now
-        )
+        let sessions = try canonicalSessions(root: root, ledger: &ledger, now: now)
+        ledger.sessions = sessions
         reconcileMetadata(&ledger, metadata: metadata, now: now)
         if !record.deleted {
-            SyncHighlightBridge.reconcile(ledger: &ledger, local: BookStorage.loadHighlights(root: root) ?? [], now: now)
+            let coordinates = try coordinateMap(root: root, metadata: metadata, record: record)
+            migrateCoordinateLedger(&ledger, root: root, remote: remote)
+            reconcileCoordinates(&ledger, root: root, record: record, coordinates: coordinates, now: now)
             SyncShelfMembershipBridge.reconcile(
                 ledger: &ledger,
                 bookID: metadata.id,
@@ -278,25 +288,336 @@ final class SyncStorage {
             generation: record.generation,
             deleted: record.deleted,
             metadata: ledger.metadata ?? Timestamped(modified: 0, value: SyncMetadata(title: metadata.displayTitle)),
-            characterCount: max(metadata.characterCount ?? 0, BookStorage.loadBookInfo(root: root)?.characterCount ?? 0),
+            characterCount: ledger.canonicalCharacterCount ?? 0,
             files: record.files
         )
         book.sessions = ledger.sessions
         if !record.deleted {
-            if let bookmark = BookStorage.loadBookmark(root: root) {
-                let modified = bookmark.lastModified
-                    ?? Self.modificationDate(root.appendingPathComponent(FileNames.bookmark)).map { Date(syncMilliseconds: $0) }
-                    ?? .distantPast
-                book.bookmark = Timestamped(
-                    modified: max(modified.syncMilliseconds, 0),
-                    value: SyncBookmark(characterCount: bookmark.characterCount)
-                )
-            }
+            book.bookmark = ledger.canonicalBookmark
             book.audiobook = ledger.audiobook
             book.highlights = ledger.highlights ?? [:]
             book.shelves = ledger.shelves ?? [:]
         }
         return book
+    }
+
+    // MARK: - Shared EPUB coordinates
+
+    private func coordinateMap(root: URL, metadata: BookMetadata, record: SyncRecord) throws -> EPUBSyncCoordinates? {
+        guard !record.deleted, let epub = metadata.epub, let info = BookStorage.loadBookInfo(root: root) else { return nil }
+        // A newer published reference still points at the remote EPUB. The old local copy
+        // cannot project its positions until download has recorded that reference as source.
+        if let published = record.files[.epub], (record.sources[.epub] ?? .min) < published.modified { return nil }
+        let url = root.appendingPathComponent(epub)
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return nil }
+        return try? EPUBSyncCoordinates.load(
+            epubURL: url, nativeInfo: info, generation: record.generation,
+            epubReference: record.files[.epub]?.value
+        )
+    }
+
+    private static func coordinateIdentity(_ coordinates: EPUBSyncCoordinates, record: SyncRecord) -> SyncCoordinateIdentity {
+        SyncCoordinateIdentity(
+            source: SyncCoordinateSource(generation: record.generation, epub: record.files[.epub]),
+            content: coordinates.identity
+        )
+    }
+
+    private static func bookmarkModified(_ bookmark: Bookmark, root: URL) -> Int64 {
+        max(bookmark.lastModified?.syncMilliseconds
+            ?? modificationDate(root.appendingPathComponent(FileNames.bookmark)) ?? 0, 0)
+    }
+
+    private static func highlightKeysByLocalID(_ keys: [String]) -> [String: Set<String>] {
+        var result: [String: Set<String>] = [:]
+        for key in keys {
+            guard let localID = UUID(uuidString: key)?.uuidString else { continue }
+            result[localID, default: []].insert(key)
+        }
+        return result
+    }
+
+    private func migrateCoordinateLedger(_ ledger: inout SyncBookLedger, root: URL, remote: SyncBook?) {
+        guard ledger.coordinateVersion == nil else { return }
+        if let bookmark = BookStorage.loadBookmark(root: root), let wire = remote?.bookmark,
+           bookmark.characterCount == wire.value.characterCount,
+           Self.bookmarkModified(bookmark, root: root) == wire.modified {
+            // The old adapter copied this exact wire record into the native sidecar. Its
+            // remote timestamp and raw coordinate prove its origin; do not convert twice.
+            ledger.canonicalBookmark = wire
+        }
+        let local = Dictionary((BookStorage.loadHighlights(root: root) ?? []).map { ($0.id.uuidString, $0) }, uniquingKeysWith: { _, last in last })
+        var native = ledger.legacyNativeHighlights ?? [:]
+        let keys = Self.highlightKeysByLocalID(Array((ledger.highlights ?? [:]).keys) + Array(native.keys))
+        var canonical: [String: Timestamped<SyncHighlight?>] = [:]
+        for (id, record) in ledger.highlights ?? [:] {
+            if record.value == nil || remote?.highlights[id] == record {
+                canonical[id] = record
+            } else if let value = record.value, let localID = UUID(uuidString: id)?.uuidString,
+                      keys[localID]?.count == 1, let highlight = local[localID],
+                      value.character == highlight.character && value.offset == highlight.offset && value.text == highlight.text {
+                native[id] = record
+            } else {
+                // There is no proof that this record came from the native sidecar.
+                canonical[id] = record
+            }
+        }
+        ledger.highlights = canonical
+        ledger.legacyNativeHighlights = native.isEmpty ? nil : native
+        ledger.coordinateVersion = 1
+        if let remote { ledger.canonicalCharacterCount = remote.characterCount }
+    }
+
+    private func reconcileCoordinates(
+        _ ledger: inout SyncBookLedger, root: URL, record: SyncRecord,
+        coordinates: EPUBSyncCoordinates?, now: Int64
+    ) {
+        guard let coordinates else { return }
+        let identity = Self.coordinateIdentity(coordinates, record: record)
+        ledger.coordinateSource = identity.source
+        ledger.canonicalCharacterCount = coordinates.canonicalTotal
+        if let bookmark = BookStorage.loadBookmark(root: root) {
+            let modified = Self.bookmarkModified(bookmark, root: root)
+            if let receipt = ledger.bookmarkProjection, receipt.identity == identity,
+               receipt.isUnchanged(bookmark, modified: modified) {
+                // Reader geometry or a one-unit projection round trip must not restamp the
+                // canonical record. Only its local projection receipt follows the sidecar.
+                ledger.bookmarkProjection = SyncBookmarkProjection(identity: identity, bookmark: bookmark, modified: modified, canonicalBookmark: receipt.canonicalBookmark)
+            } else if let receipt = ledger.bookmarkProjection, receipt.identity == identity,
+                      let canonical = ledger.canonicalBookmark, receipt.canonicalBookmark == canonical,
+                      modified >= receipt.modified,
+                      coordinates.canonicalCharacter(forNativeBookmark: bookmark) == canonical.value.characterCount {
+                // A real move can remain inside one coarser canonical unit. Reader then
+                // retains its timestamp, but the native geometry receipt must still move.
+                // Exact record association excludes a newer pending remote position.
+                ledger.bookmarkProjection = SyncBookmarkProjection(identity: identity, bookmark: bookmark,
+                                                                  modified: modified, canonicalBookmark: canonical)
+            } else if ledger.canonicalBookmark == nil {
+                if let raw = coordinates.canonicalCharacter(forNativeBookmark: bookmark) {
+                    ledger.canonicalBookmark = Timestamped(modified: modified, value: SyncBookmark(characterCount: raw))
+                    ledger.bookmarkProjection = SyncBookmarkProjection(identity: identity, bookmark: bookmark, modified: modified, canonicalBookmark: ledger.canonicalBookmark)
+                }
+            } else if let receipt = ledger.bookmarkProjection, receipt.identity == identity,
+                      modified > max(receipt.modified, ledger.canonicalBookmark?.modified ?? 0),
+                      let raw = coordinates.canonicalCharacter(forNativeBookmark: bookmark) {
+                if ledger.canonicalBookmark?.value.characterCount != raw {
+                    ledger.canonicalBookmark = Timestamped(modified: modified, value: SyncBookmark(characterCount: raw))
+                }
+                ledger.bookmarkProjection = SyncBookmarkProjection(identity: identity, bookmark: bookmark, modified: modified, canonicalBookmark: ledger.canonicalBookmark)
+            } else if let canonical = ledger.canonicalBookmark,
+                      modified == canonical.modified,
+                      let expected = coordinates.nativeBookmark(forCanonical: canonical.value.characterCount, modified: canonical.modified),
+                      SyncBookmarkProjection(identity: identity, bookmark: expected, modified: canonical.modified).samePosition(as: bookmark) {
+                ledger.bookmarkProjection = SyncBookmarkProjection(identity: identity, bookmark: bookmark, modified: modified, canonicalBookmark: canonical)
+            }
+        }
+
+        var canonical = ledger.highlights ?? [:]
+        let previous = ledger.highlightProjection?.identity == identity ? ledger.highlightProjection?.native ?? [:] : [:]
+        let keys = Self.highlightKeysByLocalID(Array(canonical.keys) + Array(previous.keys) + Array((ledger.legacyNativeHighlights ?? [:]).keys))
+        let local = BookStorage.loadHighlights(root: root) ?? []
+        let localIDs = Set(local.map(\.id.uuidString))
+        var snapshot: [String: SyncHighlight] = [:]
+        for highlight in local {
+            let localID = highlight.id.uuidString
+            let candidates = keys[localID] ?? []
+            guard candidates.count <= 1 else { continue }
+            // UUID decoding changes letter case. Preserve the sole original wire key;
+            // multiple wire keys for one local UUID cannot safely be reconciled.
+            let id = candidates.first ?? localID
+            if let known = canonical[id], known.value == nil { continue }
+            if let native = previous[id], SyncHighlightBridge.matches(native, highlight) {
+                snapshot[id] = SyncHighlight(highlight)
+                continue
+            }
+            if previous[id] == nil, let value = canonical[id]?.value,
+               ledger.legacyNativeHighlights?[id] == nil {
+                // No application receipt means the sidecar may still belong to an old
+                // EPUB/reference. Establish a baseline only when this exact projection
+                // already matches; otherwise wait for applyPendingCoordinates.
+                if let projected = coordinates.projectCanonicalHighlight(value), SyncHighlightBridge.matches(projected, highlight) {
+                    snapshot[id] = SyncHighlight(highlight)
+                }
+                continue
+            }
+            guard var exported = coordinates.exportNativeHighlight(highlight) else { continue }
+            if let known = canonical[id], let value = known.value {
+                exported.textFurigana = highlight.textFurigana ?? value.textFurigana
+                if HighlightColor(rawValue: value.color) == nil && highlight.color == .yellow { exported.color = value.color }
+                if !SyncHighlightBridge.matches(exported, value) {
+                    canonical[id] = Timestamped(modified: max(now, known.modified + 1), value: exported)
+                }
+            } else {
+                let legacy = ledger.legacyNativeHighlights?[id]
+                var modified = legacy?.modified ?? highlight.createdAt.syncMilliseconds
+                if let value = legacy?.value {
+                    exported.textFurigana = highlight.textFurigana ?? value.textFurigana
+                    if HighlightColor(rawValue: value.color) == nil && highlight.color == .yellow { exported.color = value.color }
+                    if !SyncHighlightBridge.matches(value, highlight) { modified = max(now, modified + 1) }
+                }
+                canonical[id] = Timestamped(modified: modified, value: exported)
+            }
+            ledger.legacyNativeHighlights?.removeValue(forKey: id)
+            snapshot[id] = SyncHighlight(highlight)
+        }
+        for id in previous.keys {
+            guard let localID = UUID(uuidString: id)?.uuidString, keys[localID]?.count == 1,
+                  !localIDs.contains(localID) else { continue }
+            if canonical[id]?.value != nil { canonical[id] = Timestamped(modified: now, value: nil) }
+        }
+        ledger.highlights = canonical
+        ledger.highlightProjection = SyncHighlightProjection(identity: identity, native: snapshot)
+        if ledger.legacyNativeHighlights?.isEmpty == true { ledger.legacyNativeHighlights = nil }
+    }
+
+    @discardableResult
+    private func applyCoordinateProjection(
+        _ ledger: inout SyncBookLedger, root: URL, record: SyncRecord,
+        coordinates: EPUBSyncCoordinates?
+    ) throws -> Bool {
+        guard let coordinates else { return false }
+        let identity = Self.coordinateIdentity(coordinates, record: record)
+        ledger.canonicalCharacterCount = coordinates.canonicalTotal
+        var changed = false
+        if let canonical = ledger.canonicalBookmark,
+           let projected = coordinates.nativeBookmark(forCanonical: canonical.value.characterCount, modified: canonical.modified) {
+            let local = BookStorage.loadBookmark(root: root)
+            if let previous = ledger.bookmarkProjection, previous.identity == identity,
+               previous.canonicalBookmark?.value == canonical.value, let local,
+               previous.matches(local, modified: Self.bookmarkModified(local, root: root)) {
+                // A local export can represent a point between two canonical units.
+                // Reapplying that same record must not move the native Reader backwards.
+                if previous.canonicalBookmark != canonical {
+                    let updated = Bookmark(chapterIndex: local.chapterIndex, progress: local.progress,
+                                           characterCount: local.characterCount, lastModified: Date(syncMilliseconds: canonical.modified))
+                    try BookStorage.save(updated, inside: root, as: FileNames.bookmark)
+                    ledger.bookmarkProjection = SyncBookmarkProjection(identity: identity, bookmark: updated,
+                                                                      modified: canonical.modified, canonicalBookmark: canonical)
+                }
+            } else {
+                let receipt = SyncBookmarkProjection(identity: identity, bookmark: projected, modified: canonical.modified, canonicalBookmark: canonical)
+                changed = local.map { !receipt.samePosition(as: $0) } ?? true
+                if changed || local.map({ Self.bookmarkModified($0, root: root) != canonical.modified }) == true {
+                    try BookStorage.save(projected, inside: root, as: FileNames.bookmark)
+                }
+                ledger.bookmarkProjection = receipt
+            }
+        } else {
+            ledger.bookmarkProjection = nil
+        }
+
+        let existing = BookStorage.loadHighlights(root: root) ?? []
+        var snapshot: [String: SyncHighlight] = [:]
+        let canonical = ledger.highlights ?? [:]
+        let keys = Self.highlightKeysByLocalID(Array(canonical.keys) + Array((ledger.highlightProjection?.native ?? [:]).keys) + Array((ledger.legacyNativeHighlights ?? [:]).keys))
+        let ambiguous = Set(keys.filter { $0.value.count > 1 }.map(\.key))
+        let preserved = existing.filter { ambiguous.contains($0.id.uuidString) }
+        var native = Dictionary(existing.filter { !ambiguous.contains($0.id.uuidString) }.map { ($0.id.uuidString, $0) }, uniquingKeysWith: { _, last in last })
+        for id in (ledger.highlightProjection?.native ?? [:]).keys {
+            guard let localID = UUID(uuidString: id)?.uuidString, keys[localID]?.count == 1 else { continue }
+            if canonical[id] == nil || canonical[id]?.value == nil { native[localID] = nil }
+        }
+        for (id, record) in canonical {
+            guard let localID = UUID(uuidString: id)?.uuidString, keys[localID]?.count == 1 else { continue }
+            guard let value = record.value else { native[localID] = nil; continue }
+            guard let projected = coordinates.projectCanonicalHighlight(value), let highlight = projected.highlight(id: id) else { continue }
+            native[localID] = highlight
+            snapshot[id] = projected
+        }
+        let updated = (Array(native.values) + preserved).sorted { ($0.character, $0.createdAt, $0.id.uuidString) < ($1.character, $1.createdAt, $1.id.uuidString) }
+        if updated != existing { try BookStorage.save(updated, inside: root, as: FileNames.highlights) }
+        ledger.highlightProjection = SyncHighlightProjection(identity: identity, native: snapshot)
+        return changed
+    }
+
+    /// Called after the exact downloaded EPUB has produced its native BookInfo, and before
+    /// Reader restoration. Pending canonical positions never enter the native sidecars early.
+    func applyPendingCoordinates(key: String) throws {
+        guard let record = state.books[key], !record.deleted else { return }
+        let root = try Self.resolveBookDirectory(folder: key)
+        guard let metadata = BookStorage.loadMetadata(root: root) else { return }
+        var ledger = SyncBookLedger.load(root: root)
+        guard ledger.coordinateVersion == 1 else { return }
+        let coordinates = try coordinateMap(root: root, metadata: metadata, record: record)
+        guard coordinates != nil else { return }
+        // Opening again before the next periodic sync must preserve a real native edit
+        // made after the last application receipt.
+        reconcileCoordinates(&ledger, root: root, record: record, coordinates: coordinates, now: Date.now.syncMilliseconds)
+        let changed = try applyCoordinateProjection(&ledger, root: root, record: record, coordinates: coordinates)
+        try ledger.save(root: root)
+        SyncReaderBridge.model(for: key)?.applySyncedState(bookmarkChanged: changed)
+        NotificationCenter.default.post(name: Self.booksChangedNotification, object: nil)
+    }
+
+    /// Reader retains this validated value for its session. A cached map alone does not
+    /// prove that a newer remote generation/reference has reached the local EPUB.
+    func sharedCoordinates(root: URL) -> EPUBSyncCoordinates? {
+        guard SyncBookLedger.load(root: root).coordinateVersion == 1,
+              let metadata = BookStorage.loadMetadata(root: root),
+              let record = state.books[Self.key(root.lastPathComponent)] else { return nil }
+        return try? coordinateMap(root: root, metadata: metadata, record: record)
+    }
+
+    /// A replaced reference may need downloading even when an older local EPUB exists.
+    /// This query only inspects local state and never starts a transfer.
+    func needsEPUBDownload(key: String) -> Bool {
+        guard let record = state.books[key], record.attached, !record.deleted,
+              let published = record.files[.epub], published.value != nil else { return false }
+        if (record.sources[.epub] ?? .min) < published.modified { return true }
+        guard let root = try? Self.resolveBookDirectory(folder: key),
+              let epub = BookStorage.loadMetadata(root: root)?.epub else { return true }
+        return !FileManager.default.fileExists(atPath: root.appendingPathComponent(epub).path(percentEncoded: false))
+    }
+
+    /// Shelf display uses one coordinate system for both numerator and denominator.
+    /// A pending local EPUB without a map cannot safely combine its native raw position
+    /// with the canonical total; remote-only placeholders can display their wire ratio.
+    func sharedProgress(root: URL, bookmark: Bookmark?) -> Double? {
+        let ledger = SyncBookLedger.load(root: root)
+        guard let total = ledger.canonicalCharacterCount, total > 0 else { return nil }
+        if let canonical = ledger.canonicalBookmark {
+            if BookStorage.loadMetadata(root: root)?.epub == nil {
+                return min(1, max(0, Double(canonical.value.characterCount) / Double(total)))
+            }
+        }
+        guard let bookmark, let metadata = BookStorage.loadMetadata(root: root),
+              let record = state.books[Self.key(root.lastPathComponent)],
+              let coordinates = try? coordinateMap(root: root, metadata: metadata, record: record),
+              coordinates.canonicalTotal > 0 else { return nil }
+        if let canonical = ledger.canonicalBookmark {
+            guard let receipt = ledger.bookmarkProjection,
+                  receipt.identity == Self.coordinateIdentity(coordinates, record: record) else { return nil }
+            let modified = Self.bookmarkModified(bookmark, root: root)
+            if receipt.matches(bookmark, modified: modified), receipt.canonicalBookmark == canonical {
+                return min(1, max(0, Double(canonical.value.characterCount) / Double(coordinates.canonicalTotal)))
+            }
+            guard modified > receipt.modified else { return nil }
+        }
+        guard let raw = coordinates.canonicalCharacter(forNativeBookmark: bookmark) else { return nil }
+        return min(1, max(0, Double(raw) / Double(coordinates.canonicalTotal)))
+    }
+
+    private func canonicalSessions(root: URL, ledger: inout SyncBookLedger, now: Int64) throws -> ReadingSessionRecords {
+        let local = StatisticsStorage.load(root: root, resetMinutes: Self.resetMinutes)
+        if ledger.canonicalSessions != true, ledger.appliedDaily != nil {
+            let migrated = SyncSessionMigration.canonicalRecords(
+                local,
+                ledger: &ledger,
+                key: Self.key(root.lastPathComponent),
+                deviceID: SyncDevice.id,
+                resetMinutes: Self.resetMinutes,
+                now: now
+            )
+            if migrated != local {
+                try StatisticsStorage.save(migrated, root: root, resetMinutes: Self.resetMinutes)
+            }
+            ledger.canonicalSessions = true
+            ledger.appliedDaily = nil
+            ledger.sessionDays = [:]
+            return migrated
+        }
+        ledger.canonicalSessions = true
+        return local
     }
 
     func applyBook(key: String, book: SyncBook) throws {
@@ -313,7 +634,7 @@ final class SyncStorage {
         }
 
         let root = try Self.bookDirectory(folder: folder, archived: book.deleted)
-        let stored = book.deleted && book.sessions.values.allSatisfy { $0.value == nil }
+        let stored = book.deleted && book.sessions.isEmpty
         let oldMetadata = BookStorage.loadMetadata(root: root)
         var metadata = oldMetadata ?? BookMetadata(
             title: book.metadata.value.title,
@@ -332,7 +653,9 @@ final class SyncStorage {
             metadata.bookLanguage = book.metadata.value.language
         }
         metadata.modified = book.metadata.modified
-        if book.characterCount > 0 {
+        if let info = BookStorage.loadBookInfo(root: root) {
+            metadata.characterCount = info.characterCount
+        } else if book.characterCount > 0 {
             metadata.characterCount = book.characterCount
         }
         if !book.deleted, let bookmark = book.bookmark {
@@ -356,49 +679,37 @@ final class SyncStorage {
         var ledger = SyncBookLedger.load(root: root)
         ledger.metadata = book.metadata
         ledger.sessions = book.sessions
-        SyncStatisticsBridge.assignDays(&ledger, resetMinutes: Self.resetMinutes)
+        ledger.canonicalSessions = true
+        ledger.appliedDaily = nil
+        ledger.sessionDays = [:]
+        let source = SyncCoordinateSource(generation: book.generation, epub: book.files[.epub])
+        if ledger.coordinateSource != source {
+            ledger.bookmarkProjection = nil
+            ledger.highlightProjection = nil
+        }
+        ledger.coordinateVersion = 1
+        ledger.coordinateSource = source
+        ledger.canonicalCharacterCount = book.characterCount
+        ledger.canonicalBookmark = book.deleted ? nil : book.bookmark
         if !stored {
-            let statistics = BookStorage.loadStatistics(root: root) ?? []
-            if let updated = SyncStatisticsBridge.applyingSessions(ledger, to: statistics, title: metadata.displayTitle) {
+            let sessions = StatisticsStorage.load(root: root, resetMinutes: Self.resetMinutes)
+            if book.sessions != sessions {
                 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-                try BookStorage.save(updated, inside: root, as: FileNames.statistics)
-                ledger.appliedDaily = SyncStatisticsBridge.dailyTotals(updated)
+                try StatisticsStorage.save(book.sessions, root: root, resetMinutes: Self.resetMinutes)
                 booksChanged = true
-            } else {
-                ledger.appliedDaily = SyncStatisticsBridge.dailyTotals(statistics)
             }
         }
 
         var bookmarkChanged = false
         if !book.deleted {
-            if let change = book.bookmark, reader?.acceptsSyncedPosition ?? true {
-                let bookmark = BookStorage.loadBookmark(root: root)
-                if bookmark?.characterCount != change.value.characterCount
-                    || (bookmark?.lastModified?.syncMilliseconds ?? .min) < change.modified {
-                    let position = BookStorage.loadBookInfo(root: root)?.resolveCharacterPosition(change.value.characterCount)
-                    let updated = Bookmark(
-                        chapterIndex: position?.spineIndex ?? bookmark?.chapterIndex ?? 0,
-                        progress: position?.progress ?? bookmark?.progress ?? 0,
-                        characterCount: change.value.characterCount,
-                        lastModified: Date(syncMilliseconds: change.modified)
-                    )
-                    bookmarkChanged = bookmark?.characterCount != change.value.characterCount
-                    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-                    try BookStorage.save(updated, inside: root, as: FileNames.bookmark)
-                    booksChanged = booksChanged || bookmarkChanged
-                }
-            }
-
             ledger.highlights = book.highlights
-            let localHighlights = BookStorage.loadHighlights(root: root) ?? []
-            if !SyncHighlightBridge.sameContent(localHighlights, book.highlights) {
-                try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-                try BookStorage.save(SyncHighlightBridge.highlights(from: book.highlights), inside: root, as: FileNames.highlights)
-            }
+            let coordinates = try coordinateMap(root: root, metadata: metadata, record: record)
+            bookmarkChanged = try applyCoordinateProjection(&ledger, root: root, record: record, coordinates: coordinates)
+            booksChanged = booksChanged || bookmarkChanged
 
-            // While the Reader is open its player owns the playback file; the ledger keeps the
-            // last applied value so the older local position is not re-stamped as newer.
-            if let change = book.audiobook, reader == nil {
+            // Apply before notifying an open Reader so its player reloads the incoming position.
+            // Keep the remote timestamp even when the local playback value already matches.
+            if let change = book.audiobook {
                 ledger.audiobook = change
                 var playback = BookStorage.loadSasayakiPlayback(root: root) ?? SasayakiPlaybackData(lastPosition: 0)
                 let local = SyncPlayback(lastPosition: playback.lastPosition, delay: playback.delay, rate: Double(playback.rate))
@@ -508,7 +819,7 @@ final class SyncStorage {
         try prepareBook(root: root)
         try archive(metadata, root: root)
         let archive = try Self.bookDirectory(folder: key, archived: true)
-        let stored = SyncBookLedger.load(root: archive).sessions.values.allSatisfy { $0.value == nil }
+        let stored = SyncBookLedger.load(root: archive).sessions.isEmpty
             && (BookStorage.loadStatistics(root: archive) ?? []).allSatisfy { $0.charactersRead == 0 && $0.readingTime == 0 }
 
         var record = state.books[key]!
@@ -645,6 +956,11 @@ final class SyncStorage {
             var ledger = SyncBookLedger.load(root: root)
             ledger.highlights = [:]
             ledger.audiobook = nil
+            ledger.canonicalBookmark = nil
+            ledger.bookmarkProjection = nil
+            ledger.highlightProjection = nil
+            ledger.coordinateSource = nil
+            ledger.legacyNativeHighlights = nil
             try ledger.save(root: root)
 
             metadata.epub = nil
@@ -662,7 +978,10 @@ final class SyncStorage {
             let key = Self.key(book.folder)
             guard state.books[key]?.placeholder == true else { continue }
             let root = try Self.bookDirectory(folder: book.folder)
-            if SyncBookLedger.load(root: root).sessions.values.contains(where: { $0.value != nil }) {
+            var ledger = SyncBookLedger.load(root: root)
+            let sessions = try canonicalSessions(root: root, ledger: &ledger, now: Date.now.syncMilliseconds)
+            // The ledger is a sync snapshot; unsynced activity and tombstones live in the session store.
+            if !sessions.isEmpty {
                 try archive(book, root: root)
             } else {
                 state.books[key] = nil
@@ -680,18 +999,24 @@ final class SyncStorage {
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
 
         var ledger = SyncBookLedger.load(root: root)
-        let archived = SyncBookLedger.load(root: destination)
-        ledger.sessions = SyncBook.mergeRecords(ledger.sessions, archived.sessions)
-        ledger.sessionDays.merge(archived.sessionDays) { current, _ in current }
+        var archived = SyncBookLedger.load(root: destination)
+        let localSessions = try canonicalSessions(root: root, ledger: &ledger, now: Date.now.syncMilliseconds)
+        let archivedSessions = try canonicalSessions(root: destination, ledger: &archived, now: Date.now.syncMilliseconds)
+        ledger.sessions = SyncBook.mergeRecords(localSessions, archivedSessions)
+        ledger.canonicalSessions = true
+        ledger.appliedDaily = nil
+        ledger.sessionDays = [:]
         ledger.highlights = nil
         ledger.shelves = nil
         ledger.audiobook = nil
+        ledger.canonicalBookmark = nil
+        ledger.bookmarkProjection = nil
+        ledger.highlightProjection = nil
+        ledger.coordinateSource = nil
+        ledger.legacyNativeHighlights = nil
         try ledger.save(root: destination)
 
-        if let statistics = BookStorage.loadStatistics(root: root) {
-            let merged = StatisticsEditor.deduplicated(statistics + (BookStorage.loadStatistics(root: destination) ?? []))
-            try BookStorage.save(merged, inside: destination, as: FileNames.statistics)
-        }
+        try StatisticsStorage.save(ledger.sessions, root: destination, resetMinutes: Self.resetMinutes)
 
         var cover: String?
         if let source = book.coverURL, FileManager.default.fileExists(atPath: source.path(percentEncoded: false)) {
@@ -719,16 +1044,17 @@ final class SyncStorage {
     /// Brings archived statistics back when a deleted book is imported again.
     private func restoreArchive(folder: String, into root: URL) throws {
         let archive = try Self.bookDirectory(folder: folder, archived: true)
-        guard FileManager.default.fileExists(atPath: archive.path(percentEncoded: false)) else { return }
-        let archived = SyncBookLedger.load(root: archive)
+        guard archive.standardizedFileURL != root.standardizedFileURL,
+              FileManager.default.fileExists(atPath: archive.path(percentEncoded: false)) else { return }
+        var archived = SyncBookLedger.load(root: archive)
         var ledger = SyncBookLedger.load(root: root)
-        ledger.sessions = SyncBook.mergeRecords(ledger.sessions, archived.sessions)
-        ledger.sessionDays.merge(archived.sessionDays) { current, _ in current }
-        if let archivedStatistics = BookStorage.loadStatistics(root: archive) {
-            let merged = StatisticsEditor.deduplicated((BookStorage.loadStatistics(root: root) ?? []) + archivedStatistics)
-            try BookStorage.save(merged, inside: root, as: FileNames.statistics)
-            ledger.appliedDaily = SyncStatisticsBridge.dailyTotals(merged)
-        }
+        let localSessions = try canonicalSessions(root: root, ledger: &ledger, now: Date.now.syncMilliseconds)
+        let archivedSessions = try canonicalSessions(root: archive, ledger: &archived, now: Date.now.syncMilliseconds)
+        ledger.sessions = SyncBook.mergeRecords(localSessions, archivedSessions)
+        ledger.canonicalSessions = true
+        ledger.appliedDaily = nil
+        ledger.sessionDays = [:]
+        try StatisticsStorage.save(ledger.sessions, root: root, resetMinutes: Self.resetMinutes)
         try ledger.save(root: root)
         try FileManager.default.removeItem(at: archive)
     }
@@ -774,6 +1100,7 @@ final class SyncStorage {
             FileNames.bookmark,
             FileNames.highlights,
             FileNames.statistics,
+            StatisticsStorage.sessionsFileName,
             FileNames.sasayakiPlayback,
             FileNames.sasayakiMatch,
         ]

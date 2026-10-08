@@ -40,8 +40,10 @@
 			</array>
 		</dict>
 	</array>
-	<key>NiratanGoogleClientID</key>
-	<string>$(NIRATAN_GOOGLE_CLIENT_ID)</string>
+	<key>HoshiReaderGoogleClientID</key>
+	<string>$(HOSHI_READER_GOOGLE_CLIENT_ID)</string>
+	<key>HoshiReaderGoogleClientSecret</key>
+	<string>$(HOSHI_READER_GOOGLE_CLIENT_SECRET)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -126,7 +126,7 @@ struct ShelfView: View {
                             viewModel: viewModel,
                             currentShelf: viewModel.shelfName(containing: book.id),
                             onSelect: {
-                                if book.epub == nil {
+                                if viewModel.needsBookDownload(book) {
                                     viewModel.downloadBook(book, onOpen: onOpenBook)
                                 } else {
                                     onOpenBook(book)

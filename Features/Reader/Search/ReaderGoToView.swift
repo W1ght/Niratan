@@ -39,6 +39,7 @@ struct ReaderGoToView: View {
     let onHighlightJump: (Highlight) -> Void
     let onHighlightDelete: (Highlight) -> Void
     let onDismiss: () -> Void
+    var highlightSpineIndex: ((Highlight) -> Int?)? = nil
 
     @State private var selectedTab: ReaderGoToTab = .chapters
     @State private var query = ""
@@ -365,7 +366,15 @@ struct ReaderGoToView: View {
     private var highlightSections: [HighlightSection] {
         let labels = chapterLabelBySpineIndex
         let grouped = Dictionary(grouping: highlights) { highlight in
-            var spine = bookInfo.resolveCharacterPosition(highlight.character)?.spineIndex ?? -1
+            var spine: Int
+            if let highlightSpineIndex {
+                // An unresolved shared DOM anchor stays ungrouped. Its native
+                // integer may also belong to another zero-count chapter.
+                guard let resolved = highlightSpineIndex(highlight) else { return -1 }
+                spine = resolved
+            } else {
+                spine = bookInfo.resolveCharacterPosition(highlight.character)?.spineIndex ?? -1
+            }
             while spine > 0, labels[spine] == nil {
                 spine -= 1
             }

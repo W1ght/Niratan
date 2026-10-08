@@ -96,7 +96,7 @@ nonisolated extension Timestamped {
 }
 
 nonisolated enum SyncProvider: String, CaseIterable, Codable, Sendable {
-    /// Whole-library sync between Niratan devices.
+    /// Whole-library sync shared with Hoshi Reader.
     case gdrive
     /// Per-book ッツ/yatsu compatible sync (the original Niratan sync).
     case ttu
@@ -139,7 +139,7 @@ nonisolated struct SyncHighlight: Codable, Equatable, Sendable {
         character = highlight.character
         offset = highlight.offset
         text = highlight.text
-        textFurigana = nil
+        textFurigana = highlight.textFurigana
         color = highlight.color.rawValue
         createdAt = highlight.createdAt.syncMilliseconds
     }
@@ -151,6 +151,7 @@ nonisolated struct SyncHighlight: Codable, Equatable, Sendable {
             character: character,
             offset: offset,
             text: text,
+            textFurigana: textFurigana,
             color: HighlightColor(rawValue: color) ?? .yellow,
             createdAt: Date(syncMilliseconds: createdAt)
         )

@@ -1,6 +1,266 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Google Drive sign-in is already in progress." : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive sign-in is already in progress."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在进行 Google Drive 登录。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在進行 Google Drive 登入。"
+          }
+        }
+      }
+    },
+    "Could not start Google Drive sign-in. Please try again." : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not start Google Drive sign-in. Please try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法开始 Google Drive 登录，请重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法開始 Google Drive 登入，請重試。"
+          }
+        }
+      }
+    },
+    "Could not open the browser for Google Drive sign-in." : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not open the browser for Google Drive sign-in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开浏览器进行 Google Drive 登录。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法開啟瀏覽器進行 Google Drive 登入。"
+          }
+        }
+      }
+    },
+    "Google Drive sign-in timed out. Please try again." : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive sign-in timed out. Please try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive 登录超时，请重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive 登入逾時，請重試。"
+          }
+        }
+      }
+    },
+    "Google Drive sign-in was not completed. Please try again." : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive sign-in was not completed. Please try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive 登录未完成，请重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive 登入未完成，請重試。"
+          }
+        }
+      }
+    },
+    "Google Drive sign-in" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive sign-in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive 登录"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive 登入"
+          }
+        }
+      }
+    },
+    "Google Drive authorization received. Return to Niratan to finish connecting." : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Drive authorization received. Return to Niratan to finish connecting."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收到 Google Drive 授权，请返回 Niratan 完成连接。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收到 Google Drive 授權，請返回 Niratan 完成連線。"
+          }
+        }
+      }
+    },
+    "This Google Drive callback could not be accepted. Return to Niratan to continue sign-in." : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Google Drive callback could not be accepted. Return to Niratan to continue sign-in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法接受此 Google Drive 回调，请返回 Niratan 继续登录。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法接受此 Google Drive 回呼，請返回 Niratan 繼續登入。"
+          }
+        }
+      }
+    },
+    "Google Drive could not refresh authorization. Your saved connection was kept. Please try again." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google Drive could not refresh authorization. Your saved connection was kept. Please try again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google Drive 未能刷新授权。已保留原有连接，请重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Google Drive 未能更新授權。已保留原有連線，請重試。" } }
+      }
+    },
+    "Sign in with the same Google account as Hoshi Reader to sync books, covers, reading positions, statistics, highlights, shelves and Sasayaki data." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in with the same Google account as Hoshi Reader to sync books, covers, reading positions, statistics, highlights, shelves and Sasayaki data." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用与 Hoshi Reader 相同的 Google 账号登录，即可同步书籍、封面、阅读位置、统计、高亮、书架和 Sasayaki 数据。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "使用與 Hoshi Reader 相同的 Google 帳號登入，即可同步書籍、封面、閱讀位置、統計、螢光標記、書架與 Sasayaki 資料。" } }
+      }
+    },
+    "Sign in with Google" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in with Google" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用 Google 登录" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "使用 Google 登入" } }
+      }
+    },
+    "Hoshi Reader" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hoshi Reader" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Hoshi Reader" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Hoshi Reader" } }
+      }
+    },
+    "Unavailable in this build" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unavailable in this build" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建暂不可用" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此組建暫不可用" } }
+      }
+    },
+    "This build is missing Hoshi Reader's Google sign-in configuration. Please use a build with shared-library sign-in configured." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build is missing Hoshi Reader's Google sign-in configuration. Please use a build with shared-library sign-in configured." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建缺少 Hoshi Reader 的 Google 登录配置。请使用已配置共享书库登录的版本。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此組建缺少 Hoshi Reader 的 Google 登入設定。請使用已設定共用書庫登入的版本。" } }
+      }
+    },
+    "The Hoshi Reader library is not accessible. Sync once in Hoshi Reader, then sign in again with the same Google account." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The Hoshi Reader library is not accessible. Sync once in Hoshi Reader, then sign in again with the same Google account." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法访问 Hoshi Reader 书库。请先在 Hoshi Reader 中同步一次，再使用同一个 Google 账号重新登录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法存取 Hoshi Reader 書庫。請先在 Hoshi Reader 中同步一次，再使用同一個 Google 帳號重新登入。" } }
+      }
+    },
+    "Reconnect to grant access to your Hoshi Reader library. Your existing authorization is kept if you cancel." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reconnect to grant access to your Hoshi Reader library. Your existing authorization is kept if you cancel." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请重新连接，授权访问你的 Hoshi Reader 书库。取消连接会保留现有授权。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請重新連線，授權存取你的 Hoshi Reader 書庫。取消連線會保留現有授權。" } }
+      }
+    },
+    "Authorization required" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Authorization required" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要重新授权" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "需要重新授權" } }
+      }
+    },
+    "Reconnect Google Drive" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reconnect Google Drive" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新连接 Google Drive" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新連線 Google Drive" } }
+      }
+    },
+    "Google Drive file access was not granted. Reconnect and allow access to sync." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google Drive file access was not granted. Reconnect and allow access to sync." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未获得 Google Drive 文件访问权限。请重新连接并允许访问，以进行同步。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "未取得 Google Drive 檔案存取權限。請重新連線並允許存取，以進行同步。" } }
+      }
+    },
+    "Could not save Google Drive authorization. Please try connecting again." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not save Google Drive authorization. Please try connecting again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法保存 Google Drive 授权，请尝试重新连接。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法儲存 Google Drive 授權，請嘗試重新連線。" } }
+      }
+    },
   "Enter the address shown in Fushi's interconnect settings, for example 192.168.1.10:38765.": {
     "localizations": {
       "en": {

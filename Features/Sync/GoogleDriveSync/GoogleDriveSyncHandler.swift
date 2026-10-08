@@ -44,8 +44,8 @@ nonisolated struct GoogleDriveChanges: Decodable {
 @MainActor
 final class GoogleDriveSyncHandler {
     static let shared = GoogleDriveSyncHandler()
-    /// Library root on Drive. Separate from the ッツ/ttu folders and from upstream Hoshi Reader.
-    static let rootFolderName = "Niratan"
+    /// The same library root used by Hoshi Reader; ッツ/ttu retains its own layout.
+    static let rootFolderName = GoogleDriveSyncCache.sharedLibraryName
     private let client = GoogleDriveClient.shared
     private let fileFields = "id,name,mimeType,md5Checksum,size,parents,trashed,createdTime"
 
@@ -73,8 +73,15 @@ final class GoogleDriveSyncHandler {
     }
 
     func layout() async throws -> (root: String, state: String, books: String) {
-        guard let root = try await folder(parent: "root", name: Self.rootFolderName, create: true),
-              let state = try await folder(parent: root, name: "state", create: true),
+        // A different OAuth project cannot see Hoshi's drive.file library. Creating another
+        // folder with the same name would silently reproduce the original split-library bug.
+        guard let root = try await folder(parent: "root", name: Self.rootFolderName, create: false) else {
+            throw GoogleDriveError.apiError(
+                String(localized: "The Hoshi Reader library is not accessible. Sync once in Hoshi Reader, then sign in again with the same Google account."),
+                statusCode: nil
+            )
+        }
+        guard let state = try await folder(parent: root, name: "state", create: true),
               let books = try await folder(parent: root, name: "books", create: true) else {
             throw GoogleDriveError.invalidResponse
         }
@@ -109,6 +116,19 @@ final class GoogleDriveSyncHandler {
         return try await list(query: query)
     }
 
+    /// Batch only the shared library's direct children. A cross-app authorization must not
+    /// turn the old app-scoped listing into a scan of unrelated files in the user's Drive.
+    func children(parents: [String]) async throws -> [GoogleDriveFile] {
+        var result: [GoogleDriveFile] = []
+        let parents = Array(Set(parents)).sorted()
+        for start in stride(from: 0, to: parents.count, by: 50) {
+            let batch = parents[start..<min(start + 50, parents.count)]
+            let query = batch.map { "'\(escape($0))' in parents" }.joined(separator: " or ")
+            result += try await list(query: query)
+        }
+        return result.sorted { $0.id < $1.id }
+    }
+
     func list(query: String) async throws -> [GoogleDriveFile] {
         var result: [GoogleDriveFile] = []
         var cursor: String?
@@ -136,12 +156,12 @@ final class GoogleDriveSyncHandler {
         try await client.request("files/\(file.id)", query: [URLQueryItem(name: "alt", value: "media")])
     }
 
-    func upload(data: Data, fileName: String, folder: String) async throws {
+    func upload(file: URL, fileName: String, folder: String) async throws {
         let existing = try await children(parent: folder, name: fileName)
         if !existing.isEmpty {
             return
         }
-        try await client.write(data: data, name: fileName, parent: folder)
+        try await client.write(file: file, name: fileName, parent: folder)
     }
 
     func download(_ file: GoogleDriveFile, onProgress: @MainActor @Sendable @escaping (Double) -> Void) async throws -> Data {

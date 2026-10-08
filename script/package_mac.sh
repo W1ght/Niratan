@@ -71,6 +71,10 @@ if [[ ! -x "$APP_BUNDLE/Contents/MacOS/$APP_NAME" ]]; then
   exit 1
 fi
 
+# Verify the expanded final Info.plist before signing or creating a distributable
+# artifact. Configuration values stay private and are never printed.
+python3 script/configure_hoshi_google_signin.py --verify-bundle "$APP_BUNDLE"
+
 verify_full_bundle() {
   local frameworks="$APP_BUNDLE/Contents/Frameworks"
   local youtube_resources="$APP_BUNDLE/Contents/Resources/YouTubeKit_YouTubeKit.bundle"

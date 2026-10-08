@@ -18,7 +18,11 @@ enum GoogleDriveAuthError: LocalizedError {
     case tokenExchangeFailed(statusCode: Int)
     case notAuthenticated
     case tokenRefreshFailed
+    case tokenRefreshUnavailable
     case missingRefreshToken
+    case missingLibraryAccess
+    case credentialsSaveFailed
+    case sharedClientNotConfigured
     
     var errorDescription: String? {
         switch self {
@@ -36,8 +40,16 @@ enum GoogleDriveAuthError: LocalizedError {
             return String(localized: "Not authenticated\nPlease sign in")
         case .tokenRefreshFailed:
             return String(localized: "Failed to refresh token\nPlease sign in again")
+        case .tokenRefreshUnavailable:
+            return String(localized: "Google Drive could not refresh authorization. Your saved connection was kept. Please try again.")
         case .missingRefreshToken:
             return String(localized: "Google did not return a refresh token\nPlease try connecting again")
+        case .missingLibraryAccess:
+            return String(localized: "Google Drive file access was not granted. Reconnect and allow access to sync.")
+        case .credentialsSaveFailed:
+            return String(localized: "Could not save Google Drive authorization. Please try connecting again.")
+        case .sharedClientNotConfigured:
+            return String(localized: "This build is missing Hoshi Reader's Google sign-in configuration. Please use a build with shared-library sign-in configured.")
         }
     }
 }
@@ -48,6 +60,8 @@ class GoogleDriveAuth: NSObject {
     static let shared = GoogleDriveAuth()
     private static let logger = Logger(subsystem: "moe.shishamo.hoshi", category: "Sync")
     private let authorizationSession = GoogleDriveAuthorizationSession()
+    private let loopbackAuthorization = GoogleDriveLoopbackAuthorization()
+    private var authenticationAttempt: UUID?
     private var cachedCredentials: GoogleDriveCredentials?
     private override init() {}
     
@@ -55,54 +69,74 @@ class GoogleDriveAuth: NSObject {
         cachedCredentials != nil || TokenStorage.hasStoredCredentials
     }
 
-    /// OAuth client bundled with this build for the Google Drive provider
-    /// (`NIRATAN_GOOGLE_CLIENT_ID` build setting); empty in builds without one.
-    static var bundledClientId: String? {
-        let value = (Bundle.main.object(forInfoDictionaryKey: "NiratanGoogleClientID") as? String)?
+    /// A Mac client supplied by Hoshi Reader's Google Cloud project owner. It must
+    /// belong to the same project as the Hoshi Reader build on the other device.
+    static var bundledSharedClientId: String? {
+        let value = (Bundle.main.object(forInfoDictionaryKey: "HoshiReaderGoogleClientID") as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return isValidGoogleClientId(value) ? value : nil
     }
 
-    /// The Google Drive provider prefers the bundled client and otherwise uses the client ID
-    /// entered in Settings; the ッツ/ttu provider always needs the user's own client.
+    private static func bundledClientSecret(for clientID: String) -> String? {
+        guard clientID == bundledSharedClientId else { return nil }
+        let value = (Bundle.main.object(forInfoDictionaryKey: "HoshiReaderGoogleClientSecret") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty || value.hasPrefix("$(") ? nil : value
+    }
+
+    /// Shared-library credentials have their own explicit configuration. Never infer
+    /// compatibility from the previous Niratan/TTU client or from a Google account.
     static func clientId(for provider: SyncProvider) -> String {
         let userClientId = (UserDefaults.standard.string(forKey: "googleClientId") ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         switch provider {
         case .gdrive:
-            return bundledClientId ?? userClientId
+            return bundledSharedClientId ?? ""
         case .ttu:
             return userClientId
         }
     }
 
+    static var hasSharedLibraryClient: Bool {
+        isValidGoogleClientId(clientId(for: .gdrive))
+    }
+
     private static let connectedClientIdKey = "googleDriveConnectedClientId"
+    /// Non-secret authorization metadata. Missing on older per-file connections.
+    private static let grantedScopeKey = "googleDriveGrantedScope"
+
+    var requiresLibraryAuthorization: Bool {
+        isAuthenticated && Self.hasSharedLibraryClient && !isAuthenticated(for: .gdrive)
+    }
 
     /// Whether the stored authorization belongs to the client the provider uses. Compares the
     /// non-secret client id recorded at sign-in instead of reading the Keychain item.
     func isAuthenticated(for provider: SyncProvider) -> Bool {
         guard isAuthenticated else { return false }
         let connected = UserDefaults.standard.string(forKey: Self.connectedClientIdKey)
-            ?? UserDefaults.standard.string(forKey: "googleClientId")?.trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? (provider == .ttu ? UserDefaults.standard.string(forKey: "googleClientId")?.trimmingCharacters(in: .whitespacesAndNewlines) : nil)
         let configured = Self.clientId(for: provider)
-        return !configured.isEmpty && connected == configured
+        guard Self.isValidGoogleClientId(configured), connected == configured else { return false }
+        return provider != .gdrive || GoogleDriveAuthorizationPolicy.permitsStoredScope(
+            UserDefaults.standard.string(forKey: Self.grantedScopeKey)
+        )
     }
 
     func authenticate(provider: SyncProvider) async throws {
+        if provider == .gdrive && !Self.hasSharedLibraryClient {
+            throw GoogleDriveAuthError.sharedClientNotConfigured
+        }
         let clientId = Self.clientId(for: provider)
         guard Self.isValidGoogleClientId(clientId) else {
             throw GoogleDriveAuthError.invalidClientId
         }
-        let previousClientId = UserDefaults.standard.string(forKey: Self.connectedClientIdKey)
-
         let manager = GoogleDriveSyncManager.shared
         await manager.stop()
         defer {
             manager.start()
         }
 
-        _ = previousClientId
-        try await authenticate(clientId: clientId)
+        try await authenticate(clientId: clientId, provider: provider)
         // Any new authorization may belong to another Google account.
         try manager.resetConnection()
         GoogleDriveHandler.clearCache()
@@ -112,36 +146,65 @@ class GoogleDriveAuth: NSObject {
         try credentials().accessToken
     }
     
-    func authenticate(clientId: String) async throws {
+    func authenticate(clientId: String, provider: SyncProvider = .ttu) async throws {
         let clientId = clientId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard Self.isValidGoogleClientId(clientId) else {
             throw GoogleDriveAuthError.invalidClientId
         }
-        let scheme = clientId.components(separatedBy: ".").reversed().joined(separator: ".")
-        let redirectUri = "\(scheme):/oauth2callback"
-        
-        var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
-        components.queryItems = [
-            URLQueryItem(name: "client_id", value: clientId),
-            URLQueryItem(name: "redirect_uri", value: redirectUri),
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/drive.file"),
-            URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent"),
-        ]
-        
-        guard let authURL = components.url else {
-            throw GoogleDriveAuthError.invalidAuthURL
+        guard authenticationAttempt == nil else {
+            throw GoogleDriveLoopbackAuthorizationError.alreadyInProgress
         }
+        let attempt = UUID()
+        authenticationAttempt = attempt
+        defer {
+            if authenticationAttempt == attempt { authenticationAttempt = nil }
+        }
+        let requestedScope = GoogleDriveAuthorizationPolicy.requestedScope
+        let connection = GoogleDriveClient.shared.connectionId
+        let code: String
+        let redirectUri: String
+        let codeVerifier: String?
+        if provider == .gdrive {
+            let result = try await loopbackAuthorization.authorize(clientID: clientId, scope: requestedScope)
+            code = result.code
+            redirectUri = result.redirectURI
+            codeVerifier = result.codeVerifier
+        } else {
+            let scheme = clientId.components(separatedBy: ".").reversed().joined(separator: ".")
+            redirectUri = "\(scheme):/oauth2callback"
+            codeVerifier = nil
         
-        let code = try await getAuthorizationCode(from: authURL, callbackScheme: scheme)
-        let credentials = try await exchangeCode(code: code, clientId: clientId, redirectUri: redirectUri)
-        storeCredentials(credentials)
+            var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+            components.queryItems = [
+                URLQueryItem(name: "client_id", value: clientId),
+                URLQueryItem(name: "redirect_uri", value: redirectUri),
+                URLQueryItem(name: "response_type", value: "code"),
+                URLQueryItem(name: "scope", value: requestedScope),
+                URLQueryItem(name: "access_type", value: "offline"),
+                URLQueryItem(name: "prompt", value: "consent"),
+            ]
+
+            guard let authURL = components.url else {
+                throw GoogleDriveAuthError.invalidAuthURL
+            }
+            code = try await getAuthorizationCode(from: authURL, callbackScheme: scheme)
+        }
+        try GoogleDriveClient.shared.checkConnection(connection)
+        try checkAuthenticationAttempt(attempt)
+        let (credentials, grantedScope) = try await exchangeCode(
+            code: code, clientId: clientId, redirectUri: redirectUri, requestedScope: requestedScope,
+            codeVerifier: codeVerifier, clientSecret: Self.bundledClientSecret(for: clientId)
+        )
+        try GoogleDriveClient.shared.checkConnection(connection)
+        try checkAuthenticationAttempt(attempt)
+        try storeCredentials(credentials)
         UserDefaults.standard.set(clientId, forKey: Self.connectedClientIdKey)
+        UserDefaults.standard.set(grantedScope, forKey: Self.grantedScopeKey)
         Self.logger.info("Google Drive authentication completed; stored credentials available: \(self.isAuthenticated, privacy: .public)")
     }
     
     func refreshAccessToken() async throws -> String {
+        let connection = GoogleDriveClient.shared.connectionId
         let credentials = try credentials()
         
         let url = URL(string: "https://oauth2.googleapis.com/token")!
@@ -150,36 +213,68 @@ class GoogleDriveAuth: NSObject {
         request.timeoutInterval = 10
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         
-        let params = [
+        var params = [
             "client_id": credentials.clientId,
             "grant_type": "refresh_token",
             "refresh_token": credentials.refreshToken
         ]
+        if let secret = credentials.clientSecret ?? Self.bundledClientSecret(for: credentials.clientId) {
+            params["client_secret"] = secret
+        }
         var bodyComponents = URLComponents()
         bodyComponents.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
         request.httpBody = bodyComponents.percentEncodedQuery?.data(using: .utf8)
         
         let (data, response) = try await URLSession.shared.data(for: request)
+        try GoogleDriveClient.shared.checkConnection(connection)
+        try Task.checkCancellation()
         Self.logTokenEndpointResponse(data: data, response: response, context: "refresh")
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            clearCredentials()
-            throw GoogleDriveAuthError.tokenRefreshFailed
+            if GoogleDriveAuthorizationPolicy.invalidatesStoredCredentials(
+                statusCode: (response as? HTTPURLResponse)?.statusCode, responseBody: data
+            ) {
+                clearCredentials()
+                throw GoogleDriveAuthError.tokenRefreshFailed
+            }
+            throw GoogleDriveAuthError.tokenRefreshUnavailable
         }
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
+        // Refresh responses may omit scope, so keep the known grant in that case.
+        if let scope = tokenResponse.scope,
+           !GoogleDriveAuthorizationPolicy.includes(scope, required: GoogleDriveAuthorizationPolicy.fileScope) {
+            UserDefaults.standard.set(scope, forKey: Self.grantedScopeKey)
+            throw GoogleDriveAuthError.missingLibraryAccess
+        }
         let updatedCredentials = GoogleDriveCredentials(
             accessToken: tokenResponse.accessToken,
             refreshToken: credentials.refreshToken,
-            clientId: credentials.clientId
+            clientId: credentials.clientId,
+            clientSecret: credentials.clientSecret
         )
-        storeCredentials(updatedCredentials)
+        try storeCredentials(updatedCredentials)
+        if let scope = tokenResponse.scope {
+            UserDefaults.standard.set(scope, forKey: Self.grantedScopeKey)
+        }
         
         return tokenResponse.accessToken
     }
 
     func signOut() {
+        cancelAuthentication()
         clearCredentials()
+    }
+
+    func cancelAuthentication() {
+        authenticationAttempt = nil
+        loopbackAuthorization.cancel()
+        authorizationSession.cancel()
+    }
+
+    private func checkAuthenticationAttempt(_ attempt: UUID) throws {
+        try Task.checkCancellation()
+        guard authenticationAttempt == attempt else { throw CancellationError() }
     }
     
     private func getAuthorizationCode(from url: URL, callbackScheme: String) async throws -> String {
@@ -198,19 +293,24 @@ class GoogleDriveAuth: NSObject {
         return code
     }
     
-    private func exchangeCode(code: String, clientId: String, redirectUri: String) async throws -> GoogleDriveCredentials {
+    private func exchangeCode(
+        code: String, clientId: String, redirectUri: String, requestedScope: String,
+        codeVerifier: String?, clientSecret: String?
+    ) async throws -> (GoogleDriveCredentials, String) {
         let url = URL(string: "https://oauth2.googleapis.com/token")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 10
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         
-        let params = [
+        var params = [
             "code": code,
             "client_id": clientId,
             "redirect_uri": redirectUri,
             "grant_type": "authorization_code"
         ]
+        if let codeVerifier { params["code_verifier"] = codeVerifier }
+        if let clientSecret { params["client_secret"] = clientSecret }
         
         var bodyComponents = URLComponents()
         bodyComponents.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
@@ -225,16 +325,22 @@ class GoogleDriveAuth: NSObject {
         }
         
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
+        guard let grantedScope = GoogleDriveAuthorizationPolicy.grantedScope(
+            response: tokenResponse.scope, requested: requestedScope
+        ) else {
+            throw GoogleDriveAuthError.missingLibraryAccess
+        }
         guard let refresh = tokenResponse.refreshToken else {
-            clearCredentials()
             throw GoogleDriveAuthError.missingRefreshToken
         }
 
-        return GoogleDriveCredentials(
+        let credentials = GoogleDriveCredentials(
             accessToken: tokenResponse.accessToken,
             refreshToken: refresh,
-            clientId: clientId
+            clientId: clientId,
+            clientSecret: clientSecret
         )
+        return (credentials, grantedScope)
     }
 
     private func credentials() throws -> GoogleDriveCredentials {
@@ -250,15 +356,18 @@ class GoogleDriveAuth: NSObject {
         return storedCredentials
     }
 
-    private func storeCredentials(_ credentials: GoogleDriveCredentials) {
+    private func storeCredentials(_ credentials: GoogleDriveCredentials) throws {
+        guard TokenStorage.saveCredentials(credentials) else {
+            throw GoogleDriveAuthError.credentialsSaveFailed
+        }
         cachedCredentials = credentials
-        TokenStorage.saveCredentials(credentials)
     }
 
     private func clearCredentials() {
         cachedCredentials = nil
         TokenStorage.clear()
         UserDefaults.standard.removeObject(forKey: Self.connectedClientIdKey)
+        UserDefaults.standard.removeObject(forKey: Self.grantedScopeKey)
     }
     
     private static func isValidGoogleClientId(_ clientId: String) -> Bool {
@@ -290,6 +399,10 @@ class GoogleDriveAuth: NSObject {
 
 private nonisolated final class GoogleDriveAuthorizationSession: NSObject, ASWebAuthenticationPresentationContextProviding {
     private var activeSession: ASWebAuthenticationSession?
+
+    func cancel() {
+        activeSession?.cancel()
+    }
 
     func callbackURL(from url: URL, callbackScheme: String) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
@@ -330,9 +443,11 @@ private nonisolated final class GoogleDriveAuthorizationSession: NSObject, ASWeb
 private struct TokenResponse: Codable {
     let accessToken: String
     let refreshToken: String?
+    let scope: String?
     
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
+        case scope
     }
 }

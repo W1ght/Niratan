@@ -19,8 +19,17 @@ struct SyncView: View {
     @State private var showSignOutConfirmation = false
     @State private var showQueue = false
 
-    private var needsOwnClientId: Bool {
-        userConfig.syncProvider == .ttu || GoogleDriveAuth.bundledClientId == nil
+    private var needsLibraryAuthorization: Bool {
+        userConfig.syncProvider == .gdrive && GoogleDriveAuth.shared.requiresLibraryAuthorization
+    }
+
+    private var connectionStatus: String {
+        if isConnecting { return String(localized: "Connecting…") }
+        if userConfig.syncProvider == .gdrive && !GoogleDriveAuth.hasSharedLibraryClient {
+            return String(localized: "Unavailable in this build")
+        }
+        if isAuthenticated { return String(localized: "Connected") }
+        return needsLibraryAuthorization ? String(localized: "Authorization required") : String(localized: "Not connected")
     }
 
     var body: some View {
@@ -52,11 +61,11 @@ struct SyncView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     switch userConfig.syncProvider {
                     case .gdrive:
-                        Text("Syncs your whole library between Niratan devices: books, covers, reading positions, statistics, highlights, shelves and Sasayaki data.")
+                        Text("Sign in with the same Google account as Hoshi Reader to sync books, covers, reading positions, statistics, highlights, shelves and Sasayaki data.")
                     case .ttu:
                         Text("Sync bookmarks and statistics with ッツ Reader per book via Google Drive.")
                     }
-                    if userConfig.enableSync && needsOwnClientId {
+                    if userConfig.enableSync && userConfig.syncProvider == .ttu {
                         Text("A **[Google Cloud project](https://github.com/ttu-ttu/ebook-reader?tab=readme-ov-file#storage-sources)** is necessary for syncing.")
                         Text("1. After the initial setup, create another **OAuth client ID** in the same project.")
                         Text("2. Select **iOS** as the **Application type** and set the **Bundle ID** to '**moe.shishamo.hoshi**'.")
@@ -70,7 +79,7 @@ struct SyncView: View {
             }
 
             if userConfig.enableSync {
-                connectionSection(clientId: $userConfig.googleClientId)
+                connectionSection
 
                 if userConfig.syncProvider == .ttu {
                     ttuSections
@@ -136,21 +145,20 @@ struct SyncView: View {
         }
     }
 
-    private func connectionSection(clientId: Binding<String>) -> some View {
-        NativeSettingsSectionCard("Connection") {
-            if needsOwnClientId {
+    private var connectionSection: some View {
+        @Bindable var userConfig = userConfig
+        return NativeSettingsSectionCard("Connection") {
+            if userConfig.syncProvider == .ttu {
                 NativeSettingsRow("Client ID") {
-                    TextField("Required", text: clientId)
-                        .disabled(isAuthenticated)
+                    TextField("Required", text: $userConfig.googleClientId)
+                        .disabled(isAuthenticated || isConnecting)
                         .opacity(isAuthenticated ? 0.6 : 1)
                         .nativeSettingsTextField()
                 }
                 NativeSettingsSeparator()
             }
             NativeSettingsRow("Status") {
-                Text(isConnecting
-                     ? String(localized: "Connecting…")
-                     : (isAuthenticated ? String(localized: "Connected") : String(localized: "Not connected")))
+                Text(connectionStatus)
                     .foregroundStyle(.secondary)
             }
             NativeSettingsSeparator()
@@ -170,10 +178,28 @@ struct SyncView: View {
                     Button {
                         signIn()
                     } label: {
-                        Text("Connect Google Drive")
+                        Text(userConfig.syncProvider == .gdrive
+                             ? String(localized: "Sign in with Google")
+                             : String(localized: "Connect Google Drive"))
                     }
                     .disabled(isConnecting)
+                    if isConnecting {
+                        Button("Cancel") {
+                            GoogleDriveAuth.shared.cancelAuthentication()
+                        }
+                    }
+                    if GoogleDriveAuth.shared.isAuthenticated {
+                        Button("Sign out", role: .destructive) {
+                            showSignOutConfirmation = true
+                        }
+                    }
                 }
+            }
+        } footer: {
+            if userConfig.syncProvider == .gdrive && !GoogleDriveAuth.hasSharedLibraryClient {
+                Text("This build is missing Hoshi Reader's Google sign-in configuration. Please use a build with shared-library sign-in configured.")
+            } else if needsLibraryAuthorization {
+                Text("Reconnect to grant access to your Hoshi Reader library. Your existing authorization is kept if you cancel.")
             }
         }
     }
@@ -223,7 +249,7 @@ struct SyncView: View {
         let queue = librarySync.queue
         let progress = librarySync.progress
         let failed = queue.filter { $0.error != nil }.count
-        return NativeSettingsSectionCard("Library") {
+        return NativeSettingsSectionCard("Hoshi Reader") {
             NativeSettingsRow("Last Sync") {
                 if let lastSync = librarySync.lastSync {
                     Text(lastSync, format: .dateTime.month().day().hour().minute())
@@ -301,6 +327,8 @@ struct SyncView: View {
             }
             do {
                 try await GoogleDriveAuth.shared.authenticate(provider: userConfig.syncProvider)
+            } catch is CancellationError {
+                // The previous authorization remains available after cancelling sign-in.
             } catch {
                 present(error)
             }

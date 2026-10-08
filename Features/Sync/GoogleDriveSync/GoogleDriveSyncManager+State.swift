@@ -50,6 +50,7 @@ extension GoogleDriveSyncManager {
     private func syncState(book: BookMetadata?) async throws {
         try Task.checkCancellation()
         errorMessage = nil
+        try prepareSharedLibrary()
         try store.detectLocalChanges()
 
         if let book {
@@ -203,11 +204,7 @@ extension GoogleDriveSyncManager {
             remote = book
         }
 
-        if store.state.books[key]?.pending == true, var loaded = try store.loadBook(key: key, remote: remote) {
-            // The open Reader keeps its own position; that alone must not keep the book pending.
-            if let reader = SyncReaderBridge.model(for: key), !reader.acceptsSyncedPosition {
-                loaded.bookmark = book.bookmark
-            }
+        if store.state.books[key]?.pending == true, let loaded = try store.loadBook(key: key, remote: remote) {
             guard loaded == book else {
                 cache.bookVersions[key] = versions
                 return
@@ -264,16 +261,8 @@ extension GoogleDriveSyncManager {
             return
         }
 
-        // A local book that never synced must not be deleted by an old deletion marker of a
-        // book with the same folder name; it continues as a new generation instead.
-        if remote.deleted && !book.attached && !book.deleted && remote.generation >= book.generation {
-            store.state.books[key]!.generation = remote.generation + 1
-            store.state.books[key]!.cleanup.insert(remote.generation)
-            store.state.books[key]!.pending = true
-        }
-        let current = store.state.books[key]!
-        let replaced = remote.generation > current.generation && (current.attached || current.deleted)
-        if replaced || (remote.deleted && remote.generation >= current.generation) {
+        let replaced = remote.generation > book.generation && (book.attached || book.deleted)
+        if replaced || (remote.deleted && remote.generation >= book.generation) {
             reader?.closeForSyncedDeletion()
         }
 

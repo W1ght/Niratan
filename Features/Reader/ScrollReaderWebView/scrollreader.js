@@ -9,9 +9,13 @@
 window.hoshiReader = {
     ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
     ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
+    sharedRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ가-힣ㄱ-ㆎ\p{Radical}\p{Unified_Ideograph}]+/gimu,
+    sharedRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ가-힣ㄱ-ㆎ\p{Radical}\p{Unified_Ideograph}]/iu,
+    sharedSyncCoordinates: false,
     activeCueId: null,
     cueWrappers: new Map(),
     nodeStartOffsets: new WeakMap(),
+    nodeStartNativeOffsets: new WeakMap(),
     nodeStartRawOffsets: new WeakMap(),
     
     isVertical() {
@@ -26,17 +30,41 @@ window.hoshiReader = {
     countChars(text) {
         return Array.from(this.normalizeText(text)).length;
     },
+
+    countNativeChars(text) {
+        return Array.from(text.replace(this.ttuRegexNegated, '')).length;
+    },
     
     countRawChars(text) {
         return Array.from(text).length;
     },
     
     normalizeText(text) {
-        return text.replace(this.ttuRegexNegated, '');
+        return text.replace(this.sharedSyncCoordinates ? this.sharedRegexNegated : this.ttuRegexNegated, '');
     },
     
     isMatchableChar(char) {
-        return this.ttuRegex.test(char || '');
+        return (this.sharedSyncCoordinates ? this.sharedRegex : this.ttuRegex).test(char || '');
+    },
+
+    rangeForCharacter(node, characterIndex) {
+        // Bookmarks count normalized code points; DOM Range offsets count UTF-16 units.
+        let index = 0;
+        let offset = 0;
+        for (const char of node.textContent) {
+            const next = offset + char.length;
+            if (this.isMatchableChar(char)) {
+                if (index === characterIndex) {
+                    const range = document.createRange();
+                    range.setStart(node, offset);
+                    range.setEnd(node, next);
+                    return range;
+                }
+                index += 1;
+            }
+            offset = next;
+        }
+        return null;
     },
     
     createWalker(rootNode) {
@@ -74,20 +102,25 @@ window.hoshiReader = {
     
     buildNodeOffsets() {
         const offsets = new WeakMap();
+        const nativeOffsets = new WeakMap();
         const rawOffsets = new WeakMap();
         const walker = this.createWalker();
         let count = 0;
+        let nativeCount = 0;
         let rawCount = 0;
         let node;
         
         while (node = walker.nextNode()) {
             offsets.set(node, count);
+            nativeOffsets.set(node, nativeCount);
             rawOffsets.set(node, rawCount);
             count += this.countChars(node.textContent);
+            nativeCount += this.countNativeChars(node.textContent);
             rawCount += this.countRawChars(node.textContent);
         }
         
         this.nodeStartOffsets = offsets;
+        this.nodeStartNativeOffsets = nativeOffsets;
         this.nodeStartRawOffsets = rawOffsets;
     },
     
@@ -296,7 +329,7 @@ window.hoshiReader = {
     },
     
     notifyRestoreComplete() {
-        window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
+        window.webkit?.messageHandlers?.restoreCompleted?.postMessage(window.hoshiReaderRestoreToken ?? null);
     },
 
     async restoreProgress(progress) {
@@ -320,26 +353,54 @@ window.hoshiReader = {
             return;
         }
         
-        var targetCharCount = Math.ceil(totalChars * progress);
+        // A near-end fraction may round to totalChars, past the final readable glyph.
+        var targetCharCount = Math.min(Math.ceil(totalChars * progress), totalChars - 1);
         var runningSum = 0;
         var targetNode = null;
+        var targetOffset = 0;
         
         walker = this.createWalker();
         while (node = walker.nextNode()) {
-            runningSum += this.countChars(node.textContent);
             targetNode = node;
-            if (runningSum > targetCharCount) {
+            var nodeLength = this.countChars(node.textContent);
+            if (runningSum + nodeLength > targetCharCount) {
+                targetOffset = targetCharCount - runningSum;
                 break;
             }
+            runningSum += nodeLength;
         }
         
         if (targetNode) {
-            var el = targetNode.parentElement;
-            if (el) {
-                el.scrollIntoView({
-                    block: progress >= 0.999999 ? 'end' : 'start',
-                    behavior: 'instant'
-                });
+            if (progress >= 0.999999) {
+                targetNode.parentElement?.scrollIntoView({ block: 'end', behavior: 'instant' });
+                // A large paragraph's end can leave its final readable glyph
+                // outside the viewport in vertical writing. Keep the end
+                // alignment, then bring that precise glyph into view.
+                const range = this.rangeForCharacter(targetNode, targetOffset);
+                if (range) {
+                    const rect = range.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        const left = vertical
+                            ? (rect.left < 0 ? Math.floor(rect.left) : Math.max(0, Math.ceil(rect.right - window.innerWidth)))
+                            : 0;
+                        const top = vertical
+                            ? 0
+                            : (rect.top < 0 ? Math.floor(rect.top) : Math.max(0, Math.ceil(rect.bottom - window.innerHeight)));
+                        if (left || top) {
+                            window.scrollBy({ left, top, behavior: 'instant' });
+                        }
+                    }
+                }
+            } else {
+                const range = this.rangeForCharacter(targetNode, targetOffset);
+                if (range) {
+                    const rect = range.getBoundingClientRect();
+                    window.scrollBy({
+                        left: vertical ? rect.right - window.innerWidth : 0,
+                        top: vertical ? 0 : rect.top,
+                        behavior: 'instant'
+                    });
+                }
             }
         }
         

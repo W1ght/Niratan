@@ -61,7 +61,7 @@ struct Device {
         setDay(dateKey, characters: current.charactersRead + characters, seconds: current.readingTime + seconds)
     }
 
-    /// Mirrors SyncStorage.loadBook + applyBook for the statistics part of one book.
+    /// Exercises the legacy daily adapter still used for the one-time session migration.
     mutating func sync(with remote: inout [String: Timestamped<ReadingSession?>]) {
         SyncStatisticsBridge.reconcile(ledger: &ledger, statistics: statistics, key: key, deviceID: id, resetMinutes: 0, now: tick())
         let merged = SyncBook.mergeRecords(ledger.sessions, remote)
@@ -179,6 +179,26 @@ struct LibrarySyncModelTest {
         let macDay2 = mac.total(day2)
         require(other.total(day2) == macDay2, "devices agree after a tombstoned session: \(other.total(day2)) vs \(macDay2)")
 
+        // Two older devices can hold the same synced daily total under different native
+        // ids after daily imports. Migration uses their shared wire id as the baseline.
+        let baseline = SyncDailyTotal(charactersRead: 200, readingTime: 120)
+        let baselineSession = SyncStatisticsBridge.session(dateKey: day1, total: baseline, resetMinutes: 0)
+        let baselineID = SyncSessionID.legacy(key: key, dateKey: day1)
+        let legacyRecords: ReadingSessionRecords = [baselineID: Timestamped(modified: 8, value: baselineSession)]
+        let nativeA: ReadingSessionRecords = ["native-a": Timestamped(modified: 10, value: SyncStatisticsBridge.session(dateKey: day1, total: SyncDailyTotal(charactersRead: 220, readingTime: 130), resetMinutes: 0))]
+        let nativeB: ReadingSessionRecords = ["native-b": Timestamped(modified: 11, value: SyncStatisticsBridge.session(dateKey: day1, total: SyncDailyTotal(charactersRead: 230, readingTime: 140), resetMinutes: 0))]
+        var ledgerA = SyncBookLedger(sessions: legacyRecords, appliedDaily: [day1: baseline])
+        var ledgerB = ledgerA
+        let migratedA = SyncSessionMigration.canonicalRecords(nativeA, ledger: &ledgerA, key: key, deviceID: "A", resetMinutes: 0, now: 20)
+        let migratedB = SyncSessionMigration.canonicalRecords(nativeB, ledger: &ledgerB, key: key, deviceID: "B", resetMinutes: 0, now: 21)
+        require(migratedA[baselineID] == legacyRecords[baselineID], "shared historical session ids and timestamps survive migration")
+        require(migratedA["native-a"]?.value == nil && migratedB["native-b"]?.value == nil, "native ids carrying imported aggregates are retired")
+        require(ReadingSessionLog.total(migratedA) == ReadingSessionLog.total(nativeA), "migration preserves this device's accumulated activity")
+        require(ReadingSessionLog.total(migratedB) == ReadingSessionLog.total(nativeB), "migration preserves the other device's accumulated activity")
+        let migratedMerged = SyncBook.mergeRecords(migratedA, migratedB)
+        require(ReadingSessionLog.total(migratedMerged) == ReadingTotal(charactersRead: 250, readingTime: 150), "two migrations keep the 200 shared baseline once and combine only 20+30 local reading")
+        require(ReadingSessionLog.total(SyncBook.mergeRecords(migratedMerged, legacyRecords)) == ReadingSessionLog.total(migratedMerged), "an old cloud document cannot duplicate the migrated baseline")
+
         // MARK: Highlights
 
 
@@ -202,6 +222,20 @@ struct LibrarySyncModelTest {
         SyncHighlightBridge.reconcile(ledger: &macLedger, local: [highlight(first, color: .blue)], now: tick())
         require(macLedger.highlights?[first.uuidString]?.value == nil, "a deleted highlight stays deleted")
         require(SyncHighlightBridge.sameContent([], macLedger.highlights ?? [:]), "applied highlights match the merged records")
+
+        var furigana = SyncHighlight(highlight(first))
+        furigana.textFurigana = "<ruby>猫<rt>ねこ</rt></ruby>"
+        furigana.color = "future-color"
+        let furiganaRecords = [first.uuidString: Timestamped(modified: tick(), value: furigana as SyncHighlight?)]
+        let localFurigana = SyncHighlightBridge.highlights(from: furiganaRecords)
+        require(localFurigana.first?.textFurigana == furigana.textFurigana, "remote furigana is present in local highlight storage")
+        var furiganaLedger = SyncBookLedger(highlights: furiganaRecords)
+        SyncHighlightBridge.reconcile(ledger: &furiganaLedger, local: localFurigana, now: tick())
+        require(furiganaLedger.highlights == furiganaRecords, "an untouched unknown color and furigana round trip without a new timestamp")
+        var recolored = localFurigana[0]
+        recolored = Highlight(id: recolored.id, character: recolored.character, offset: recolored.offset, text: recolored.text, textFurigana: recolored.textFurigana, color: .blue, createdAt: recolored.createdAt)
+        SyncHighlightBridge.reconcile(ledger: &furiganaLedger, local: [recolored], now: tick())
+        require(furiganaLedger.highlights?[first.uuidString]?.value?.textFurigana == furigana.textFurigana, "local recoloring preserves remote furigana")
 
         // MARK: Shelves
 

@@ -16,7 +16,9 @@ window.hoshiHighlights = {
         const startPrefix = range.startContainer.textContent.substring(0, range.startOffset);
         const endPrefix = range.endContainer.textContent.substring(0, range.endOffset);
         
-        const start = window.hoshiReader.nodeStartOffsets.get(range.startContainer) + window.hoshiReader.countChars(startPrefix);
+        // Local sidecars keep their native basis; SyncStorage maps the exact DOM
+        // anchor to Hoshi's wire basis when publishing the highlight.
+        const start = window.hoshiReader.nodeStartNativeOffsets.get(range.startContainer) + window.hoshiReader.countNativeChars(startPrefix);
         const rawStart = window.hoshiReader.nodeStartRawOffsets.get(range.startContainer) + window.hoshiReader.countRawChars(startPrefix);
         const rawEnd = window.hoshiReader.nodeStartRawOffsets.get(range.endContainer) + window.hoshiReader.countRawChars(endPrefix);
         if (rawEnd <= rawStart) {

@@ -9,19 +9,10 @@
 import Foundation
 import Network
 
-nonisolated struct GoogleDriveSyncCache: Codable {
-    var cursor: String?
-    var root = ""
-    var stateFolder = ""
-    var bookFolder = ""
-    var bookVersions: [String: [String: String]] = [:]
-    var bookFolders: [String: String]?
-}
-
-/// Whole-library Google Drive sync between Niratan devices (the "Google Drive" provider).
+/// Whole-library Google Drive sync with Hoshi Reader (the "Google Drive" provider).
 ///
-/// Drive layout: `Niratan/state/<book>.json` holds one `SyncBook` per book,
-/// `Niratan/state/.shelves.json` the shelf list, and `Niratan/books/<book>/<generation>/`
+/// Drive layout: `Hoshi Reader/state/<book>.json` holds one `SyncBook` per book,
+/// `Hoshi Reader/state/.shelves.json` the shelf list, and `Hoshi Reader/books/<book>/<generation>/`
 /// the EPUB, cover and Sasayaki match. Sync is last-edit-wins per field; statistics and
 /// highlights merge by id and deletion wins. It polls every two minutes while the app is
 /// active and 30 seconds after a local change.
@@ -209,6 +200,7 @@ final class GoogleDriveSyncManager {
 
     func clearCache() async throws {
         await stop()
+        try prepareSharedLibrary()
         // Keep the root so a replaced or trashed library folder is still detected.
         cache = GoogleDriveSyncCache(root: cache.root)
         remoteBooks = [:]
@@ -219,14 +211,32 @@ final class GoogleDriveSyncManager {
     /// Forgets everything known about the remote library, e.g. after connecting another
     /// account. Remote-only placeholders are removed; local books are uploaded again.
     func resetConnection() throws {
-        try store.prepareLibrary()
-        try store.removePlaceholders()
-        try store.resetSyncState()
-        cache = GoogleDriveSyncCache()
+        // Credentials may already belong to a new account. Forget remote IDs before any
+        // fallible local work, and retain the reattachment flag until that work succeeds.
+        cache = GoogleDriveSyncCache(requiresReattachment: true)
         remoteBooks = [:]
         unsupportedFormat = false
         errorMessage = nil
         lastSync = nil
+        try saveCache()
+        try store.prepareLibrary()
+        try store.removePlaceholders()
+        try store.resetSyncState()
+        cache = GoogleDriveSyncCache()
+        try saveCache()
+    }
+
+    /// Switching from the old Niratan library invalidates only its local remote references.
+    /// The old cloud folder and all local books/sidecars remain available; local records are
+    /// reconciled into the shared library with their original edit timestamps.
+    func prepareSharedLibrary() throws {
+        guard cache.libraryName != GoogleDriveSyncCache.sharedLibraryName
+            || store.state.libraryName != GoogleDriveSyncCache.sharedLibraryName
+            || cache.requiresReattachment == true else { return }
+        try store.prepareLibrary()
+        try store.resetSyncState()
+        cache.selectSharedLibrary(force: true)
+        remoteBooks = [:]
         try saveCache()
     }
 

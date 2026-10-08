@@ -7,12 +7,10 @@
 
 import Foundation
 
-// Niratan keeps its local formats (daily ッツ statistics, highlight arrays, shelf lists) so
-// backups, the ttu provider, the statistics dashboard and older builds keep working. The
-// library sync model needs mergeable records instead, so each book keeps a ledger next to its
-// files that remembers what was last applied locally. Comparing the local files with the
-// ledger turns local edits into timestamped records; applying a merged record writes the
-// local files and the ledger together.
+// Library sync uses the native reading-session file directly. The ledger adapts the local
+// highlight arrays and shelf lists into timestamped records and remembers playback/metadata
+// changes. Its legacy daily-statistics fields remain readable for the one-time migration;
+// TTU-compatible daily statistics are derived from canonical sessions by StatisticsStorage.
 
 nonisolated struct SyncDailyTotal: Codable, Equatable, Sendable {
     var charactersRead: Int
@@ -40,15 +38,28 @@ nonisolated struct SyncDailyTotal: Codable, Equatable, Sendable {
 nonisolated struct SyncBookLedger: Codable, Equatable, Sendable {
     /// Every reading session known for the book, including deletion markers.
     var sessions: [String: Timestamped<ReadingSession?>] = [:]
-    /// Reporting day of each session, fixed when the session is first seen so a later reset
-    /// time change does not move history between days.
+    /// Legacy daily-adapter reporting days, retained until session migration finishes.
     var sessionDays: [String: String] = [:]
-    /// Daily totals as they were after the last reconcile/apply; `nil` until the first sync.
+    /// Legacy daily-adapter baseline; cleared after migration to canonical sessions.
     var appliedDaily: [String: SyncDailyTotal]?
     var highlights: [String: Timestamped<SyncHighlight?>]?
     var shelves: [String: Timestamped<Bool>]?
     var metadata: Timestamped<SyncMetadata>?
     var audiobook: Timestamped<SyncPlayback>?
+    /// Older Niratan builds synthesized daily sessions in this ledger. Once migrated, the
+    /// session file is authoritative and these records are only a last-synced snapshot.
+    var canonicalSessions: Bool?
+    /// Format-1 positions are Hoshi's coordinates, independent of the native BookInfo.
+    /// Optional fields keep ledgers written before the coordinate adapter readable.
+    var coordinateVersion: Int?
+    var canonicalBookmark: Timestamped<SyncBookmark>?
+    var canonicalCharacterCount: Int?
+    var coordinateSource: SyncCoordinateSource?
+    var bookmarkProjection: SyncBookmarkProjection?
+    var highlightProjection: SyncHighlightProjection?
+    /// Older local ledgers used native positions. Keep unresolved native anchors off the
+    /// wire until their exact EPUB can export them; the user's highlight sidecar is retained.
+    var legacyNativeHighlights: [String: Timestamped<SyncHighlight?>]?
 
     static let fileName = ".sync_ledger.json"
 
@@ -60,6 +71,90 @@ nonisolated struct SyncBookLedger: Codable, Equatable, Sendable {
     @MainActor
     func save(root: URL) throws {
         try JSONEncoder().encode(self).write(to: root.appendingPathComponent(Self.fileName), options: .atomic)
+    }
+}
+
+nonisolated struct SyncCoordinateSource: Codable, Equatable, Sendable {
+    var generation: Int
+    var epub: Timestamped<String?>?
+}
+
+nonisolated struct SyncCoordinateIdentity: Codable, Equatable, Sendable {
+    var source: SyncCoordinateSource
+    var content: String
+}
+
+nonisolated struct SyncBookmarkProjection: Codable, Equatable, Sendable {
+    var identity: SyncCoordinateIdentity
+    var chapterIndex: Int
+    var progress: Double
+    var characterCount: Int
+    var modified: Int64
+    var canonicalBookmark: Timestamped<SyncBookmark>?
+
+    init(identity: SyncCoordinateIdentity, bookmark: Bookmark, modified: Int64, canonicalBookmark: Timestamped<SyncBookmark>? = nil) {
+        self.identity = identity
+        chapterIndex = bookmark.chapterIndex
+        progress = bookmark.progress
+        characterCount = bookmark.characterCount
+        self.modified = modified
+        self.canonicalBookmark = canonicalBookmark
+    }
+
+    func samePosition(as bookmark: Bookmark) -> Bool {
+        chapterIndex == bookmark.chapterIndex && characterCount == bookmark.characterCount
+            && abs(progress - bookmark.progress) < 0.000000001
+    }
+
+    func matches(_ bookmark: Bookmark, modified: Int64) -> Bool {
+        isUnchanged(bookmark, modified: modified) && self.modified == modified
+    }
+
+    func isUnchanged(_ bookmark: Bookmark, modified: Int64) -> Bool {
+        if samePosition(as: bookmark) { return true }
+        // Reader's floating multiplication may round an imported integer down by one.
+        // This tolerance applies only to the same chapter/progress and original stamp.
+        return self.modified == modified && chapterIndex == bookmark.chapterIndex
+            && abs(progress - bookmark.progress) < 0.000000001
+            && characterCount >= 0 && bookmark.characterCount >= 0
+            && (characterCount > bookmark.characterCount
+                ? characterCount - bookmark.characterCount : bookmark.characterCount - characterCount) <= 1
+    }
+}
+
+nonisolated struct SyncHighlightProjection: Codable, Equatable, Sendable {
+    var identity: SyncCoordinateIdentity
+    /// Only successfully projected highlights can be removed by a local deletion.
+    /// Canonical records with missing or ambiguous anchors never enter this snapshot.
+    var native: [String: SyncHighlight]
+}
+
+nonisolated enum SyncSessionMigration {
+    /// Old daily imports could copy one shared total into different native ids on different
+    /// devices. Reconcile the final local delta against the shared wire baseline once, then
+    /// use its ids as the canonical historical sessions to avoid counting that total twice.
+    static func canonicalRecords(
+        _ local: ReadingSessionRecords,
+        ledger: inout SyncBookLedger,
+        key: String,
+        deviceID: String,
+        resetMinutes: Int,
+        now: Int64
+    ) -> ReadingSessionRecords {
+        SyncStatisticsBridge.reconcile(
+            ledger: &ledger,
+            statistics: ReadingSessionLog.dailyStatistics(local, title: "", resetMinutes: resetMinutes),
+            key: key,
+            deviceID: deviceID,
+            resetMinutes: resetMinutes,
+            now: now
+        )
+        var result = ledger.sessions
+        for (id, record) in local where result[id] == nil {
+            // Retired native ids remain tombstoned so an open Reader starts a fresh stint.
+            result[id] = Timestamped(modified: max(now, record.modified), value: nil)
+        }
+        return result
     }
 }
 
@@ -120,6 +215,7 @@ nonisolated enum SyncDevice {
     }
 }
 
+/// The former daily adapter is used only to reconcile the last delta during migration.
 nonisolated enum SyncStatisticsBridge {
     static func dailyTotals(_ statistics: [Statistics]) -> [String: SyncDailyTotal] {
         var totals: [String: SyncDailyTotal] = [:]
@@ -331,7 +427,7 @@ nonisolated enum SyncHighlightBridge {
                 guard let value = record.value else { continue }
                 if !matches(value, highlight) {
                     var updated = SyncHighlight(highlight)
-                    updated.textFurigana = value.textFurigana
+                    updated.textFurigana = highlight.textFurigana ?? value.textFurigana
                     records[id] = Timestamped(modified: now, value: updated)
                 }
             } else {
@@ -353,11 +449,13 @@ nonisolated enum SyncHighlightBridge {
         let live = records.compactMapValues { $0.value }
         guard live.count == local.count else { return false }
         return local.allSatisfy { highlight in
-            live[highlight.id.uuidString].map { matches($0, highlight) } ?? false
+            live[highlight.id.uuidString].map {
+                matches($0, highlight) && $0.textFurigana == highlight.textFurigana
+            } ?? false
         }
     }
 
-    private static func matches(_ value: SyncHighlight, _ highlight: Highlight) -> Bool {
+    static func matches(_ value: SyncHighlight, _ highlight: Highlight) -> Bool {
         // A color this build does not know is shown as yellow but must not be rewritten.
         let sameColor = HighlightColor(rawValue: value.color) == nil
             ? highlight.color == .yellow
@@ -365,6 +463,16 @@ nonisolated enum SyncHighlightBridge {
         return value.character == highlight.character
             && value.offset == highlight.offset
             && value.text == highlight.text
+            && (highlight.textFurigana == nil || value.textFurigana == highlight.textFurigana)
+            && sameColor
+    }
+
+    static func matches(_ first: SyncHighlight, _ second: SyncHighlight) -> Bool {
+        let sameColor = HighlightColor(rawValue: second.color) == nil
+            ? first.color == HighlightColor.yellow.rawValue : first.color == second.color
+        return first.character == second.character && first.offset == second.offset
+            && first.text == second.text
+            && (first.textFurigana == nil || first.textFurigana == second.textFurigana)
             && sameColor
     }
 }

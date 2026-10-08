@@ -156,6 +156,8 @@ final class NativeReaderModel: SyncOpenReader {
     var bookInfo = BookInfo(characterCount: 0, chapterInfo: [:])
     var index = 0
     var progress: Double = 0
+    var usesSharedSyncCoordinates = false
+    private var sharedCoordinates: EPUBSyncCoordinates?
     var isLoading = true
     var isGalleryIndexing = false
     var popups: [NativeReaderPopup] = []
@@ -163,9 +165,8 @@ final class NativeReaderModel: SyncOpenReader {
     var imageURL: URL?
     var highlights: [Highlight] = []
     var highlightRevision = 0
-    /// Until the open-time library sync finishes, a newer remote position may still move the
-    /// reader; afterwards the local position is never changed under the user.
-    private(set) var acceptsSyncedPosition = true
+    /// Ignore callbacks from the previous page until a synced bookmark finishes restoring.
+    private var applyingSyncedBookmark = false
     var loadRevision = 0
     var pendingFragment: String?
     var isTracking = false
@@ -338,6 +339,8 @@ final class NativeReaderModel: SyncOpenReader {
         } else {
             bookInfo = BookInfo(characterCount: 0, chapterInfo: [:])
         }
+        try? SyncStorage.shared.applyPendingCoordinates(key: SyncStorage.key(book.folder))
+        refreshSharedCoordinateMode(root: root)
         highlights = BookStorage.loadHighlights(root: root) ?? []
         setupSasayakiPlayer(rootURL: root)
         loadStatistics()
@@ -514,13 +517,11 @@ final class NativeReaderModel: SyncOpenReader {
         let librarySync = GoogleDriveSyncManager.shared
         if librarySync.enabled {
             await librarySync.sync(book: book)
-            acceptsSyncedPosition = false
             loadCurrentChapterState()
             resetTrackingBaseline()
             // Fushi interconnect is independent of the selected Google Drive provider.
             guard fushiAutoSyncEnabled else { return }
         }
-        acceptsSyncedPosition = false
         guard autoSyncEnabled || fushiAutoSyncEnabled else {
             resetTrackingBaseline()
             return
@@ -630,7 +631,55 @@ final class NativeReaderModel: SyncOpenReader {
               let chapterInfo = bookInfo.chapterInfo[item.path] else {
             return 0
         }
+        if let character = sharedCoordinates?.nativeCharacter(spineIndex: index, progress: progress) {
+            return character
+        }
         return chapterInfo.currentTotal + Int(Double(chapterInfo.chapterCount) * progress)
+    }
+
+    private func refreshSharedCoordinateMode(root: URL) {
+        let validated = SyncBookLedger.load(root: root).coordinateVersion == 1
+            ? SyncStorage.shared.sharedCoordinates(root: root) : nil
+        if let validated {
+            sharedCoordinates = validated
+        } else if document == nil {
+            sharedCoordinates = nil
+        }
+        // Pending replacement coordinates cannot project incoming wire state.
+        // The open extracted document keeps its validated basis until it closes,
+        // so waiting for the replacement does not reflow its current position.
+        usesSharedSyncCoordinates = sharedCoordinates != nil
+    }
+
+    /// New shared sessions use Hoshi's unit; historical session records remain unchanged.
+    private var statisticsCharacterPosition: Int {
+        guard let coordinates = sharedCoordinates,
+              let character = coordinates.canonicalCharacter(spineIndex: index, progress: progress) else {
+            return currentCharacter
+        }
+        return character
+    }
+
+    var displayedCharacterCount: Int { statisticsCharacterPosition }
+    var displayedBookInfo: BookInfo { sharedCoordinates?.canonicalBookInfo ?? bookInfo }
+    var displayedChapterCharactersRemaining: Int {
+        displayedProgressChapterRange.remaining(at: displayedCharacterCount)
+    }
+
+    func sharedHighlightSpineIndex(_ highlight: Highlight) -> Int? {
+        sharedCoordinates?.nativeHighlightSpineIndex(highlight)
+    }
+
+    var displayedProgressChapterRange: ReaderChapterIndex.ChapterRange {
+        guard let coordinates = sharedCoordinates else { return currentProgressChapterRange }
+        let info = coordinates.canonicalBookInfo
+        let items = document.map { BookProcessor.tableOfContentsItemPaths(in: $0.tableOfContents) } ?? []
+        let starts = ReaderChapterIndex.chapterStarts(tableOfContentsItems: items, bookInfo: info)
+        let spineStart = coordinates.canonicalCharacter(spineIndex: index, progress: 0) ?? 0
+        let spineEnd = spineStart + (coordinates.canonicalChapterCount(spineIndex: index) ?? 0)
+        let lookup = spineEnd > spineStart ? min(displayedCharacterCount, spineEnd - 1) : spineStart
+        return ReaderChapterIndex.chapterRange(containing: lookup, chapterStarts: starts,
+                                              bookCharacterCount: info.characterCount)
     }
 
     var currentTOCChapterRange: ReaderChapterIndex.ChapterRange {
@@ -724,7 +773,12 @@ final class NativeReaderModel: SyncOpenReader {
 
     func chapterHighlightsJSON() -> String? {
         guard let range = chapterRange else { return nil }
-        let list = highlights.filter { $0.character >= range.start && $0.character < range.end }
+        let list = highlights.filter { highlight in
+            if let coordinates = sharedCoordinates {
+                return coordinates.nativeHighlightSpineIndex(highlight) == index
+            }
+            return highlight.character >= range.start && highlight.character < range.end
+        }
         guard !list.isEmpty,
               let data = try? JSONEncoder().encode(list) else {
             return nil
@@ -733,23 +787,41 @@ final class NativeReaderModel: SyncOpenReader {
     }
 
     func updateProgress(_ newProgress: Double) {
+        guard !applyingSyncedBookmark else { return }
         progress = min(max(newProgress, 0), 1)
     }
 
     func saveBookmark(_ newProgress: Double) {
+        guard !applyingSyncedBookmark, !didPrepareForReaderLifecycleClose else { return }
         persistBookmark(newProgress)
         flushStats()
     }
 
     private func persistBookmark(_ newProgress: Double) {
-        guard let rootURL else { return }
+        guard !applyingSyncedBookmark, !didPrepareForReaderLifecycleClose, let rootURL else { return }
         updateProgress(newProgress)
         bridge.updateProgress(progress)
+        let stored = BookStorage.loadBookmark(root: rootURL)
+        let characterCount = currentCharacter
+        let coordinates = sharedCoordinates
+        // Native rounding may collapse distinct Hoshi positions, including
+        // chapters with no native characters. Timestamp the actual wire position.
+        let compareCanonical = coordinates != nil
+        let timestampCharacter = compareCanonical
+            ? (coordinates?.canonicalCharacter(spineIndex: index, progress: progress) ?? characterCount)
+            : characterCount
+        let previousTimestampCharacter = compareCanonical
+            ? stored.flatMap { coordinates?.canonicalCharacter(forNativeBookmark: $0) }
+            : stored?.characterCount
         let bookmark = Bookmark(
             chapterIndex: index,
             progress: progress,
-            characterCount: currentCharacter,
-            lastModified: Date()
+            characterCount: characterCount,
+            lastModified: ReaderBookmarkPersistencePolicy.modificationDate(
+                currentCharacterCount: timestampCharacter,
+                previousCharacterCount: previousTimestampCharacter,
+                previousModifiedDate: stored?.lastModified
+            )
         )
         let url = rootURL.appendingPathComponent(FileNames.bookmark)
         readerPersistenceLogger.notice(
@@ -892,7 +964,12 @@ final class NativeReaderModel: SyncOpenReader {
         )
     }
 
-    func handleRestoreCompleted() {
+    func handleRestoreCompleted(loadRevision restoredLoadRevision: Int) {
+        guard restoredLoadRevision == loadRevision, !didPrepareForReaderLifecycleClose else { return }
+        if applyingSyncedBookmark {
+            applyingSyncedBookmark = false
+            resetTrackingBaseline()
+        }
         if sasayakiPlayer?.hasAudio != true {
             sasayakiPlayer?.restoreAudio()
         }
@@ -974,6 +1051,7 @@ final class NativeReaderModel: SyncOpenReader {
     }
 
     func handleManualNavigation() {
+        guard !applyingSyncedBookmark else { return }
         readerStatisticsLogger.notice(
             "reader.statistics.pageTurn book=\(self.book.folder, privacy: .public) mode=\(self.statisticsAutostartMode.rawValue, privacy: .public) tracking=\(self.isTracking, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.currentCharacter, privacy: .public)"
         )
@@ -982,8 +1060,8 @@ final class NativeReaderModel: SyncOpenReader {
     }
 
     func updateStats() {
-        guard enableStatistics else { return }
-        let currentCharacter = currentCharacter
+        guard enableStatistics, !applyingSyncedBookmark else { return }
+        let currentCharacter = statisticsCharacterPosition
         let now = Date.now
         // A session belongs to the reporting day it started on. A Mac Reader can stay open
         // across the reset time, so close the old session and continue in a new one.
@@ -1019,7 +1097,7 @@ final class NativeReaderModel: SyncOpenReader {
 
     func resetTrackingBaseline() {
         lastTimestamp = .now
-        lastCount = currentCharacter
+        lastCount = statisticsCharacterPosition
         readerStatisticsLogger.notice(
             "reader.statistics.baseline book=\(self.book.folder, privacy: .public) chapter=\(self.index, privacy: .public) progress=\(self.progress, privacy: .public) current=\(self.lastCount, privacy: .public)"
         )
@@ -1048,14 +1126,30 @@ final class NativeReaderModel: SyncOpenReader {
         resetTrackingBaseline()
     }
 
-    /// Library sync applied remote statistics or highlights to this book's files. The reading
-    /// position is left alone while the book is open.
+    /// Apply the merged position while the Reader is open, matching Hoshi Reader's library sync.
+    /// The restored page must settle before callbacks can write a new local bookmark.
     func applySyncedState(bookmarkChanged: Bool) {
-        if bookmarkChanged && acceptsSyncedPosition {
-            reloadBookmark()
+        guard !didPrepareForReaderLifecycleClose, let rootURL else { return }
+        let previousCoordinateMode = usesSharedSyncCoordinates
+        refreshSharedCoordinateMode(root: rootURL)
+        if bookmarkChanged,
+           let bookmark = BookStorage.loadBookmark(root: rootURL),
+           let position = restoredBookmarkPosition(bookmark) {
+            applyingSyncedBookmark = true
+            index = position.spineIndex
+            progress = position.progress
+            pendingFragment = nil
+            currentSpinePage = nil
+            loadRevision += 1
+            isLoading = true
+            resetTrackingBaseline()
+            loadCurrentChapterState()
+        } else if previousCoordinateMode != usesSharedSyncCoordinates {
+            loadRevision += 1
+            isLoading = true
+            resetTrackingBaseline()
         }
         reloadStatisticsAfterExternalMutation()
-        guard let rootURL else { return }
         let stored = BookStorage.loadHighlights(root: rootURL) ?? []
         if stored != highlights {
             highlights = stored
@@ -1063,6 +1157,21 @@ final class NativeReaderModel: SyncOpenReader {
             loadRevision += 1
             isLoading = true
         }
+        if let player = sasayakiPlayer,
+           let playback = BookStorage.loadSasayakiPlayback(root: rootURL) {
+            let current = SyncPlayback(lastPosition: player.playback.lastPosition, delay: player.playback.delay, rate: Double(player.playback.rate))
+            let synced = SyncPlayback(lastPosition: playback.lastPosition, delay: playback.delay, rate: Double(playback.rate))
+            if !SyncStorage.samePlayback(current, synced) {
+                player.reloadPlayback()
+            }
+        }
+    }
+
+    private func restoredBookmarkPosition(_ bookmark: Bookmark) -> (spineIndex: Int, progress: Double)? {
+        if let document, document.spine.items.indices.contains(bookmark.chapterIndex), bookmark.progress.isFinite {
+            return (bookmark.chapterIndex, min(max(bookmark.progress, 0), 1))
+        }
+        return bookInfo.resolveCharacterPosition(bookmark.characterCount)
     }
 
     /// The book was deleted on another device: keep this session's statistics, then close.
@@ -1173,6 +1282,25 @@ final class NativeReaderModel: SyncOpenReader {
         pendingFragment = nil
         loadRevision += 1
         establishProgrammaticDestination(result.progress)
+        isLoading = true
+        popups.removeAll()
+        loadCurrentChapterState()
+    }
+
+    func jumpToHighlight(_ highlight: Highlight) {
+        guard let coordinates = sharedCoordinates else {
+            jumpToCharacter(highlight.character)
+            return
+        }
+        guard let destination = coordinates.nativeHighlightBookmark(highlight) else { return }
+        recordPosition()
+        flushStats()
+        sasayakiPlayer?.prepareTransition()
+        index = destination.chapterIndex
+        progress = destination.progress
+        pendingFragment = nil
+        loadRevision += 1
+        establishProgrammaticDestination(destination.progress)
         isLoading = true
         popups.removeAll()
         loadCurrentChapterState()
@@ -1801,6 +1929,7 @@ struct NativeReaderView: View {
         guard showsPageCount, userConfig.readerShowProgress || userConfig.readerShowChapterProgress else { return nil }
         return [
             "pages-v1",
+            "\(model.usesSharedSyncCoordinates)",
             "\(userConfig.verticalWriting)",
             "\(userConfig.readerTwoColumnHorizontalPages)",
             "\(userConfig.paragraphMode)",
@@ -1826,8 +1955,8 @@ struct NativeReaderView: View {
         let pages = showsPageCount ? model.pageProgress : nil
         if userConfig.readerShowProgress {
             let line = progressLine(
-                current: model.currentCharacter,
-                total: model.bookInfo.characterCount,
+                current: model.displayedCharacterCount,
+                total: model.displayedBookInfo.characterCount,
                 pages: pages.map { ($0.page, $0.total) }
             )
             if !line.isEmpty {
@@ -1835,9 +1964,9 @@ struct NativeReaderView: View {
             }
         }
         if userConfig.readerShowChapterProgress {
-            let chapter = model.currentProgressChapterRange
+            let chapter = model.displayedProgressChapterRange
             let line = progressLine(
-                current: chapter.character(at: model.currentCharacter),
+                current: chapter.character(at: model.displayedCharacterCount),
                 total: chapter.count,
                 pages: pages.map { ($0.chapterPage, $0.chapterTotal) }
             )
@@ -1886,6 +2015,11 @@ struct NativeReaderView: View {
         userConfig.enableSasayaki
             && model.sasayakiPlayer?.hasAudio == true
             && model.sasayakiPlayer?.hasMatch == true
+    }
+
+    private var sharedHighlightSpineResolver: ((Highlight) -> Int?)? {
+        guard model.usesSharedSyncCoordinates else { return nil }
+        return { highlight in model.sharedHighlightSpineIndex(highlight) }
     }
 
     private func navigateBackward() {
@@ -2028,7 +2162,9 @@ struct NativeReaderView: View {
                         chapterURL: chapterURL,
                         readAccessURL: readAccessURL,
                         reloadID: readerIdentity,
+                        loadRevision: model.loadRevision,
                         progress: model.progress,
+                        sharedSyncCoordinates: model.usesSharedSyncCoordinates,
                         bridge: model.bridge,
                         bridgeCommandCount: model.bridge.pendingCommands.count,
                         userConfig: userConfig,
@@ -2072,8 +2208,8 @@ struct NativeReaderView: View {
                                 model.closePopup()
                             }
                         },
-                        onRestoreCompleted: {
-                            model.handleRestoreCompleted()
+                        onRestoreCompleted: { restoredLoadRevision in
+                            model.handleRestoreCompleted(loadRevision: restoredLoadRevision)
                         },
                         onImageTapped: { url in
                             model.imageURL = url
@@ -2092,8 +2228,8 @@ struct NativeReaderView: View {
                         hoverLookupDelayMs: userConfig.desktopLookupHoverDelayMs,
                         isLookupPopupVisible: model.popup != nil,
                         contentLanguage: profileRepository.activeProfile.language,
-                        currentCharacter: model.currentCharacter,
-                        bookCharacterCount: model.bookInfo.characterCount,
+                        currentCharacter: model.displayedCharacterCount,
+                        bookCharacterCount: model.displayedBookInfo.characterCount,
                         showStatisticsMetrics: userConfig.enableStatistics,
                         showStatisticsButton: userConfig.enableStatistics,
                         isStatisticsTracking: model.isTracking,
@@ -2250,8 +2386,10 @@ struct NativeReaderView: View {
             let closeRequestID = notification.userInfo?[ReaderWindowCoordinator.closeRequestIDUserInfoKey] as? UUID
             guard closeRequestID == requestID else {
                 suppressReaderLifecycleCloseOnDisappear = true
+                let requestDescription = requestID.uuidString
+                let closingDescription = closeRequestID?.uuidString ?? "nil"
                 readerPersistenceLogger.notice(
-                    "reader.lifecycle.windowWillClose.ignored book=\(model.book.folder, privacy: .public) requestID=\(requestID.uuidString, privacy: .public) closeRequestID=\(closeRequestID?.uuidString ?? "nil", privacy: .public)"
+                    "reader.lifecycle.windowWillClose.ignored book=\(model.book.folder, privacy: .public) requestID=\(requestDescription, privacy: .public) closeRequestID=\(closingDescription, privacy: .public)"
                 )
                 return
             }
@@ -2301,7 +2439,7 @@ struct NativeReaderView: View {
                             activeSheet = nil
                         },
                         onHighlightJump: { highlight in
-                            model.jumpToCharacter(highlight.character)
+                            model.jumpToHighlight(highlight)
                             activeSheet = nil
                         },
                         onHighlightDelete: { highlight in
@@ -2309,7 +2447,8 @@ struct NativeReaderView: View {
                         },
                         onDismiss: {
                             activeSheet = nil
-                        }
+                        },
+                        highlightSpineIndex: sharedHighlightSpineResolver
                     )
                 }
                 .transition(.move(edge: .leading).combined(with: .opacity))
@@ -3971,9 +4110,9 @@ private struct NativeReaderStatisticsSheet: View {
             sessionStatistics: model.sessionStatistics,
             todaysStatistics: model.todaysStatistics,
             allTimeStatistics: model.allTimeStatistics,
-            bookCharacterCount: model.bookInfo.characterCount,
-            currentCharacter: model.currentCharacter,
-            chapterCharactersRemaining: model.currentChapterCharactersRemaining,
+            bookCharacterCount: model.displayedBookInfo.characterCount,
+            currentCharacter: model.displayedCharacterCount,
+            chapterCharactersRemaining: model.displayedChapterCharactersRemaining,
             contentLanguage: contentLanguage,
             isTracking: model.isTracking,
             onStart: model.startTracking,
@@ -4145,7 +4284,9 @@ struct NativeReaderWebView: NSViewRepresentable {
     let chapterURL: URL
     let readAccessURL: URL
     let reloadID: String
+    let loadRevision: Int
     let progress: Double
+    var sharedSyncCoordinates: Bool = false
     let bridge: WebViewBridge
     let bridgeCommandCount: Int
     let userConfig: UserConfig
@@ -4177,7 +4318,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     var onTextSelected: (SelectionData) -> Int?
     var onHighlightCreated: (HighlightColor, HighlightData) -> Void
     var onTapOutside: () -> Void
-    var onRestoreCompleted: () -> Void
+    var onRestoreCompleted: (Int) -> Void
     var onImageTapped: (URL) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -4205,7 +4346,7 @@ struct NativeReaderWebView: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
         context.coordinator.webView = webView
         context.coordinator.reloadID = reloadID
-        webView.loadFileURL(chapterURL, allowingReadAccessTo: readAccessURL)
+        context.coordinator.loadVisibleChapter(webView)
         return webView
     }
 
@@ -4224,7 +4365,7 @@ struct NativeReaderWebView: NSViewRepresentable {
             context.coordinator.reloadID = reloadID
             context.coordinator.pendingProgress = progress
             (webView as? NativeReaderWKWebView)?.relinquishTextInputFocus()
-            webView.loadFileURL(chapterURL, allowingReadAccessTo: readAccessURL)
+            context.coordinator.loadVisibleChapter(webView)
         }
         context.coordinator.updatePageMeasurement()
         if let navigation = pageNavigation,
@@ -4241,6 +4382,7 @@ struct NativeReaderWebView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        coordinator.invalidateVisibleRestore()
         (webView as? NativeReaderWKWebView)?.relinquishTextInputFocus()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "textSelected")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "restoreCompleted")
@@ -4258,6 +4400,8 @@ struct NativeReaderWebView: NSViewRepresentable {
         weak var webView: WKWebView?
         var reloadID = ""
         var pendingProgress: Double
+        private var visibleNavigation: WKNavigation?
+        private var visibleRestore: ReaderRestoreIdentity?
         var lastNavigationRequestID: UUID?
         private var shouldSyncProgressAfterRestore = false
         private var hasSyncedTextColor = false
@@ -4272,6 +4416,16 @@ struct NativeReaderWebView: NSViewRepresentable {
         init(_ parent: NativeReaderWebView) {
             self.parent = parent
             self.pendingProgress = parent.progress
+        }
+
+        fileprivate func loadVisibleChapter(_ webView: WKWebView) {
+            invalidateVisibleRestore()
+            visibleNavigation = webView.loadFileURL(parent.chapterURL, allowingReadAccessTo: parent.readAccessURL)
+        }
+
+        fileprivate func invalidateVisibleRestore() {
+            visibleNavigation = nil
+            visibleRestore = nil
         }
 
         private static func cgFloatValue(_ value: Any?) -> CGFloat? {
@@ -4358,13 +4512,18 @@ struct NativeReaderWebView: NSViewRepresentable {
                 parent.onProgressChanged(progress)
                 parent.onSaveBookmark(progress)
             case "restoreCompleted":
+                guard message.webView === webView,
+                      let restore = visibleRestore,
+                      restore.accepts(token: message.body as? String, loadRevision: parent.loadRevision, reloadID: parent.reloadID) else {
+                    return
+                }
                 message.webView?.alphaValue = 1
                 message.webView?.evaluateJavaScript(textAnimationScript) { _, _ in }
                 if shouldSyncProgressAfterRestore {
                     shouldSyncProgressAfterRestore = false
                     syncInternalJumpProgress()
                 }
-                completeRestore()
+                completeRestore(restore)
             case "tapOutside":
                 parent.onTapOutside()
             case "imageTapped":
@@ -4420,7 +4579,11 @@ struct NativeReaderWebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            injectReader(into: webView, measuringPages: webView === pagesWebView)
+            if webView === pagesWebView {
+                injectReader(into: webView, measuringPages: true)
+            } else if webView === self.webView, let navigation, navigation === visibleNavigation {
+                injectReader(into: webView)
+            }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -4534,6 +4697,10 @@ struct NativeReaderWebView: NSViewRepresentable {
         }
 
         private func injectReader(into webView: WKWebView, measuringPages: Bool = false) {
+            let restore = ReaderRestoreIdentity(token: UUID().uuidString, loadRevision: parent.loadRevision, reloadID: parent.reloadID)
+            if !measuringPages {
+                visibleRestore = restore
+            }
             let writingMode = parent.userConfig.verticalWriting ? "vertical-rl" : "horizontal-tb"
             let pageWidth = max(Int(parent.viewSize.width.rounded()), 1)
             let pageHeight = max(Int(parent.viewSize.height.rounded()), 1)
@@ -4886,6 +5053,7 @@ struct NativeReaderWebView: NSViewRepresentable {
 
             let script = """
             (function() {
+                window.hoshiReaderRestoreToken = \(Self.javaScriptStringLiteral(restore.token));
                 var viewport = document.querySelector('meta[name="viewport"]');
                 if (viewport) { viewport.remove(); }
                 var newViewport = document.createElement('meta');
@@ -4905,6 +5073,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                 \(selectionScript)
                 window.hoshiSelection.language = '\(parent.contentLanguageID)';
                 \(readerScript)
+                window.hoshiReader.sharedSyncCoordinates = \(parent.sharedSyncCoordinates);
                 \(highlightsScript)
                 \(paragraphScript)
                 const lookupScanLength = \(parent.userConfig.scanLength);
@@ -5019,7 +5188,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                     if (!selected) { webkit.messageHandlers.tapOutside.postMessage(null); }
                 }, true);
                 let restoreFallback = setTimeout(() => {
-                    window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
+                    window.webkit?.messageHandlers?.restoreCompleted?.postMessage(\(Self.javaScriptStringLiteral(restore.token)));
                 }, 2500);
                 Promise.all(imagePromises)
                     .then(() => new Promise(resolve => setTimeout(resolve, 50)))
@@ -5032,7 +5201,7 @@ struct NativeReaderWebView: NSViewRepresentable {
                     })
                     .catch(error => {
                         console.error('Native reader restore failed', error);
-                        window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
+                        window.webkit?.messageHandlers?.restoreCompleted?.postMessage(\(Self.javaScriptStringLiteral(restore.token)));
                     })
                     .finally(() => clearTimeout(restoreFallback));
             })();
@@ -5047,23 +5216,29 @@ struct NativeReaderWebView: NSViewRepresentable {
 
             webView.alphaValue = 0
             webView.evaluateJavaScript(script) { [weak self] _, error in
-                guard let self else { return }
+                guard let self, self.visibleRestore == restore,
+                      restore.accepts(token: restore.token, loadRevision: self.parent.loadRevision, reloadID: self.parent.reloadID) else { return }
                 if let error {
                     print("NativeReaderWebView injection error: \(error.localizedDescription)")
                     webView.alphaValue = 1
-                    self.parent.onRestoreCompleted()
+                    self.completeRestore(restore)
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self, weak webView] in
-                guard let self, let webView, webView.alphaValue == 0 else { return }
+                guard let self, let webView, webView === self.webView, webView.alphaValue == 0,
+                      self.visibleRestore == restore,
+                      restore.accepts(token: restore.token, loadRevision: self.parent.loadRevision, reloadID: self.parent.reloadID) else { return }
                 print("NativeReaderWebView restore fallback")
                 webView.alphaValue = 1
-                self.parent.onRestoreCompleted()
+                self.completeRestore(restore)
             }
         }
 
-        private func completeRestore() {
-            parent.onRestoreCompleted()
+        private func completeRestore(_ restore: ReaderRestoreIdentity) {
+            guard visibleRestore == restore,
+                  restore.accepts(token: restore.token, loadRevision: parent.loadRevision, reloadID: parent.reloadID) else { return }
+            visibleRestore = nil
+            parent.onRestoreCompleted(restore.loadRevision)
         }
 
         fileprivate func navigate(_ direction: NativeReaderNavigationDirection) {

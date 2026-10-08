@@ -318,7 +318,9 @@ class BookshelfViewModel {
             let bookInfo = BookStorage.loadBookInfo(root: root)
             let bookmark = BookStorage.loadBookmark(root: root)
             
-            if let total = bookInfo?.characterCount ?? book.characterCount, total > 0,
+            if let shared = SyncStorage.shared.sharedProgress(root: root, bookmark: bookmark) {
+                bookProgress[book.id] = shared
+            } else if let total = bookInfo?.characterCount ?? book.characterCount, total > 0,
                let current = bookmark?.characterCount {
                 bookProgress[book.id] = Double(current) / Double(total)
             } else {
@@ -364,6 +366,12 @@ class BookshelfViewModel {
     }
 
     /// Opens a book that only exists on Google Drive after downloading its EPUB.
+    func needsBookDownload(_ book: BookMetadata) -> Bool {
+        if book.epub == nil { return true }
+        return GoogleDriveSyncManager.shared.enabled
+            && SyncStorage.shared.needsEPUBDownload(key: SyncStorage.key(book.folder))
+    }
+
     func downloadBook(_ book: BookMetadata, onOpen: @escaping (BookMetadata) -> Void) {
         guard downloadingBooks[book.id] == nil else { return }
         let sync = GoogleDriveSyncManager.shared

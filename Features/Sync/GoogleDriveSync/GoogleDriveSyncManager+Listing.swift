@@ -22,9 +22,12 @@ final class DriveListing {
 extension GoogleDriveSyncManager {
     func listFiles() async throws -> DriveListing {
         let listing = DriveListing()
-        let listed = try await drive.list(query: "'me' in owners")
+        let books = try await drive.children(parent: cache.bookFolder).filter(\.isFolder)
+        let generations = try await drive.children(parents: books.map(\.id)).filter(\.isFolder)
+        let files = try await drive.children(parents: generations.map(\.id))
+        let listed = books + generations + files
         let keys = Dictionary(
-            listed.filter { $0.parents?.contains(cache.bookFolder) == true }.map { ($0.id, $0.name) },
+            books.map { ($0.id, $0.name.precomposedStringWithCanonicalMapping) },
             uniquingKeysWith: { first, _ in first }
         )
         listing.listed = true
@@ -56,7 +59,7 @@ extension GoogleDriveSyncManager {
         cache.bookFolders?["\(key)/\(generation)"] = nil
     }
 
-    func upload(_ listing: DriveListing, key: String, generation: Int, name: String, data: Data) async throws {
+    func upload(_ listing: DriveListing, key: String, generation: Int, name: String, file: URL) async throws {
         var (book, folder) = try await resolveFolder(listing, key: key, generation: generation)
         if folder == nil {
             if book == nil {
@@ -74,9 +77,9 @@ extension GoogleDriveSyncManager {
             return
         }
         if listing.listed || listing.created.contains(folder) {
-            try await GoogleDriveClient.shared.write(data: data, name: name, parent: folder)
+            try await GoogleDriveClient.shared.write(file: file, name: name, parent: folder)
         } else {
-            try await drive.upload(data: data, fileName: name, folder: folder)
+            try await drive.upload(file: file, fileName: name, folder: folder)
         }
     }
 

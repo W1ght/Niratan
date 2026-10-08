@@ -2,6 +2,24 @@
 
 This changelog records user-visible changes only. Implementation details, investigation logs, and temporary experiments belong in commits, issues, or focused design docs.
 
+## 2.0.2
+
+### 中文
+
+- Google Drive 同步改为使用 Google 账号登录并连接现有 Hoshi Reader 书库，无需填写客户端 ID。无法访问该书库时会显示原因，不再另建独立书库；旧 Niratan 云端目录会保留。
+- Google Drive 暂时限流或服务异常时保留登录凭据，可重试同步。
+- 同步后的较新阅读位置会应用到已打开的阅读器，同一位置重复保存不会刷新时间戳。阅读会话、高亮振假名和有声书播放位置按 Hoshi 的同步记录保存，旧统计迁移避免重复累计，并保留归档历史。
+- 修复 EPUB 字符实体、引号和韩文导致的跨设备进度差异；同步保留 Hoshi 原始位置并换算到对应章节，全韩文章节也可恢复书签和定位高亮。云端替换 EPUB 后会重建索引再应用位置；本地副本丢失时可重新下载，不会移除云端 EPUB。
+- 恢复阅读位置时会定位到段落内的目标文字，避免跳到相邻页；同步有声书位置和倍速时，已打开的阅读器也会更新。
+
+### English
+
+- Google Drive sync signs in with a Google account and connects to the existing Hoshi Reader library without asking for a client ID. Inaccessible libraries produce an error instead of creating a separate library; the former Niratan cloud folder is retained.
+- Temporary Google Drive rate limits or service failures preserve the saved authorization so syncing can be retried.
+- Newer synced bookmarks also apply to an open Reader, and saving the same position preserves its timestamp. Reading sessions, highlight furigana and audiobook playback use Hoshi's sync records; older statistics migrate without duplicating shared totals, and archived history is kept.
+- Fix cross-device EPUB progress differences caused by character entities, quotes and Korean text. Sync preserves Hoshi's original position and projects it to the corresponding chapter, including bookmarks and highlight navigation in Korean-only chapters. Opening a replaced cloud EPUB rebuilds its index before applying the position. A missing local copy can be downloaded again without removing the cloud EPUB.
+- Restoring a reading position targets the character within a paragraph, avoiding the adjacent page. Synced audiobook positions and playback rates also update an open Reader.
+
 ## 2.0.1
 
 ### 中文

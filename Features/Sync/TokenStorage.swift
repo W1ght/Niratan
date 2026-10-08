@@ -13,12 +13,23 @@ struct GoogleDriveCredentials: Codable, Equatable {
     let accessToken: String
     let refreshToken: String
     let clientId: String
+    let clientSecret: String?
+
+    init(accessToken: String, refreshToken: String, clientId: String, clientSecret: String? = nil) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.clientId = clientId
+        self.clientSecret = clientSecret
+    }
 }
 
 class TokenStorage {
     private static let credentialsAccount = DevelopmentDataIsolation.keychainName("googleDriveCredentials")
     private static let credentialsPresenceKey = "GoogleDriveCredentialsStored"
-    private static let legacyCredentialAccounts = ["accessToken", "refreshToken", "clientId"]
+    private static let legacyAccessTokenAccount = DevelopmentDataIsolation.keychainName("accessToken")
+    private static let legacyRefreshTokenAccount = DevelopmentDataIsolation.keychainName("refreshToken")
+    private static let legacyClientIdAccount = DevelopmentDataIsolation.keychainName("clientId")
+    private static let legacyCredentialAccounts = [legacyAccessTokenAccount, legacyRefreshTokenAccount, legacyClientIdAccount]
 
     static var hasStoredCredentials: Bool {
         if let storedValue = UserDefaults.standard.object(forKey: credentialsPresenceKey) as? Bool {
@@ -42,13 +53,16 @@ class TokenStorage {
             kSecAttrAccount as String: credentialsAccount,
             kSecValueData as String: data
         ]
-        SecItemDelete(query as CFDictionary)
-        let status = SecItemAdd(item as CFDictionary, nil)
+        // A failed reconnect must not delete the still-valid previous authorization.
+        // Update the existing item in place, creating it only when none exists.
+        var status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(item as CFDictionary, nil)
+        }
         if status == errSecSuccess {
             UserDefaults.standard.set(true, forKey: credentialsPresenceKey)
             return true
         }
-        UserDefaults.standard.removeObject(forKey: credentialsPresenceKey)
         return false
     }
 
@@ -92,9 +106,9 @@ class TokenStorage {
 
     private static func getLegacyCredentials() -> GoogleDriveCredentials? {
         guard
-            let accessToken = getString(for: "accessToken"),
-            let refreshToken = getString(for: "refreshToken"),
-            let clientId = getString(for: "clientId")
+            let accessToken = getString(for: legacyAccessTokenAccount),
+            let refreshToken = getString(for: legacyRefreshTokenAccount),
+            let clientId = getString(for: legacyClientIdAccount)
         else {
             return nil
         }

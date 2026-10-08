@@ -7,6 +7,8 @@
 //
 
 import Foundation
+import EPUBKit
+import ZIPFoundation
 
 extension GoogleDriveSyncManager {
     func runFileSync() async throws -> Bool {
@@ -115,6 +117,9 @@ extension GoogleDriveSyncManager {
         }
         try Task.checkCancellation()
 
+        let requestedSource = store.state.books[key].map {
+            SyncCoordinateSource(generation: $0.generation, epub: $0.files[.epub])
+        }
         let root = try BookStorage.getBooksDirectory().appendingPathComponent(book.folder)
         if store.state.books[key]?.deleted == true {
             throw GoogleDriveError.apiError(String(localized: "This book was deleted."), statusCode: nil)
@@ -123,16 +128,48 @@ extension GoogleDriveSyncManager {
             try await downloadFile(key: key, fileType: .epub, listing: DriveListing(), onProgress: onProgress)
         }
         try Task.checkCancellation()
+        guard let current = store.state.books[key], !current.deleted,
+              SyncCoordinateSource(generation: current.generation, epub: current.files[.epub]) == requestedSource,
+              !store.needsEPUBDownload(key: key) else { throw CancellationError() }
 
         let metadata = BookStorage.loadMetadata(root: root) ?? book
         guard let epub = metadata.epub else {
             throw GoogleDriveError.apiError(String(localized: "This book has not been uploaded yet."), statusCode: nil)
         }
         if BookStorage.loadBookInfo(root: root) == nil {
-            let document = try BookStorage.loadEpub(root.appendingPathComponent(epub))
-            try BookStorage.save(BookProcessor.process(document: document), inside: root, as: FileNames.bookinfo)
+            try BookStorage.save(indexDownloadedEPUB(root.appendingPathComponent(epub)), inside: root, as: FileNames.bookinfo)
         }
+        try store.applyPendingCoordinates(key: key)
         return metadata
+    }
+
+    /// Validate downloaded media before replacement, without removing an open
+    /// Reader's extraction directory or changing any existing sidecar.
+    private func indexDownloadedEPUB(_ epubURL: URL) throws -> BookInfo {
+        let extraction = FileManager.default.temporaryDirectory
+            .appendingPathComponent("niratan-downloaded-epub-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: extraction, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: extraction) }
+        try FileManager.default.unzipItem(at: epubURL, to: extraction)
+        let document = try EPUBParser().parse(documentAt: extraction)
+        let extractionPath = extraction.resolvingSymlinksInPath().path + "/"
+        guard !document.spine.items.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+        for item in document.spine.items {
+            guard let manifest = document.manifest.items[item.idref] else { throw CocoaError(.fileReadCorruptFile) }
+            let chapter = document.contentDirectory.appendingPathComponent(manifest.path)
+            guard chapter.resolvingSymlinksInPath().path.hasPrefix(extractionPath),
+                  (try? String(contentsOf: chapter, encoding: .utf8)) != nil else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+        }
+        let info = BookProcessor.process(document: document)
+        for (index, item) in document.spine.items.enumerated() {
+            guard let manifest = document.manifest.items[item.idref],
+                  info.chapterInfo[manifest.path]?.spineIndex == index else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+        }
+        return info
     }
 
     private func uploadFile(key: String, fileType: SyncFileType, listing: DriveListing) async throws {
@@ -155,15 +192,10 @@ extension GoogleDriveSyncManager {
 
         let fileName = url.lastPathComponent.precomposedStringWithCanonicalMapping
         let name = fileType == .sasayaki ? "\(source)-\(fileName)" : fileName
-        let data = try await Task.detached {
-            try Data(contentsOf: url)
-        }.value
-        try Task.checkCancellation()
-
         if !canPublish(key: key, fileType: fileType, source: source, generation: record.generation) {
             return
         }
-        try await upload(listing, key: key, generation: record.generation, name: name, data: data)
+        try await upload(listing, key: key, generation: record.generation, name: name, file: url)
         try Task.checkCancellation()
         if !canPublish(key: key, fileType: fileType, source: source, generation: record.generation) {
             return
@@ -197,7 +229,8 @@ extension GoogleDriveSyncManager {
         }
         guard let reference = record.files[fileType] else { return }
         if let source = record.sources[fileType], source >= reference.modified {
-            return
+            guard fileType == .epub else { return }
+            guard try store.sourceURL(key: key, fileType: .epub) == nil else { return }
         }
 
         let root = try SyncStorage.bookDirectory(folder: key, archived: record.deleted)
@@ -227,8 +260,14 @@ extension GoogleDriveSyncManager {
             return
         }
         if let source = current.sources[fileType], source >= reference.modified {
-            return
+            guard fileType == .epub else { return }
+            guard try store.sourceURL(key: key, fileType: .epub) == nil else { return }
         }
+
+        // A malformed download must leave the old EPUB, index and source
+        // timestamp intact so reopening can retry the pending reference.
+        let downloadedInfo = fileType == .epub ? try indexDownloadedEPUB(temporary) : nil
+        try Task.checkCancellation()
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let fileName = fileType == .sasayaki ? FileNames.sasayakiMatch : name
@@ -240,11 +279,20 @@ extension GoogleDriveSyncManager {
         }
         let relative = "Books/" + (record.deleted ? "\(SyncStorage.archiveFolder)/" : "") + root.lastPathComponent + "/" + fileName
         try applyDownloadedFile(key: key, fileType: fileType, path: relative, reference: reference)
+        if let downloadedInfo {
+            try BookStorage.save(downloadedInfo, inside: root, as: FileNames.bookinfo)
+        }
     }
 
     private func applyDownloadedFile(key: String, fileType: SyncFileType, path: String?, reference: Timestamped<String?>) throws {
         guard let record = store.state.books[key] else { return }
         let root = try SyncStorage.bookDirectory(folder: key, archived: record.deleted)
+
+        if fileType == .epub, path != nil, record.sources[.epub] != reference.modified {
+            // The open model owns the old extracted document. Close that session
+            // before rebuilding its index and applying positions from the new EPUB.
+            SyncReaderBridge.model(for: key)?.closeForSyncedDeletion()
+        }
 
         if let existing = BookStorage.loadMetadata(root: root), fileType != .sasayaki {
             let oldPath: URL? = fileType == .epub ? existing.epub.map { root.appendingPathComponent($0) } : existing.coverURL

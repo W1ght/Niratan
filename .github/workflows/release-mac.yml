@@ -46,6 +46,15 @@ jobs:
           # Tests needing an Xcode build or bootstrapped video libraries report SKIP.
           bash script/run_tests.sh
 
+      - name: Set up Node for Reader regressions
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify Reader restore positions
+        shell: bash
+        run: node script/test_reader_restore_position.mjs
+
   build-mac:
     name: Build DMG
     needs: release-validation
@@ -121,9 +130,38 @@ jobs:
             "$keychain_path"
           security find-identity -v -p codesigning "$keychain_path"
 
+      - name: Configure private Google sign-in build settings
+        shell: bash
+        env:
+          HOSHI_READER_GOOGLE_CLIENT_ID: ${{ secrets.HOSHI_READER_GOOGLE_CLIENT_ID }}
+          HOSHI_READER_GOOGLE_CLIENT_SECRET: ${{ secrets.HOSHI_READER_GOOGLE_CLIENT_SECRET }}
+        run: |
+          configuration_path="$RUNNER_TEMP/hoshi-google-signin.xcconfig"
+          python3 script/configure_hoshi_google_signin.py --output "$configuration_path"
+          echo "XCODE_XCCONFIG_FILE=$configuration_path" >> "$GITHUB_ENV"
+
       - name: Build DMG
         shell: bash
+        env:
+          HOSHI_READER_GOOGLE_CLIENT_ID: ${{ secrets.HOSHI_READER_GOOGLE_CLIENT_ID }}
+          HOSHI_READER_GOOGLE_CLIENT_SECRET: ${{ secrets.HOSHI_READER_GOOGLE_CLIENT_SECRET }}
         run: script/package_mac.sh "${{ steps.version.outputs.version }}"
+
+      - name: Verify shared-library regressions against built modules
+        shell: bash
+        env:
+          HOSHI_TEST_PRODUCTS: ${{ github.workspace }}/release/DerivedData/Build/Products/Release
+        run: |
+          for test_name in epub_sync_coordinates library_sync_model library_sync_storage library_sync_coordinates; do
+            test_log="$(mktemp "$RUNNER_TEMP/hoshi-shared-sync-test.XXXXXX")"
+            bash script/run_tests.sh "$test_name" | tee "$test_log"
+            if grep -E -q '^SKIP[[:space:]]' "$test_log" \
+              || ! grep -E -q "^PASS[[:space:]]+test_${test_name}$" "$test_log"; then
+              echo "Shared-library release regression did not pass: $test_name" >&2
+              exit 1
+            fi
+            rm -f "$test_log"
+          done
 
       - name: Verify animated AVIF runtime
         shell: bash

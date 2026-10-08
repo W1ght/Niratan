@@ -166,7 +166,34 @@ class SasayakiPlayer {
         delay = playback.delay
         rate = playback.rate
         lastUpdate = Int(currentTime.rounded(.down))
-        isRestoring = false
+        seekGeneration += 1
+        let generation = seekGeneration
+        stopPlaybackTime = nil
+        pendingSeekPosition = nil
+        guard let player else {
+            isRestoring = false
+            return
+        }
+
+        let target = currentTime
+        pendingSeekPosition = target
+        player.defaultRate = rate
+        if isPlaying {
+            player.rate = rate
+        }
+        player.seek(
+            to: CMTime(seconds: target, preferredTimescale: 600),
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        ) { [weak self] finished in
+            Task { @MainActor [weak self] in
+                guard let self, self.seekGeneration == generation else { return }
+                self.isRestoring = false
+                if finished {
+                    self.pendingSeekPosition = nil
+                }
+            }
+        }
     }
 
     func updateMatchData(_ matchData: SasayakiMatchData) {
@@ -391,6 +418,8 @@ class SasayakiPlayer {
             "sasayaki.teardown.start book=\(self.rootURL.lastPathComponent, privacy: .public) current=\(self.currentTime, privacy: .public) pending=\(self.pendingSeekPosition.map { String(format: "%.3f", $0) } ?? "nil", privacy: .public) playing=\(self.isPlaying, privacy: .public)"
         )
         flushPlayback()
+        seekGeneration += 1
+        isRestoring = false
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         
@@ -603,6 +632,7 @@ class SasayakiPlayer {
     }
     
     private func tick(_ seconds: Double) {
+        guard !isRestoring else { return }
         if let pendingSeekPosition {
             guard abs(seconds - pendingSeekPosition) <= seekLandingTolerance else { return }
             self.pendingSeekPosition = nil
@@ -640,6 +670,7 @@ class SasayakiPlayer {
         
         seekGeneration += 1
         let generation = seekGeneration
+        isRestoring = false
         pendingSeekPosition = seconds
         sasayakiPersistenceLogger.notice(
             "sasayaki.seek.request book=\(self.rootURL.lastPathComponent, privacy: .public) target=\(seconds, privacy: .public) generation=\(generation, privacy: .public) startPlayback=\(startPlayback, privacy: .public) updateCue=\(updateCue, privacy: .public) stopPlaybackTime=\(stopPlaybackTime ?? -1, privacy: .public)"
