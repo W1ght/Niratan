@@ -258,15 +258,36 @@ enum ReaderLyricsModeContractTest {
             "if model.popup != nil {\n                                model.closePopup()\n                            }",
             "tapping blank lyrics space should close the current popup instead of leaving it open"
         )
-        assertContains(
+        let lyricsProgressBindings = sourceSection(
             nativeReader,
+            from: "if displayMode == .lyrics, let player = model.sasayakiPlayer {",
+            to: "popupLayer(screenSize: geometry.size)",
+            "lyrics progress bindings should belong to the actual lyrics layer"
+        )
+        assertContains(
+            lyricsProgressBindings,
+            "currentCharacter: model.displayedCharacterCount",
+            "lyrics progress should use the displayed coordinate unit for its current position"
+        )
+        assertContains(
+            lyricsProgressBindings,
+            "bookCharacterCount: model.displayedBookInfo.characterCount",
+            "lyrics progress should use the same displayed coordinate unit for its total"
+        )
+        assertNotContains(
+            lyricsProgressBindings,
             "currentCharacter: model.currentCharacter",
-            "lyrics mode should receive the Reader character position for progress display"
+            "lyrics progress must not combine a native position with the shared canonical total"
+        )
+        assertNotContains(
+            lyricsProgressBindings,
+            "bookCharacterCount: model.bookInfo.characterCount",
+            "lyrics progress must not combine the canonical position with a native total"
         )
         assertContains(
             nativeReader,
-            "bookCharacterCount: model.bookInfo.characterCount",
-            "lyrics mode should receive the total book character count for progress display"
+            "var displayedBookInfo: BookInfo { sharedCoordinates?.canonicalBookInfo ?? bookInfo }",
+            "displayed counts should retain the native basis for ordinary local books"
         )
         assertContains(
             nativeReader,

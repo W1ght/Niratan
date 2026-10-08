@@ -40,11 +40,15 @@ let releaseScript = try source("script/release_mac.sh")
 let releaseWorkflow = try source(".github/workflows/release-mac.yml")
 let updateChecker = try source("Util/Extensions.swift")
 let readme = try source("README.md")
+let syncView = try source("Features/Settings/SyncView.swift")
+let libraryCache = try source("Features/Sync/GoogleDriveSync/GoogleDriveSyncCache.swift")
+let libraryHandler = try source("Features/Sync/GoogleDriveSync/GoogleDriveSyncHandler.swift")
 
 requireContains(project, "/* Niratan.app */", "build product should be Niratan.app")
 requireContains(project, "name = \"Niratan\";", "native target should be named Niratan")
 requireContains(project, "productName = \"Niratan\";", "native target product should be named Niratan")
 requireContains(project, "INFOPLIST_KEY_CFBundleDisplayName = \"Niratan\";", "display name should be Niratan")
+requireNotContains(project, "INFOPLIST_KEY_CFBundleDisplayName = \"Hoshi Reader\";", "the shared library name must not replace the app display name")
 requireContains(project, "PRODUCT_BUNDLE_IDENTIFIER = moe.shishamo.hoshi;", "bundle id should remain stable for user data compatibility")
 requireNotContains(project, "Hoshi Reader.app", "project file should not refer to the old app bundle name")
 
@@ -86,7 +90,20 @@ else {
     exit(1)
 }
 require(localizedStrings["Niratan"] != nil, "Localizable.xcstrings should expose the Niratan app label")
-require(localizedStrings["Hoshi Reader"] == nil, "Localizable.xcstrings should not keep the old app label key")
+func localizedValue(_ key: String, language: String) -> String? {
+    let entry = localizedStrings[key] as? [String: Any]
+    let localizations = entry?["localizations"] as? [String: Any]
+    let localization = localizations?[language] as? [String: Any]
+    let unit = localization?["stringUnit"] as? [String: Any]
+    return unit?["value"] as? String
+}
+for language in ["en", "zh-Hans", "zh-Hant"] {
+    require(localizedValue("Niratan", language: language) == "Niratan", "the \(language) app label should remain Niratan")
+    require(localizedValue("Hoshi Reader", language: language) == "Hoshi Reader", "the \(language) shared library label should remain Hoshi Reader")
+}
+requireContains(libraryCache, "static let sharedLibraryName = \"Hoshi Reader\"", "the shared cloud library name should remain compatible with Hoshi Reader")
+requireContains(libraryHandler, "static let rootFolderName = GoogleDriveSyncCache.sharedLibraryName", "Drive layout should use the shared library name instead of the app brand")
+requireContains(syncView, "NativeSettingsSectionCard(\"Hoshi Reader\")", "Sync Settings should distinguish the Hoshi Reader library from the Niratan app")
 require(localizedStrings["Original Hoshi Reader Project"] != nil, "attribution to the original Hoshi Reader project should remain explicit")
 
 requireContains(readme, "# Niratan", "README should present the renamed project")
